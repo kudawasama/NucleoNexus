@@ -62,10 +62,21 @@ class SemanticMemory:
             return True
 
     def query_knowledge(self, query: str, top_k: int = 3) -> list[dict]:
-        """Busca hechos por coincidencia de términos.
-        Si query está vacío, devuelve los hechos más recientes.
+        """Busca hechos por relevancia semántica de términos significativos.
+        
+        Filtra palabras vacías (stop words) para evitar matches por 'que', 'es', etc.
+        Normaliza acentos para búsqueda robusta.
+        El score refleja cuántos términos significativos de la query aparecen en el hecho.
         """
         cur = self.conn.cursor()
+        import re as _re
+
+        # Normalizar acentos para matching
+        def _norm(t: str) -> str:
+            return (t.replace('á','a').replace('é','e').replace('í','i')
+                    .replace('ó','o').replace('ú','u').replace('ü','u')
+                    .replace('¿','').replace('?','').replace('!','')
+                    .replace('.','').replace(',',''))
 
         if not query or not query.strip():
             cur.execute(
@@ -88,38 +99,66 @@ class SemanticMemory:
                 })
             return results[:top_k]
 
-        terms = query.lower().split()
-        results = []
-        for term in terms:
-            if len(term) < 3:
-                continue
-            cur.execute(
-                "SELECT id, fact, category, confidence, source, created_at "
-                "FROM semantic WHERE LOWER(fact) LIKE ? ORDER BY confidence DESC "
-                "LIMIT ?", (f"%{term}%", top_k)
-            )
-            for row in cur.fetchall():
-                results.append(dict(row))
+        # Stop words: palabras tan comunes que no aportan significado
+        stop_words = {
+            'que', 'qué', 'es', 'son', 'las', 'los', 'una', 'uno', 'unas',
+            'por', 'para', 'con', 'del', 'sus', 'le', 'como', 'cómo',
+            'esta', 'este', 'entre', 'todo', 'tiene', 'cada', 'sin',
+            'mas', 'más', 'pero', 'era', 'han', 'has', 'sea', 'fue',
+            'ello', 'ante', 'tras', 'segun', 'durante', 'mediante',
+            'dónde', 'donde', 'cuándo', 'cuando', 'cuál', 'cual',
+        }
 
-        # Deduplicar y ordenar por confianza
-        seen = set()
-        unique = []
-        for r in results:
-            if r['id'] not in seen:
-                seen.add(r['id'])
-                unique.append({
-                    "doc_id": f"sem_{r['id']}",
-                    "text": r['fact'],
+        # Extraer términos significativos (≥3 caracteres, sin stop words)
+        all_terms = _re.findall(r'[a-záéíóúñü0-9]{3,}', query.lower())
+        terms = []
+        for t in all_terms:
+            tn = _norm(t)
+            if tn not in stop_words:
+                terms.append(tn)
+
+        # Si no quedan términos, usar todos (incluyendo stop words)
+        if not terms:
+            terms = [_norm(t) for t in all_terms]
+        if not terms:
+            return []
+
+        # Buscar facts que contengan al menos uno de los términos
+        results = []
+        seen_ids = set()
+
+        # Enfoque simple: cargar hechos una vez, filtrar en Python
+        cur.execute(
+            "SELECT id, fact, category, confidence, source, created_at "
+            "FROM semantic ORDER BY confidence DESC"
+        )
+        all_rows = cur.fetchall()
+
+        for row in all_rows:
+            fact_lower = _norm(row['fact'].lower())
+            # Contar cuántos términos significativos aparecen en el hecho
+            matches = sum(1 for t in terms if t in fact_lower)
+            if matches > 0:
+                relevance = matches / len(terms)
+                # Penalizar si solo matchean términos de 3 letras comunes
+                if matches == 1 and len(terms) > 2:
+                    # Un solo match entre muchos términos → muy probablemente irrelevante
+                    relevance *= 0.3
+                results.append({
+                    "doc_id": f"sem_{row['id']}",
+                    "text": row['fact'],
                     "metadata": {
-                        "category": r['category'],
+                        "category": row['category'],
                         "type": "semantic",
-                        "confidence": r['confidence'],
-                        "source": r['source'],
+                        "confidence": row['confidence'],
+                        "source": row['source'],
                     },
-                    "score": r['confidence'],
+                    "score": round(relevance, 4),
                 })
-        unique.sort(key=lambda x: x['score'], reverse=True)
-        return unique[:top_k]
+
+        # Ordenar por relevancia, luego por confianza
+        results.sort(key=lambda x: (x['score'], x['metadata']['confidence']), reverse=True)
+        return results[:top_k]
 
     def get_facts_by_category(self, category: str) -> list[dict]:
         cur = self.conn.cursor()

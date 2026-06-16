@@ -32,8 +32,15 @@ class ContextBuilder:
         self.skills = skill_registry
         self.memory = memory  # Sistema de memoria opcional
 
-    def build(self, user_input: str = "", personality_override: dict = None) -> str:
-        """Construye el prompt de sistema completo."""
+    def build(self, user_input: str = "", personality_override: dict = None,
+              light_mode: bool = False) -> str:
+        """Construye el prompt de sistema completo.
+        
+        Args:
+            user_input: Texto del usuario para recuperar memoria relevante
+            personality_override: Personalidad temporal
+            light_mode: True para modelos pequeños (0.5B) — sin skills ni directivas complejas
+        """
         parts = []
 
         # 1. Personalidad base
@@ -42,7 +49,8 @@ class ContextBuilder:
 
         # 2. Estado actual
         state_block = self.state.get_context_block()
-        parts.append(state_block)
+        if not light_mode:
+            parts.append(state_block)
 
         # 3. Memoria relevante (RAG)
         if self.memory and user_input:
@@ -50,13 +58,17 @@ class ContextBuilder:
             if memory_block:
                 parts.append(memory_block)
 
-        # 4. Skills/Acciones disponibles
-        skills_block = self._build_skills_context()
-        parts.append(skills_block)
+        if not light_mode:
+            # 4. Skills/Acciones disponibles
+            skills_block = self._build_skills_context()
+            parts.append(skills_block)
 
-        # 5. Directivas
-        directives = self._build_directives()
-        parts.append(directives)
+            # 5. Directivas
+            directives = self._build_directives()
+            parts.append(directives)
+        else:
+            # Modo ligero: instrucciones simples para modelos pequeños
+            parts.append(self._build_light_directives())
 
         return "\n\n".join(parts)
 
@@ -156,6 +168,18 @@ Directivas según fase:
 
 Estás en fase {phase}. Ajusta tu complejidad según esto.
 === FIN DIRECTIVAS ==="""
+
+    def _build_light_directives(self) -> str:
+        """Instrucciones simples para modelos pequeños (0.5B)."""
+        phase = self.state.get("nexus", "phase", default="Proto")
+        return f"""=== INSTRUCCIONES ===
+Eres Nexus, un asistente conversacional en fase {phase}.
+- Responde en español, claro y directo
+- Si no sabes algo, dilo honestamente
+- NO inventes datos ni horarios
+- Usa el contexto de memoria si es relevante
+- Mantén respuestas cortas y naturales
+=== FIN INSTRUCCIONES ==="""
 
     def summarize_recent(self, limit: int = 5) -> str:
         """Resumen corto para el prompt del SLM."""

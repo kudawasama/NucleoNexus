@@ -82,7 +82,7 @@ class SLMBackend:
         """Verifica conexión con servidor Ollama."""
         try:
             import requests
-            r = requests.get("http://localhost:11434/api/tags", timeout=3)
+            r = requests.get("http://localhost:11434/api/tags", timeout=2)
             if r.status_code == 200:
                 models = r.json().get("models", [])
                 model_names = [m["name"] for m in models]

@@ -3,10 +3,10 @@
     "version": "0.1.0",
     "phase": "Intermedio",
     "active_since": 1781626531.0590978,
-    "total_interactions": 61,
-    "total_learned_facts": 4,
+    "total_interactions": 112,
+    "total_learned_facts": 22,
     "total_skills": 2,
-    "confidence_level": 0.161,
+    "confidence_level": 0.212,
     "awake_time": 0
   },
   "personality": {
@@ -17,23 +17,24 @@
     "creativity": 0.4
   },
   "capabilities": {
-    "backend": "symbolic",
-    "slm_loaded": false,
+    "backend": "hybrid",
+    "slm_loaded": true,
     "skills_enabled": true,
     "memory_enabled": true,
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 161.07,
-    "responses_given": 61,
-    "successful_responses": 61,
+    "avg_response_time_ms": 167.59,
+    "responses_given": 112,
+    "successful_responses": 112,
     "failed_responses": 0,
-    "last_response_time": 1781628150.5764377
+    "last_response_time": 1781631945.2670405
   },
   "knowledge_stats": {
-    "episodic_memories": 122,
-    "semantic_facts": 4,
+    "episodic_memories": 222,
+    "semantic_facts": 22,
     "procedural_patterns": 0,
-    "skills_learned": 2
+    "skills_learned": 2,
+    "initial_facts": 22
   }
 }

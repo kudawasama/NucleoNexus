@@ -97,8 +97,8 @@ class SymbolicEngine:
         # Cuando se detecta una intent, se busca una skill action que la maneje
         # Esto permite que las skills extiendan las capacidades de Nexus
         self.INTENT_TO_ACTION = {
-            "hora": "get_time",
-            "estado": "get_nexus_status",
+            # Solo mapear intents que NO tienen handler hardcodeado
+            # Los intents con handler (hora, estado, etc.) usan su propio formato
             "clima": "get_weather",
         }
 
@@ -107,8 +107,15 @@ class SymbolicEngine:
         # Los patrones se cargan dinámicamente de la DB procedural
         pass
 
-    def process(self, user_input: str, actions_registry=None) -> str:
-        """Procesa una entrada de usuario y genera respuesta."""
+    def process(self, user_input: str, actions_registry=None, skip_bookkeeping=False) -> str:
+        """Procesa una entrada de usuario y genera respuesta.
+        
+        Args:
+            user_input: Texto del usuario
+            actions_registry: Registro de acciones disponibles
+            skip_bookkeeping: Si True, omite almacenar en memoria y actualizar estado
+                            (útil cuando el llamante ya hace el bookkeeping centralizado)
+        """
         start = time.time()
         input_lower = user_input.lower().strip()
 
@@ -136,18 +143,19 @@ class SymbolicEngine:
         # 6. Aprender de esta interacción
         self._learn_from_interaction(input_lower, response)
 
-        # 7. Registrar en memoria episódica
-        self.memory.remember("user", user_input,
-                           context={"intent": intent, "backend": "symbolic"})
-        self.memory.remember("nexus", response,
-                           context={"intent": intent, "backend": "symbolic"})
+        if not skip_bookkeeping:
+            # 7. Registrar en memoria episódica
+            self.memory.remember("user", user_input,
+                               context={"intent": intent, "backend": "symbolic"})
+            self.memory.remember("nexus", response,
+                               context={"intent": intent, "backend": "symbolic"})
 
-        # 8. Actualizar estado
-        elapsed = (time.time() - start) * 1000
-        self.state.record_interaction(success=True, response_time_ms=elapsed)
-        self.state.evolve_phase()
+            # 8. Actualizar estado
+            elapsed = (time.time() - start) * 1000
+            self.state.record_interaction(success=True, response_time_ms=elapsed)
+            self.state.evolve_phase()
 
-        # Actualizar knowledge_stats
+        # Actualizar knowledge_stats (siempre, para mantener stats frescos)
         mem_stats = self.memory.stats()
         self.state.set("knowledge_stats", "episodic_memories", value=mem_stats.get("episodic", 0))
         self.state.set("knowledge_stats", "semantic_facts", value=mem_stats.get("semantic", 0))
@@ -184,6 +192,10 @@ class SymbolicEngine:
             if re.search(pattern, text, re.IGNORECASE):
                 return intent
         return "conversacion"
+
+    def detect_intent(self, text: str) -> str:
+        """Metodo publico para detectar intencion (usado por NexusCore)."""
+        return self._detect_intent(text)
 
     def _check_action_call(self, text: str, actions_registry=None) -> Optional[str]:
         """Verifica si el input es una llamada a acción [[accion:nom(param)]]."""

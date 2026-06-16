@@ -1,0 +1,22 @@
+[
+  {"fact": "La fotosíntesis es el proceso por el cual las plantas, algas y algunas bacterias convierten la luz solar, el agua y el dióxido de carbono en glucosa y oxígeno.",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "El agua está compuesta por dos átomos de hidrógeno y uno de oxígeno (H2O).",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "La velocidad de la luz en el vacío es de aproximadamente 300.000 kilómetros por segundo.",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "El corazón humano bombea aproximadamente 5 litros de sangre por minuto.",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "La Tierra orbita alrededor del Sol a una distancia promedio de 150 millones de kilómetros.",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "El ADN es la molécula que contiene la información genética de todos los seres vivos.",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "La energía no se crea ni se destruye, solo se transforma (primera ley de la termodinámica).",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "El cerebro humano tiene aproximadamente 86 mil millones de neuronas.",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "La gravedad es la fuerza que atrae a los objetos con masa entre sí.",
+   "category": "ciencia", "source": "knowledge_base"},
+  {"fact": "Las células son la unidad básica de la vida. Todos los seres vivos están formados por células.",
+   "category": "ciencia", "source": "knowledge_base"}
+]

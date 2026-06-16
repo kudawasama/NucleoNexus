@@ -27,19 +27,19 @@ KNOWLEDGE_DB_PATH = str(KNOWLEDGE_DIR / "nexus_knowledge.db")
 
 # --- Motor de IA ----------------------------------------------
 ENGINE = {
-    "mode": "symbolic",          # "symbolic" | "hybrid" | "llm"
+    "mode": "hybrid",            # "symbolic" | "hybrid" | "llm"
     "symbolic": {
         "max_patterns": 5000,    # Maximo de patrones aprendidos
         "min_confidence": 0.15,  # Confianza minima para responder
         "learning_rate": 0.1,    # Que tan rapido aprende (0-1)
     },
     "llm": {
-        "backend": None,         # "llama.cpp" | "ollama" | "openai" | None
+        "backend": "ollama",      # None | "ollama" | "llama.cpp" | "openai"
         "model_path": None,      # Ruta al modelo GGUF
-        "model_name": "phi-2",   # Modelo por defecto (Ollama)
+        "model_name": "qwen2.5:0.5b",  # Modelo local Ollama
         "api_base": "http://localhost:11434/v1",  # Para API OpenAI compatible
         "api_key": "not-needed",
-        "max_tokens": 512,
+        "max_tokens": 1024,
         "temperature": 0.7,
     }
 }

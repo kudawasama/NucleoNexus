@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+import inspect
 from typing import Callable, Any
 
 logger = logging.getLogger("nexus.engine.actions")
@@ -29,11 +30,18 @@ class Action:
         self.success_count = 0
 
     def execute(self, **kwargs) -> dict:
-        """Ejecuta la acción y registra el resultado."""
+        """Ejecuta la accion y registra el resultado.
+        Solo pasa los parametros que el handler acepta.
+        """
         start = time.time()
         self.call_count += 1
         try:
-            result = self.handler(**kwargs)
+            # Filtrar solo los kwargs que el handler acepta
+            sig = inspect.signature(self.handler)
+            valid_params = set(sig.parameters.keys())
+            filtered_kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
+            
+            result = self.handler(**filtered_kwargs)
             elapsed = (time.time() - start) * 1000
             self.success_count += 1
             return {

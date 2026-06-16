@@ -37,6 +37,7 @@ Arquitectura:
 
 import sys
 import os
+import re
 import logging
 from pathlib import Path
 
@@ -45,7 +46,7 @@ BASE_DIR = Path(__file__).parent.resolve()
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from config import ENGINE, MEMORY, LEARNING, INTERFACE, SYSTEM, LOG_LEVEL, LOG_FILE, MEMORY_DB_PATH, DATA_DIR, SKILLS_DIR
+from config import ENGINE, MEMORY, LEARNING, INTERFACE, SYSTEM, LOG_LEVEL, LOG_FILE, MEMORY_DB_PATH, DATA_DIR, KNOWLEDGE_DIR, SKILLS_DIR
 from engine.state import StateEngine
 from engine.actions import ActionRegistry
 from memory.store import NexusMemory
@@ -55,6 +56,8 @@ from memory.procedural import ProceduralMemory
 from cognition.symbolic import SymbolicEngine
 from cognition.slm import SLMBackend
 from cognition.context import ContextBuilder
+from knowledge.loader import load_knowledge_to_memory
+from learning.extractor import learn_from_user_input, learn_from_response, reinforce_from_feedback
 from skills.registry import SkillRegistry
 from interface.cli import NexusCLI
 
@@ -85,6 +88,10 @@ class NexusCore:
         self.memory = NexusMemory(MEMORY_DB_PATH)
         logger.info("OK Memoria Persistente")
 
+        # 2b. Cargar conocimiento inicial en memoria semántica
+        facts_loaded = load_knowledge_to_memory(self.memory, str(KNOWLEDGE_DIR))
+        self.state.set("knowledge_stats", "initial_facts", value=facts_loaded)
+
         # 3. Registro de Skills
         self.skills = SkillRegistry()
         self._load_skills()
@@ -96,9 +103,15 @@ class NexusCore:
         self._register_skill_actions()
         logger.info("OK Acciones")
 
-        # 5. Backend SLM (opcional)
+        # 5. Backend SLM (Ollama local)
         self.slm = SLMBackend(ENGINE.get("llm", {}))
-        logger.info("OK Backend SLM (standby)")
+        if self.slm.load():
+            logger.info(f"OK SLM cargado ({self.slm.mode}: {self.slm.model_name})")
+            # Modo hibrido: intents rapidas en simbolico, resto en SLM
+            self.state.set("capabilities", "backend", value="hybrid")
+            self.state.set("capabilities", "slm_loaded", value=True)
+        else:
+            logger.info("OK Backend SLM (standby - symbolic fallback)")
 
         # 6. Motor Simbolico (default)
         self.symbolic = SymbolicEngine(self.state, self.memory)
@@ -176,32 +189,75 @@ class NexusCore:
     def process(self, user_input: str) -> str:
         """Procesa la entrada del usuario y genera respuesta.
 
-        Flujo:
-        1. Construye contexto inyectable (estado + memoria + skills)
-        2. Decide backend segun configuracion (symbolic | slm | hybrid)
-        3. Ejecuta acciones si es necesario
-        4. Aprende de la interaccion
-        5. Devuelve respuesta
+        Modos de operacion:
+        - symbolic:   solo motor simbolico (sin modelo, sin internet)
+        - slm:        solo SLM local (modelo responde todo)
+        - hybrid:     intents rapidas en simbolico, general en SLM
         """
+        # 1. Generar respuesta según el backend activo
+        response = self._get_response(user_input)
+
+        # 2. Aprender de la interacción (solo desde input del usuario, no del SLM)
+        learned_input = learn_from_user_input(user_input, self.memory)
+        reinforced = reinforce_from_feedback(user_input, self.memory)
+
+        # 3. Registrar en memoria episódica
+        self.memory.remember("user", user_input, context={"backend": "main"})
+        self.memory.remember("nexus", response, context={"backend": "main"})
+
+        # 4. Actualizar estado
+        self.state.record_interaction(success=True)
+        self.state.evolve_phase()
+
+        return response
+
+    def _get_response(self, user_input: str) -> str:
+        """Selecciona y ejecuta el backend adecuado según el modo actual."""
         backend_mode = self.state.get("capabilities", "backend", default="symbolic")
 
-        if backend_mode == "slm" and self.slm and self.slm.loaded:
-            # Construir contexto para el SLM
-            system_prompt = self.context.build(user_input)
-            # Generar con SLM
-            response = self.slm.generate(user_input, system_prompt=system_prompt)
-            if response:
-                self.memory.remember("user", user_input, context={"backend": "slm"})
-                self.memory.remember("nexus", response, context={"backend": "slm"})
-                self.state.record_interaction(success=True)
-                self.state.evolve_phase()
-                return response
-            else:
-                # Fallback a simbolico si SLM falla
-                logger.warning("SLM fallo, usando modo simbolico como fallback")
+        # --- HYBRID: intent -> simbolico, resto -> SLM ---
+        if backend_mode == "hybrid" and self.slm and self.slm.loaded:
+            intent = self.symbolic.detect_intent(user_input.lower().strip())
+            fast_intents = {"saludo", "despedida", "agradecimiento", "presentacion",
+                            "hora", "calcular", "fase", "ayuda", "memoria",
+                            "nombre", "reset", "personalidad", "confianza",
+                            "estado", "clima"}
+            if intent in fast_intents:
+                # Excepción: "calcular" sin números → es conceptual (explicación), no operación
+                if intent == "calcular" and not re.search(r'\d+\s*[+\-*/]\s*\d+', user_input):
+                    pass  # Dejar que caiga al SLM o búsqueda en memoria
+                else:
+                    return self.symbolic.process(user_input, actions_registry=self.actions,
+                                                skip_bookkeeping=True)
 
-        # Modo simbolico (default o fallback)
-        return self.symbolic.process(user_input, actions_registry=self.actions)
+            # Pregunta sin intent rápido: ver si hay hechos en memoria
+            facts = self.memory.query_knowledge(user_input, top_k=2)
+            if facts and any(f.get("score", 0) >= 0.15 for f in facts):
+                return self.symbolic.process(user_input, actions_registry=self.actions,
+                                            skip_bookkeeping=True)
+
+            # Sin hechos en memoria → intentar con SLM
+            try:
+                system_prompt = self.context.build(user_input, light_mode=True)
+                response = self.slm.generate(user_input, system_prompt=system_prompt)
+                if response:
+                    return response
+            except Exception as e:
+                logger.warning(f"SLM fallo, usando simbolico: {e}")
+
+        # --- SLM mode: todo via SLM ---
+        if backend_mode == "slm" and self.slm and self.slm.loaded:
+            try:
+                system_prompt = self.context.build(user_input)
+                response = self.slm.generate(user_input, system_prompt=system_prompt)
+                if response:
+                    return response
+            except Exception as e:
+                logger.warning(f"SLM fallo, usando simbolico: {e}")
+
+        # --- Modo simbolico (default o fallback) ---
+        return self.symbolic.process(user_input, actions_registry=self.actions,
+                                    skip_bookkeeping=True)
 
     def reset(self):
         """Reinicia Nexus a su estado inicial."""
