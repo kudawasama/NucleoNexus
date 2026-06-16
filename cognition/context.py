@@ -173,13 +173,29 @@ Estás en fase {phase}. Ajusta tu complejidad según esto.
         """Instrucciones simples para modelos pequeños (0.5B)."""
         phase = self.state.get("nexus", "phase", default="Proto")
         return f"""=== INSTRUCCIONES ===
-Eres Nexus, un asistente conversacional en fase {phase}.
-- Responde en español, claro y directo
+Eres Nexus, asistente en fase {phase}.
+- Responde en español, claro y breve
+- Si tienes un hecho en el contexto, úsalo para responder
 - Si no sabes algo, dilo honestamente
 - NO inventes datos ni horarios
-- Usa el contexto de memoria si es relevante
-- Mantén respuestas cortas y naturales
 === FIN INSTRUCCIONES ==="""
+
+    def build_react(self, user_input: str, memory_facts: list = None,
+                    memory_records: list = None) -> str:
+        """Construye un prompt con contexto mínimo (reservado para futuro ReAct)."""
+        parts = []
+        parts.append(self._build_light_directives())
+        if memory_facts or memory_records:
+            lines = ["=== CONTEXTO DE MEMORIA ==="]
+            if memory_facts:
+                for f in memory_facts[:3]:
+                    lines.append(f"  - {f.get('text', '')[:120]}")
+            if memory_records:
+                for r in memory_records[:2]:
+                    lines.append(f"  - {r.get('text', '')[:100]}")
+            parts.append("\n".join(lines))
+        parts.append(f"Usuario: {user_input}")
+        return "\n\n".join(parts)
 
     def summarize_recent(self, limit: int = 5) -> str:
         """Resumen corto para el prompt del SLM."""

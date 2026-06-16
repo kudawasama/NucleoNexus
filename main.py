@@ -215,7 +215,7 @@ class NexusCore:
         """Selecciona y ejecuta el backend adecuado según el modo actual."""
         backend_mode = self.state.get("capabilities", "backend", default="symbolic")
 
-        # --- HYBRID: intent -> simbolico, resto -> SLM ---
+        # --- HYBRID: intent -> simbolico, resto -> SLM (ReAct) ---
         if backend_mode == "hybrid" and self.slm and self.slm.loaded:
             intent = self.symbolic.detect_intent(user_input.lower().strip())
             fast_intents = {"saludo", "despedida", "agradecimiento", "presentacion",
@@ -236,11 +236,19 @@ class NexusCore:
                 return self.symbolic.process(user_input, actions_registry=self.actions,
                                             skip_bookkeeping=True)
 
-            # Sin hechos en memoria → intentar con SLM
+            # Sin hechos → SLM con contexto de memoria
             try:
-                system_prompt = self.context.build(user_input, light_mode=True)
-                response = self.slm.generate(user_input, system_prompt=system_prompt)
+                mem_facts = self.memory.query_knowledge(user_input, top_k=3)
+                mem_records = self.memory.recall(user_input, top_k=2)
+                prompt = self.context.build_react(
+                    user_input,
+                    memory_facts=mem_facts,
+                    memory_records=mem_records,
+                )
+                response = self.slm.generate(user_input, system_prompt=prompt)
                 if response:
+                    # Detectar y ejecutar acciones embebidas [[accion:...]]
+                    self._execute_react_actions(response, user_input)
                     return response
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
@@ -258,6 +266,57 @@ class NexusCore:
         # --- Modo simbolico (default o fallback) ---
         return self.symbolic.process(user_input, actions_registry=self.actions,
                                     skip_bookkeeping=True)
+
+    # ─── ReAct: acciones embebidas en respuesta del SLM ─────────
+
+    def _execute_react_actions(self, response: str, user_input: str):
+        """Ejecuta acciones [[accion:...]] embebidas en la respuesta del SLM."""
+        import re
+        for match in re.finditer(r'\[\[accion:(\w+)\(([^)]*)\)\]\]', response):
+            action_name = match.group(1)
+            params_str = match.group(2)
+            params = {}
+            if params_str:
+                for pair in params_str.split(","):
+                    if "=" in pair:
+                        k, v = pair.split("=", 1)
+                        params[k.strip()] = v.strip().strip('"').strip("'")
+            logger.info(f"ReAct: ejecutando accion {action_name}({params})")
+            if action_name == "buscar_memoria":
+                query = params.get("query", params_str.strip().strip('"').strip("'"))
+                results = self.memory.query_knowledge(query, top_k=3)
+                if results:
+                    for r in results:
+                        self.memory.learn_fact(
+                            r["text"], category="react",
+                            confidence=0.3, source="react_busqueda"
+                        )
+                        logger.info(f"ReAct: aprendido de busqueda: {r['text'][:60]}")
+            elif action_name == "calcular":
+                expr = params.get("expresion", params_str.strip().strip('"').strip("'"))
+                self.memory.remember("nexus", f"[calculo: {expr}]",
+                                   context={"backend": "react"})
+
+    def _clean_react_response(self, response: str) -> str:
+        """Limpia el formato ReAct para mostrar solo la respuesta al usuario."""
+        import re
+        # Extraer solo la parte después de "Respuesta:" o "RESPONDER:"
+        for prefix in ["Respuesta:", "RESPONDER:", "RESPUESTA:", "respuesta:"]:
+            if prefix in response:
+                after = response.split(prefix, 1)[1].strip()
+                # Quitar posibles marcadores de fin
+                after = re.sub(r'\n===.*$', '', after)
+                after = re.sub(r'\[\[accion:.*?\]\]', '', after)
+                return after.strip()
+        # Si no encuentra el formato, devolver la última línea sustancial
+        lines = [l.strip() for l in response.split("\n") if l.strip()]
+        meaningful = [l for l in lines if not l.startswith("Pienso") 
+                     and not l.startswith("PENSAR") and not l.startswith("HACER")
+                     and not l.startswith("🔧") and not l.startswith("🤔")
+                     and not l.startswith("===")]
+        if meaningful:
+            return meaningful[-1]
+        return response.strip()[:300]
 
     def reset(self):
         """Reinicia Nexus a su estado inicial."""
