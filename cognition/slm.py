@@ -16,6 +16,7 @@ import logging
 import json
 import subprocess
 import time
+import os
 from typing import Optional
 
 logger = logging.getLogger("nexus.cognition.slm")
@@ -39,6 +40,22 @@ class SLMBackend:
         self.temperature = config.get("temperature", 0.7)
         self.loaded = False
         self._process = None
+        self._api_key = config.get("api_key")
+        # Fallback: leer de variables de entorno
+        if not self._api_key:
+            self._api_key = os.environ.get("OPENCODE_GO_API_KEY")
+        # Fallback 2: leer del archivo master env
+        if not self._api_key:
+            master_path = "H:/Mi unidad/kudawa-master.env"
+            if os.path.exists(master_path):
+                try:
+                    with open(master_path, 'r') as f:
+                        for line in f:
+                            if line.startswith('OPENCODE_GO_API_KEY=') and '***' not in line:
+                                self._api_key = line.split('=', 1)[1].strip().strip('"').strip("'")
+                                break
+                except:
+                    pass
         logger.info(f"SLMBackend creado (modo: {self.mode})")
 
     def load(self) -> bool:
@@ -102,19 +119,27 @@ class SLMBackend:
         """Verifica conexión con API compatible OpenAI."""
         try:
             import requests
-            # Prueba el endpoint base
             base_url = self.config.get("api_base", "http://localhost:8000/v1")
-            r = requests.get(f"{base_url}/models", timeout=3)
+            # Usar la misma key que ya se obtuvo en __init__
+            api_key = self._api_key
+            if not api_key:
+                logger.warning("No API key para OpenAI. Configura OPENCODE_GO_API_KEY")
+                return False
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": "Nexus/1.0",
+            }
+            r = requests.get(f"{base_url}/models", headers=headers, timeout=5)
             if r.status_code == 200:
                 self.loaded = True
-                logger.info(f"API OpenAI compatible conectada: {base_url}")
+                logger.info(f"OpenAI compatible conectada: {base_url}")
                 return True
         except Exception as e:
             logger.warning(f"No se pudo conectar a API OpenAI: {e}")
         return False
 
     def generate(self, prompt: str, system_prompt: str = None,
-                 structured: bool = False) -> Optional[dict]:
+                 structured: bool = False) -> Optional[str]:
         """Genera una respuesta usando el SLM cargado.
         
         Args:
@@ -136,7 +161,11 @@ class SLMBackend:
         if self.mode == "ollama":
             return self._generate_ollama(prompt, system_prompt)
         elif self.mode == "openai":
-            return self._generate_openai(prompt, system_prompt)
+            result = self._generate_openai(prompt, system_prompt)
+            if result and structured:
+                # Envolver en dict para mantener consistencia con structured mode
+                return {"response": result, "model": self.model_name}
+            return result
         elif self.mode == "llamacpp":
             return self._generate_llamacpp(prompt, system_prompt)
         return None
@@ -240,28 +269,49 @@ class SLMBackend:
         try:
             import requests
             base_url = self.config.get("api_base", "http://localhost:8000/v1")
-            api_key = self.config.get("api_key", "not-needed")
+            chat_url = f"{base_url}/chat/completions"
+            api_key = self._api_key
+            if not api_key:
+                logger.error("No API key configurada para OpenAI")
+                return None
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "Nexus/1.0",
+            }
             messages = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
 
-            r = requests.post(
-                f"{base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": self.model_name,
-                    "messages": messages,
-                    "max_tokens": self.max_tokens,
-                    "temperature": self.temperature,
-                },
-                timeout=30
-            )
+            payload = {
+                "model": self.model_name,
+                "messages": messages,
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+            }
+
+            r = requests.post(chat_url, headers=headers, json=payload, timeout=45)
             if r.status_code == 200:
-                return r.json()["choices"][0]["message"]["content"]
+                data = r.json()
+                content = data["choices"][0]["message"].get("content", "")
+                # Si el modelo es de razonamiento y no dio contenido,
+                # aumentar tokens o devolver lo que haya
+                if not content.strip():
+                    reasoning = data["choices"][0]["message"].get("reasoning_content", "")
+                    if reasoning:
+                        logger.info("Modelo de razonamiento, sin contenido visible")
+                return content or None
+            else:
+                logger.error(f"OpenAI API error {r.status_code}: {r.text[:100]}")
+                return None
+        except ImportError:
+            logger.warning("requests no instalado. Usa: pip install requests")
+            return None
         except Exception as e:
             logger.error(f"Error en generación OpenAI: {e}")
-        return None
+            return None
 
     def _generate_llamacpp(self, prompt: str, system_prompt: str = None) -> Optional[str]:
         """Genera respuesta via llama.cpp server."""
