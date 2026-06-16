@@ -239,16 +239,30 @@ class NexusCore:
         backend_mode = self.state.get("capabilities", "backend", default="symbolic")
 
         # ─────────────────────────────────────────────────────────
-        # TOOL INTENTS: ejecutar directamente sin SLM
-        # (Qwen 0.5B no genera reliablemente accion=usar_herramienta)
+        # TOOL INTENTS: deteccion directa (sin pasar por detect_intent
+        # que tiene conflictos: "calcula" activa calcular antes que web_search)
         # ─────────────────────────────────────────────────────────
-        intent = self.symbolic.detect_intent(user_input.lower().strip())
-        tool_intents = {"web_search", "read_file", "search_files", "run_command"}
-        if intent in tool_intents:
-            result = self._handle_tool_intent(intent, user_input)
+        input_lower = user_input.lower().strip()
+        
+        # Mapa de tool intents con su regex de deteccion
+        tool_patterns = [
+            ("web_search", r'(?:busca|buscar|investiga|investigar|encuentra|encontrar|consulta|consultar)\s+(?:en la web|en internet|en google|online|en linea|en línea)'),
+            ("read_file", r'(?:lee|leer|abre|abrir|muestra|mostrar)\s+(?:el\s+)?(?:archivo|fichero|file)'),
+            ("search_files", r'(?:busca|buscar|encuentra|encontrar)\s+(?:en|dentro\s+de)\s+(?:los\s+)?(?:archivos|ficheros|codigo|código)'),
+            ("run_command", r'\b(ejecuta|ejecutar|corre|correr|run|terminal|comando)\s+'),
+        ]
+        
+        tool_intent = None
+        for name, pattern in tool_patterns:
+            if re.search(pattern, input_lower, re.IGNORECASE):
+                tool_intent = name
+                break
+        
+        if tool_intent:
+            result = self._handle_tool_intent(tool_intent, user_input)
             if result:
                 metadata["backend"] = "symbolic"
-                metadata["tool_called"] = intent
+                metadata["tool_called"] = tool_intent
                 return result, metadata
 
         # --- HYBRID: intent -> simbolico, resto -> SLM (ReAct) ---
