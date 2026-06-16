@@ -1,0 +1,3 @@
+"""
+Núcleo Nexus — Memoria Persistente
+"""

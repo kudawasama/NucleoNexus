@@ -1,0 +1,14 @@
+# Nucleo Nexus - Dependencias minimas
+# Sin GPU, sin servidores, sin nube.
+# Esto es todo lo que necesitas.
+
+# Sin dependencias externas por ahora!
+# El nucleo funciona 100% con la stdlib de Python.
+# 
+# Cuando quieras activar el modo SLM local, necesitaras:
+# requests          # Para conectar con Ollama/llama.cpp
+# 
+# Para el futuro (opcional, fases Avanzado/Pro):
+# numpy             # Computacion numerica para vectores
+# sentence-transformers  # Embeddings semanticos (modelos mini)
+# llama-cpp-python  # Inference local con modelos GGUF

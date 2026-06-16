@@ -1,0 +1,39 @@
+{
+  "nexus": {
+    "version": "0.1.0",
+    "phase": "Proto",
+    "active_since": 1781626531.0590978,
+    "total_interactions": 5,
+    "total_learned_facts": 0,
+    "total_skills": 1,
+    "confidence_level": 0.105,
+    "awake_time": 0
+  },
+  "personality": {
+    "name": "Nexus",
+    "tone": "analytical",
+    "formality": 0.5,
+    "curiosity": 0.7,
+    "creativity": 0.4
+  },
+  "capabilities": {
+    "backend": "symbolic",
+    "slm_loaded": false,
+    "skills_enabled": true,
+    "memory_enabled": true,
+    "learning_enabled": true
+  },
+  "performance": {
+    "avg_response_time_ms": 40.27,
+    "responses_given": 5,
+    "successful_responses": 5,
+    "failed_responses": 0,
+    "last_response_time": 1781626585.5272322
+  },
+  "knowledge_stats": {
+    "episodic_memories": 0,
+    "semantic_facts": 0,
+    "procedural_patterns": 0,
+    "skills_learned": 1
+  }
+}

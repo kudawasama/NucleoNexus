@@ -1,0 +1,24 @@
+# Byte-compiled
+__pycache__/
+*.pyc
+*.pyo
+
+# Data persistente (se genera sola al correr)
+data/memory/
+data/logs/
+data/state/.nexus_history
+
+# Ambiente
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
