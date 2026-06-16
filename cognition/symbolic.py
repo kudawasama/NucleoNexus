@@ -117,6 +117,13 @@ class SymbolicEngine:
         self.state.record_interaction(success=True, response_time_ms=elapsed)
         self.state.evolve_phase()
 
+        # Actualizar knowledge_stats
+        mem_stats = self.memory.stats()
+        self.state.set("knowledge_stats", "episodic_memories", value=mem_stats.get("episodic", 0))
+        self.state.set("knowledge_stats", "semantic_facts", value=mem_stats.get("semantic", 0))
+        self.state.set("knowledge_stats", "procedural_patterns", value=mem_stats.get("procedural", 0))
+        self.state.set("nexus", "total_learned_facts", value=mem_stats.get("semantic", 0))
+
         return response
 
     def _respond_empty(self) -> str:
@@ -128,12 +135,13 @@ class SymbolicEngine:
             "saludo": r'\b(hola|buenas|hey|saludos|que tal|qué tal|buen[oa]s)\b',
             "despedida": r'\b(adiós|adios|chao|bye|nos vemos|hasta luego|saludos)\b',
             "agradecimiento": r'\b(gracias|thank|thanks|graciass)\b',
-            "presentacion": r'\b(quién eres|quien eres|que eres|qué eres|presentate|presentate)\b',
+            "presentacion": r'\b(quién eres|quien eres|que eres|qué eres|presentate|presentate|capacidades|que puedes hacer|qué puedes hacer|que sabes hacer)\b',
             "estado": r'\b(estado|status|cómo estás|como estas|que tal|qué tal)\b',
             "aprender": r'\b(aprend[aeio]|enseñ[ae]|nuev[ao]|saber|conocimiento|recuerd[ae])\b',
             "fase": r'\b(fase|evolución|evolucion|nivel|progreso|level|phase)\b',
             "ayuda": r'\b(ayuda|help|comando|command|qué puedes|que puedes|skills)\b',
             "memoria": r'\b(recuerda[s]?|memoria|olvid|acuerd[ao])\b',
+            "nombre": r'\b(cómo me llamo|como me llamo|sabes mi nombre|sabes quién soy|quién soy|me llamo|mi nombre es)\b',
             "reset": r'\b(reset|reiniciar|borrar|limpiar|empezar de nuevo)\b',
             "personalidad": r'\b(personalidad|tono|voz|estilo|forma[l]?|ser)\b',
             "confianza": r'\b(confianza|seguro|certeza|cuanto sabes|qué tanto sabes)\b',
@@ -179,12 +187,13 @@ class SymbolicEngine:
             "saludo": self._handle_greeting,
             "despedida": self._handle_farewell,
             "agradecimiento": lambda t, m, f: random.choice(PROTO_PHRASES["agradecimiento"]),
-            "presentacion": lambda t, m, f: random.choice(PROTO_PHRASES["presentacion"]),
+            "presentacion": self._handle_presentacion,
             "estado": self._handle_status,
             "aprender": self._handle_learn,
             "fase": self._handle_phase,
             "ayuda": self._handle_help,
             "memoria": self._handle_memory,
+            "nombre": self._handle_name,
             "reset": self._handle_reset,
             "personalidad": self._handle_personality,
             "confianza": self._handle_confidence,
@@ -336,9 +345,143 @@ class SymbolicEngine:
             f"Al llegar a 100%... algo especial podría pasar."
         )
 
+    def _handle_presentacion(self, text: str, memories: list, facts: list) -> str:
+        """Presentacion de Nexus con capacidades detalladas."""
+        phase = self.state.get("nexus", "phase", default="Proto")
+        skills_count = self.state.get("nexus", "total_skills", default=0)
+        backend = self.state.get("capabilities", "backend", default="symbolic")
+        return (
+            "Soy **Nucleo Nexus**, un sistema de IA en evolucion progresiva.\n\n"
+            f"· Fase actual: {phase}\n"
+            f"· Backend: {backend}\n"
+            f"· Skills cargadas: {skills_count}\n\n"
+            "**Mis capacidades actuales:**\n"
+            "  • Aprendizaje incremental — aprendo de cada interaccion\n"
+            "  • Memoria persistente — recuerdo lo que me ensenas\n"
+            "  • Deteccion de intenciones — entiendo saludos, preguntas, comandos\n"
+            "  • Evolucion por fases — mejoro con el uso (Proto -> Pro)\n"
+            "  • Personalidad ajustable — cambio mi tono y estilo\n"
+            "  • Skills modulares — puedo ejecutar funciones\n"
+            "  • SLM-Ready — cuando actives un modelo local, pienso mejor\n\n"
+            "Puedes ensenarme cosas con: 'aprende que [algo]'\n"
+            "Ver mi progreso con: /fase\n"
+            "Ver mi estado con: /status\n"
+            "Cambiar mi personalidad con: /personalidad"
+        )
+
+    def _handle_name(self, text: str, memories: list, facts: list) -> str:
+        """Maneja preguntas sobre el nombre del usuario."""
+        text_lower = text.lower()
+
+        # Primero buscar en memoria semantica si sabemos el nombre
+        if self.memory:
+            facts = self.memory.query_knowledge("nombre usuario", top_k=5)
+            name_facts = [f for f in facts if "nombre" in f.get("text", "").lower()
+                         or "llama" in f.get("text", "").lower()]
+            if name_facts:
+                # Extraer el nombre del hecho
+                fact_text = name_facts[0].get("text", "")
+                # Buscar nombre: "el usuario se llama X" o "mi nombre es X"
+                name_match = re.search(r'(?:se llama|es|mi nombre es) (\w+)', fact_text)
+                if name_match:
+                    return (
+                        f"¡Claro! Recuerdo que tu nombre es **{name_match.group(1)}**. "
+                        f"Lo aprendi cuando me lo dijiste."
+                    )
+
+        # Si es una declaracion de nombre ("me llamo X", "mi nombre es X")
+        name_declaration = re.search(
+            r'(?:mi nombre es|me llamo|soy) ([a-záéíóúñ]+)',
+            text_lower
+        )
+        if name_declaration:
+            user_name = name_declaration.group(1)
+            self.memory.learn_fact(
+                f"el usuario se llama {user_name}",
+                category="personal",
+                confidence=0.8,
+                source="usuario"
+            )
+            return (
+                f"¡Encantado de conocerte, {user_name.capitalize()}! 🎉\n"
+                f"He guardado tu nombre en mi memoria. No lo olvidare."
+            )
+
+        # No sabemos el nombre
+        return (
+            "Aun no se tu nombre. Si quieres decirmelo, puedes decir:\n"
+            "  'Mi nombre es [tu nombre]'\n"
+            "  'Me llamo [tu nombre]'"
+        )
+
     def _handle_conversation(self, text: str, memories: list, facts: list) -> str:
-        """Respuesta general cuando no hay una intención clara."""
-        # Si hay hechos relevantes, úsalos
+        """Respuesta general que busca activamente en memoria."""
+        text_lower = text.lower()
+
+        # --- Auto-aprendizaje: detectar datos personales ---
+        # "mi nombre es X" o "me llamo X"
+        name_match = re.search(
+            r'(?:mi nombre es|me llamo) ([a-záéíóúñ]+)', text_lower
+        )
+        if name_match:
+            user_name = name_match.group(1)
+            self.memory.learn_fact(
+                f"el usuario se llama {user_name}",
+                category="personal",
+                confidence=0.8,
+                source="usuario"
+            )
+            return (
+                f"¡Encantado de conocerte, {user_name.capitalize()}! 🎉 "
+                f"He guardado tu nombre en mi memoria."
+            )
+
+        # "soy X" (nombre)
+        soy_match = re.match(r'^soy ([a-záéíóúñ]+)$', text_lower)
+        if soy_match:
+            user_name = soy_match.group(1)
+            self.memory.learn_fact(
+                f"el usuario se llama {user_name}",
+                category="personal",
+                confidence=0.8,
+                source="usuario"
+            )
+            return f"¡Hola, {user_name.capitalize()}! Un gusto."
+
+        # --- Busqueda activa en memoria ---
+        # Detectar si es una pregunta
+        is_question = any(q in text_lower for q in [
+            "sabes", "conoces", "recuerdas", "como", "qué", "que",
+            "cuando", "donde", "por que", "por qué", "cual", "cuál"
+        ])
+
+        if is_question:
+            # Buscar en memoria semantica
+            mem_facts = self.memory.query_knowledge(text, top_k=5)
+            if mem_facts:
+                relevant = [f for f in mem_facts if f.get("score", 0) > 0.15]
+                if relevant:
+                    fact_texts = [f.get("text", "")[:100] for f in relevant[:3]]
+                    fact_texts = [f for f in fact_texts if f]
+                    if fact_texts:
+                        return (
+                            f"Segun lo que he aprendido: {'; '.join(fact_texts)}.\n"
+                            f"¿Quieres que profundice en algo?"
+                        )
+
+            # Buscar en memoria episodica (conversacion previa)
+            mem_recall = self.memory.recall(text, top_k=5)
+            if mem_recall:
+                relevant = [m for m in mem_recall if m.get("score", 0) > 0.1]
+                if relevant:
+                    best = relevant[0].get("text", "")[:120]
+                    return (
+                        f"Esto me recuerda algo que mencionaste antes: "
+                        f"\"{best}\". "
+                        f"¿Quieres que retomemos ese tema?"
+                    )
+
+        # --- Si hay hechos relevantes, usarlos ---
         if facts:
             fact_texts = [f.get("text", "")[:80] for f in facts[:2]]
             if fact_texts:
@@ -347,20 +490,32 @@ class SymbolicEngine:
                     f"¿Quieres que profundice en algún tema?"
                 )
 
-        # Si hay recuerdos similares, referencia
+        # --- Si hay recuerdos similares ---
         if memories:
             return (
                 "Esto me recuerda algo que hablamos antes. "
                 "Dame un momento para conectar los puntos... "
-                "Cuéntame más para poder darte una mejor respuesta."
+                "Cuentame más para poder darte una mejor respuesta."
             )
 
-        # Respuesta genérica de fase Proto
-        return (
-            "Estoy procesando tu mensaje. Como estoy en fase Proto, "
-            "cada interacción me ayuda a mejorar. "
-            "¿Puedes darme más contexto o enseñarme algo nuevo sobre esto?"
-        )
+        # --- Respuesta generica segun la fase ---
+        phase = self.state.get("nexus", "phase", default="Proto")
+        phase_responses = {
+            "Proto": (
+                "Estoy procesando tu mensaje. Como estoy en fase Proto, "
+                "cada interaccion me ayuda a mejorar. "
+                "¿Puedes darme mas contexto o ensenarme algo nuevo sobre esto?"
+            ),
+            "Básico": (
+                "Entiendo. Estoy en fase Basico y cada conversacion me hace "
+                "mas inteligente. Cuentame mas para poder ayudarte mejor."
+            ),
+            "Intermedio": (
+                "He registrado tu mensaje. Con mi memoria y experiencia, "
+                "puedo analizarlo mejor. ¿Que mas necesitas?"
+            ),
+        }
+        return phase_responses.get(phase, phase_responses["Proto"])
 
     def _learn_from_interaction(self, user_input: str, response: str):
         """Extrae patrones aprendibles de la interacción."""

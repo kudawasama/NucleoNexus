@@ -176,6 +176,7 @@ class NexusCLI:
             "/memoria": self._cmd_memory,
             "/hechos": self._cmd_facts,
             "/skills": self._cmd_skills,
+            "/skill": self._cmd_skills,
             "/personalidad": self._cmd_personality,
             "/backend": self._cmd_backend,
             "/export": self._cmd_export,
