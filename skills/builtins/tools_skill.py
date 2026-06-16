@@ -1,7 +1,7 @@
 """
 Skill Builtin — Tools (Hermes Agent-style)
 ===========================================
-Tools: web_search, read_file, write_file, search_files, run_command, python_eval
+Tools: web_search, read_file, write_file, search_files, run_command, python_eval, browse_website
 Cada tool se auto-registra como accion en el ActionRegistry de Nexus.
 """
 
@@ -22,8 +22,198 @@ logger = logging.getLogger("nexus.skills.tools")
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
 
+# ======================================================================
+#  FUNCIONES AUXILIARES (module-level, usadas por las closures)
+# ======================================================================
+
+def _clean_search_query(query: str) -> str:
+    """Limpia una query de busqueda: quita stop words.
+    Preserva mayusculas para acronimos (RAG, LLM, API, etc.)."""
+    stop_words = {
+        "sobre", "acerca", "respecto",
+        "la", "el", "los", "las", "un", "una", "unos", "unas",
+        "de", "del", "en", "por", "para", "con", "sin", "entre",
+        "que", "cual", "cuales", "como", "cuando", "donde",
+        "the", "a", "an", "of", "in", "on", "at", "by", "for",
+        "with", "from", "to", "and", "or", "is", "are", "was",
+        "about", "what", "which", "how", "where", "when",
+        "todo", "toda", "todos", "todas", "muy", "mas", "más",
+        "informacion", "información",
+    }
+    words = query.strip().split()
+    cleaned = [w for w in words if w.lower() not in stop_words]
+    return " ".join(cleaned) if cleaned else query.strip()
+
+
+# Cache de resultados para evitar rate limiting
+_SEARCH_CACHE = {}
+
+def _web_search_html(clean_query: str, original_query: str = "", max_results: int = 5) -> dict:
+    """Wikipedia API + GitHub fallback con cache."""
+    cache_key = f"wiki:{clean_query}:{original_query}"
+    if cache_key in _SEARCH_CACHE:
+        return _SEARCH_CACHE[cache_key]
+
+    try:
+        wiki_query = clean_query if clean_query else original_query
+        url = (
+            "https://en.wikipedia.org/w/api.php"
+            "?action=query&list=search&srsearch="
+            f"{urllib.parse.quote(wiki_query)}"
+            "&format=json&srlimit=5&utf8=1"
+        )
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "NexusAI/1.0 (local research assistant)"}
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+
+        results = data.get("query", {}).get("search", [])
+
+        # Detectar acronimos en la query
+        acronyms = [w for w in wiki_query.split() if w.isupper() and len(w) >= 2]
+
+        def _has_acronym(res_list, acr_list):
+            if not acr_list:
+                return True
+            import re as _ar
+            for r in res_list[:5]:
+                title = r.get("title", "")
+                snippet = r.get("snippet", "")
+                # Primero busca en el TITULO
+                for acr in acr_list:
+                    if _ar.search(r'\b' + acr + r'\b', title):
+                        return True
+                # Si no esta en el titulo, busca en el snippet CON contexto tech
+                for acr in acr_list:
+                    if _ar.search(r'\b' + acr + r'\b', snippet):
+                        # Verificar contexto tecnologico
+                        text = (title + " " + snippet).lower()
+                        if any(t in text for t in
+                            ["ai", "llm", "model", "retrieval", "generation",
+                             "computer", "computing", "algorithm", "science",
+                             "neural", "deep learning", "machine learning",
+                             "data", "search", "vector", "embedding",
+                             "language model", "nlp", "transformer",
+                             "knowledge", "semantic", "index", "database"]):
+                            return True
+            return False
+
+        # ─── Si hay acronimos, reordenar: primero los resultados que los contengan
+        # en contexto tecnologico, luego el resto
+        if acronyms:
+            def _relevance_score(r):
+                title = r.get("title", "")
+                snippet = r.get("snippet", "")
+                text = (title + " " + snippet).lower()
+                score = 0
+                # +2 si el titulo contiene el acronimo como palabra
+                for acr in acronyms:
+                    if _re.search(r'\b' + acr + r'\b', title):
+                        score += 2
+                    if _re.search(r'\b' + acr + r'\b', snippet):
+                        score += 1
+                # +1 por cada termino tecnologico
+                for t in ["retrieval", "generation", "computer", "computing",
+                          "algorithm", "neural", "vector", "database",
+                          "machine learning", "artificial intelligence",
+                          "nlp", "transformer", "embedding", "semantic"]:
+                    if t in text:
+                        score += 1
+                return score
+            
+            results.sort(key=_relevance_score, reverse=True)
+
+        # Si no hay resultados o son malos, probar alternativas
+        if not results:
+            alt_queries = []
+            if acronyms:
+                for acr in acronyms[:1]:  # Solo la primera alternativa mas relevante
+                    alt_queries.append(f"{acr} computer science")
+            if len(wiki_query.split()) <= 2 and not alt_queries:
+                alt_queries.append(f"{wiki_query} concept")
+
+            for aq in alt_queries[:2]:
+                try:
+                    aurl = (
+                        "https://en.wikipedia.org/w/api.php"
+                        "?action=query&list=search&srsearch="
+                        f"{urllib.parse.quote(aq)}&format=json&srlimit=5&utf8=1"
+                    )
+                    areq = urllib.request.Request(aurl, headers={"User-Agent": "NexusAI/1.0"})
+                    with urllib.request.urlopen(areq, timeout=6) as aresp:
+                        alt_data = json.loads(aresp.read().decode())
+                    alt_res = alt_data.get("query", {}).get("search", [])
+                    if alt_res and (not acronyms or _has_acronym(alt_res, acronyms)):
+                        results, wiki_query = alt_res, aq
+                        break
+                except Exception:
+                    continue
+
+        # GitHub fallback
+        if not results:
+            try:
+                gh_q = original_query or clean_query
+                gh_url = f"https://api.github.com/search/repositories?q={urllib.parse.quote(gh_q)}&per_page=5&sort=updated"
+                gh_req = urllib.request.Request(
+                    gh_url, headers={"User-Agent": "NexusAI/1.0", "Accept": "application/vnd.github.v3+json"}
+                )
+                with urllib.request.urlopen(gh_req, timeout=10) as resp:
+                    gh_data = json.loads(resp.read().decode())
+                items = gh_data.get("items", [])
+
+                if not items:
+                    import re as _gr
+                    um = _gr.match(r'^([\w-]+)$', gh_q.strip())
+                    if um:
+                        try:
+                            uurl = f"https://api.github.com/users/{um.group(1)}/repos?per_page=5&sort=updated"
+                            ureq = urllib.request.Request(
+                                uurl, headers={"User-Agent": "NexusAI/1.0", "Accept": "application/vnd.github.v3+json"}
+                            )
+                            with urllib.request.urlopen(ureq, timeout=10) as uresp:
+                                urepos = json.loads(uresp.read().decode())
+                            if isinstance(urepos, list):
+                                items = urepos
+                        except Exception:
+                            pass
+
+                if items:
+                    out = []
+                    for r in items[:max_results]:
+                        name = r.get("full_name", "") or r.get("name", "")
+                        desc = r.get("description", "") or "(sin descripcion)"
+                        stars = r.get("stargazers_count", 0)
+                        url_r = r.get("html_url", "") or f"https://github.com/{name}"
+                        out.append(f"• {name} ⭐{stars} — {desc[:120]} ({url_r})")
+                    return {"resultados": out[:max_results], "total": len(out), "consulta": clean_query or original_query, "fuente": "GitHub"}
+            except Exception:
+                pass
+
+            result = {"resultados": [], "mensaje": f"No encontre resultados para '{original_query or clean_query}'"}
+            _SEARCH_CACHE[cache_key] = result
+            return result
+
+        out = []
+        for r in results[:max_results]:
+            title = r.get("title", "")
+            snippet = _re.sub(r"<[^>]+>", "", r.get("snippet", ""))
+            url_r = f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+            out.append(f"• {title} — {snippet[:150]} ({url_r})")
+        result = {"resultados": out[:max_results], "total": len(out), "consulta": wiki_query, "fuente": "Wikipedia"}
+        _SEARCH_CACHE[cache_key] = result
+        return result
+    except Exception as e:
+        err = {"error": f"Error en busqueda: {e}"}
+        _SEARCH_CACHE[cache_key] = err
+        return err
+
+
+# ======================================================================
+#  REGISTRO DE LA SKILL
+# ======================================================================
+
 def register() -> Skill:
-    """Registra y devuelve la skill de herramientas tipo Hermes Agent."""
     skill = Skill(
         name="tools",
         description="Herramientas: busqueda web, archivos, comandos, Python",
@@ -31,197 +221,64 @@ def register() -> Skill:
         author="Nexus + Hermes Agent",
     )
 
-    # ═══════════════════════════════════════════════════════════
-    #  1. web_search — busca en la web via DuckDuckGo
-    # ═══════════════════════════════════════════════════════════
+    # ─── 1. web_search ───────────────────────────────────────────────
     def _web_search(query: str = "", max_results: int = 5):
-        """Busca en la web usando DuckDuckGo (gratuito, sin API key).
-
-        Args:
-            query: Termino de busqueda
-            max_results: Max. resultados a devolver (default 5)
-        """
         if not query:
             return {"error": "No especificaste que buscar. Ej: 'busca noticias de IA'"}
+        clean_query = _clean_search_query(query)
         try:
-            url = (
-                f"https://api.duckduckgo.com/"
-                f"?q={urllib.parse.quote(query)}"
+            ddg_url = (
+                f"https://api.duckduckgo.com/?q={urllib.parse.quote(clean_query)}"
                 f"&format=json&no_html=1&skip_disambig=1"
             )
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            req = urllib.request.Request(ddg_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=6) as resp:
                 data = json.loads(resp.read().decode())
 
             results = []
-            # Respuesta directa (Abstract)
             abstract = data.get("AbstractText", "")
             source = data.get("AbstractSource", "")
+            response_type = data.get("Type", "")
             if abstract:
                 results.append(f"[{source}] {abstract}")
 
-            # Temas relacionados
-            topics = data.get("RelatedTopics", [])
-            for topic in topics[:max_results]:
+            for topic in data.get("RelatedTopics", [])[:max_results]:
                 if "Text" in topic:
-                    text = topic["Text"]
                     url_t = topic.get("FirstURL", "")
-                    if url_t:
-                        results.append(f"• {text} ({url_t})")
-                    else:
-                        results.append(f"• {text}")
+                    results.append(f"• {topic['Text']} ({url_t})" if url_t else f"• {topic['Text']}")
                 elif "Topics" in topic:
                     for sub in topic["Topics"][:3]:
                         if "Text" in sub:
                             results.append(f"• {sub['Text']}")
 
-            # Si la API instantanea no dio resultados, usar busqueda HTML
+            # Si el query tiene acronimos, verificar que los resultados los contengan
+            # como termino tecnico (no solo en pagina de desambiguacion)
+            ddg_type = data.get("Type", "")
+            ddg_acronyms = [w for w in clean_query.split() if w.isupper() and len(w) >= 2]
+            if ddg_acronyms and (ddg_type == "D" or not results):
+                # Type D = desambiguacion → buscar en Wikipedia con contexto
+                results = []
             if not results:
-                return _web_search_html(query, max_results)
+                return _web_search_html(clean_query, query, max_results)
 
-            return {
-                "resultados": results[:max_results],
-                "total": len(results),
-                "consulta": query,
-            }
+            return {"resultados": results[:max_results], "total": len(results), "consulta": clean_query}
         except urllib.error.URLError:
             return {"error": "Sin conexion a internet. No puedo buscar en la web."}
         except Exception as e:
             return {"error": f"Error en busqueda web: {e}"}
 
-    def _web_search_html(query: str, max_results: int = 5) -> dict:
-        """Busqueda via Wikipedia API (fallback cuando DuckDuckGo no da resultados)."""
-        try:
-            # Wikipedia API — gratuita, sin API key, sin bloqueo
-            wiki_url = (
-                "https://en.wikipedia.org/w/api.php"
-                "?action=query&list=search&srsearch="
-                f"{urllib.parse.quote(query)}"
-                "&format=json&srlimit=5&utf8=1"
-            )
-            req = urllib.request.Request(
-                wiki_url,
-                headers={"User-Agent": "NexusAI/1.0 (local research assistant)"},
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode())
-
-            search_results = data.get("query", {}).get("search", [])
-            if not search_results:
-                # Fallback: GitHub API (publica, sin auth para busquedas)
-                try:
-                    # 1. Busqueda general
-                    gh_url = (
-                        "https://api.github.com/search/repositories"
-                        f"?q={urllib.parse.quote(query)}&per_page=5&sort=updated"
-                    )
-                    gh_req = urllib.request.Request(
-                        gh_url,
-                        headers={
-                            "User-Agent": "NexusAI/1.0",
-                            "Accept": "application/vnd.github.v3+json",
-                        },
-                    )
-                    with urllib.request.urlopen(gh_req, timeout=10) as resp:
-                        gh_data = json.loads(resp.read().decode())
-
-                    gh_items = gh_data.get("items", [])
-                    
-                    # 2. Si el query parece un username, buscar sus repos directamente
-                    if not gh_items and not query.startswith("user:"):
-                        import re as gh_re
-                        # Detectar si el query es un username de GitHub
-                        user_match = gh_re.match(r'^([a-zA-Z0-9_-]+)$', query.strip())
-                        if user_match:
-                            username = user_match.group(1)
-                            try:
-                                user_url = (
-                                    f"https://api.github.com/users/{username}/repos"
-                                    "?per_page=5&sort=updated"
-                                )
-                                user_req = urllib.request.Request(
-                                    user_url,
-                                    headers={
-                                        "User-Agent": "NexusAI/1.0",
-                                        "Accept": "application/vnd.github.v3+json",
-                                    },
-                                )
-                                with urllib.request.urlopen(user_req, timeout=10) as resp:
-                                    user_repos = json.loads(resp.read().decode())
-                                if isinstance(user_repos, list) and user_repos:
-                                    gh_items = user_repos
-
-                            except Exception:
-                                pass
-
-                    if gh_items:
-                        results = []
-                        for r in gh_items[:max_results]:
-                            name = r.get("full_name", "") or r.get("name", "")
-                            desc = r.get("description", "") or "(sin descripcion)"
-                            stars = r.get("stargazers_count", 0)
-                            url_r = r.get("html_url", "") or f"https://github.com/{name}"
-                            results.append(
-                                f"• {name} ⭐{stars} — {desc[:120]} ({url_r})"
-                            )
-                        return {
-                            "resultados": results[:max_results],
-                            "total": len(results),
-                            "consulta": query,
-                            "fuente": "GitHub",
-                        }
-                except Exception:
-                    pass  # Si GitHub falla, continuar con mensaje vacio
-
-                return {
-                    "resultados": [],
-                    "mensaje": f"No encontre resultados para '{query}'",
-                }
-
-            results = []
-            for r in search_results[:max_results]:
-                title = r.get("title", "")
-                snippet = _re.sub(r"<[^>]+>", "", r.get("snippet", ""))
-                page_id = r.get("pageid", "")
-                url_result = f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
-                results.append(f"• {title} — {snippet[:150]} ({url_result})")
-
-            return {
-                "resultados": results[:max_results],
-                "total": len(results),
-                "consulta": query,
-                "fuente": "Wikipedia",
-            }
-        except Exception as e:
-            return {"error": f"Error en busqueda: {e}"}
-
     skill.register_action(
         name="web_search",
-        description="Busca informacion en la web. Usa DuckDuckGo + Wikipedia.",
+        description="Busca informacion en la web. Usa DuckDuckGo + Wikipedia + GitHub.",
         handler=_web_search,
         parameters={
-            "query": {
-                "type": "string",
-                "description": "Termino de busqueda (ej: 'noticias IA 2025')",
-            },
-            "max_results": {
-                "type": "integer",
-                "description": "Maximo de resultados (1-10)",
-                "default": 5,
-            },
+            "query": {"type": "string", "description": "Termino de busqueda"},
+            "max_results": {"type": "integer", "description": "Maximo de resultados (1-10)", "default": 5},
         },
     )
 
-    # ═══════════════════════════════════════════════════════════
-    #  2. read_file — lee el contenido de un archivo
-    # ═══════════════════════════════════════════════════════════
+    # ─── 2. read_file ───────────────────────────────────────────────
     def _read_file(path: str = "", max_lines: int = 50):
-        """Lee un archivo de texto.
-
-        Args:
-            path: Ruta al archivo (relativa al proyecto o absoluta)
-            max_lines: Max. lineas a leer (default 50)
-        """
         if not path:
             return {"error": "Especifica la ruta del archivo. Ej: 'README.md'"}
         try:
@@ -229,26 +286,17 @@ def register() -> Skill:
             if not target.is_absolute():
                 target = PROJECT_ROOT / target
             target = target.resolve()
-
-            # Seguridad: no salir del proyecto
             if not str(target).startswith(str(PROJECT_ROOT)):
                 return {"error": f"No puedo leer archivos fuera del proyecto: {target}"}
-
             if not target.exists():
                 return {"error": f"Archivo no encontrado: {path}"}
-            if not target.is_file():
-                return {"error": f"No es un archivo: {path}"}
-
             content = target.read_text(encoding="utf-8", errors="replace")
             lines = content.splitlines()
-            total = len(lines)
-            muestra = lines[:max_lines]
-
             return {
                 "archivo": str(target.relative_to(PROJECT_ROOT)),
-                "total_lineas": total,
-                "lineas": muestra,
-                "truncado": total > max_lines,
+                "total_lineas": len(lines),
+                "lineas": lines[:max_lines],
+                "truncado": len(lines) > max_lines,
             }
         except Exception as e:
             return {"error": f"Error leyendo archivo: {e}"}
@@ -258,28 +306,13 @@ def register() -> Skill:
         description="Lee el contenido de un archivo de texto.",
         handler=_read_file,
         parameters={
-            "path": {
-                "type": "string",
-                "description": "Ruta del archivo (ej: 'docs/README.md' o 'config.py')",
-            },
-            "max_lines": {
-                "type": "integer",
-                "description": "Maximo de lineas a mostrar (default 50)",
-                "default": 50,
-            },
+            "path": {"type": "string", "description": "Ruta del archivo (ej: 'docs/README.md')"},
+            "max_lines": {"type": "integer", "description": "Maximo de lineas a mostrar", "default": 50},
         },
     )
 
-    # ═══════════════════════════════════════════════════════════
-    #  3. write_file — escribe o sobreescribe un archivo
-    # ═══════════════════════════════════════════════════════════
+    # ─── 3. write_file ──────────────────────────────────────────────
     def _write_file(path: str = "", content: str = ""):
-        """Crea o sobreescribe un archivo con el contenido dado.
-
-        Args:
-            path: Ruta del archivo a crear/escribir
-            content: Contenido a escribir
-        """
         if not path:
             return {"error": "Especifica la ruta del archivo"}
         if not content:
@@ -289,20 +322,12 @@ def register() -> Skill:
             if not target.is_absolute():
                 target = PROJECT_ROOT / target
             target = target.resolve()
-
-            # Seguridad: no salir del proyecto
             if not str(target).startswith(str(PROJECT_ROOT)):
                 return {"error": f"No puedo escribir fuera del proyecto: {target}"}
-
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
             size = len(content.encode("utf-8"))
-            return {
-                "archivo": str(target.relative_to(PROJECT_ROOT)),
-                "bytes": size,
-                "lineas": len(content.splitlines()),
-                "mensaje": f"Archivo escrito correctamente ({size} bytes)",
-            }
+            return {"archivo": str(target.relative_to(PROJECT_ROOT)), "bytes": size, "lineas": len(content.splitlines()), "mensaje": f"Archivo escrito ({size} bytes)"}
         except Exception as e:
             return {"error": f"Error escribiendo archivo: {e}"}
 
@@ -311,71 +336,33 @@ def register() -> Skill:
         description="Crea o sobreescribe un archivo con contenido nuevo.",
         handler=_write_file,
         parameters={
-            "path": {
-                "type": "string",
-                "description": "Ruta del archivo (ej: 'notas.txt' o 'src/script.py')",
-            },
-            "content": {
-                "type": "string",
-                "description": "Contenido completo del archivo",
-            },
+            "path": {"type": "string", "description": "Ruta del archivo"},
+            "content": {"type": "string", "description": "Contenido completo del archivo"},
         },
     )
 
-    # ═══════════════════════════════════════════════════════════
-    #  4. search_files — busca texto en archivos del proyecto
-    # ═══════════════════════════════════════════════════════════
+    # ─── 4. search_files ────────────────────────────────────────────
     def _search_files(pattern: str = "", file_pattern: str = "*", path: str = "."):
-        """Busca un patron de texto en archivos del proyecto (grep-like).
-
-        Args:
-            pattern: Texto o regex a buscar
-            file_pattern: Patron de archivo (ej: '*.py', '*.md')
-            path: Directorio donde buscar
-        """
         if not pattern:
             return {"error": "Especifica el texto a buscar"}
         try:
-            search_path = Path(path)
-            if not search_path.is_absolute():
-                search_path = PROJECT_ROOT / search_path
-            search_path = search_path.resolve()
-
-            if not search_path.exists():
-                return {"error": f"Directorio no encontrado: {path}"}
-
-            results = []
-            files_scanned = 0
-
+            search_path = (PROJECT_ROOT / path).resolve()
+            results, scanned = [], 0
             for fpath in sorted(search_path.rglob(file_pattern)):
                 if not fpath.is_file():
                     continue
-                files_scanned += 1
+                scanned += 1
                 try:
-                    text = fpath.read_text(encoding="utf-8", errors="ignore")
-                    lines = text.splitlines()
-                    for i, line in enumerate(lines, 1):
+                    for i, line in enumerate(fpath.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
                         if _re.search(pattern, line, _re.IGNORECASE):
-                            rel = fpath.relative_to(PROJECT_ROOT)
-                            context = line.strip()[:100]
-                            results.append({
-                                "archivo": str(rel),
-                                "linea": i,
-                                "texto": context,
-                            })
+                            results.append({"archivo": str(fpath.relative_to(PROJECT_ROOT)), "linea": i, "texto": line.strip()[:100]})
                             if len(results) >= 20:
                                 break
                 except Exception:
                     pass
                 if len(results) >= 20:
                     break
-
-            return {
-                "resultados": results[:20],
-                "total_encontrados": len(results),
-                "archivos_escaneados": files_scanned,
-                "patron": pattern,
-            }
+            return {"resultados": results[:20], "total_encontrados": len(results), "archivos_escaneados": scanned, "patron": pattern}
         except Exception as e:
             return {"error": f"Error en busqueda: {e}"}
 
@@ -384,234 +371,112 @@ def register() -> Skill:
         description="Busca texto o patrones en archivos del proyecto (como grep).",
         handler=_search_files,
         parameters={
-            "pattern": {
-                "type": "string",
-                "description": "Texto o expresion regular a buscar",
-            },
-            "file_pattern": {
-                "type": "string",
-                "description": "Filtro de archivos (ej: '*.py', '*.md', '*')",
-                "default": "*",
-            },
-            "path": {
-                "type": "string",
-                "description": "Directorio donde buscar (default: '.')",
-                "default": ".",
-            },
+            "pattern": {"type": "string", "description": "Texto o expresion regular a buscar"},
+            "file_pattern": {"type": "string", "description": "Filtro de archivos (ej: '*.py')", "default": "*"},
+            "path": {"type": "string", "description": "Directorio donde buscar", "default": "."},
         },
     )
 
-    # ═══════════════════════════════════════════════════════════
-    #  5. run_command — ejecuta un comando de shell
-    # ═══════════════════════════════════════════════════════════
+    # ─── 5. run_command ─────────────────────────────────────────────
     def _run_command(command: str = "", timeout: int = 15):
-        """Ejecuta un comando de shell y devuelve la salida.
-
-        Args:
-            command: Comando a ejecutar (shell, bash en Windows)
-            timeout: Timeout en segundos (default 15)
-        """
         if not command:
             return {"error": "Especifica el comando a ejecutar"}
         try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            output = []
+            result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
+            out = []
             if result.stdout:
-                lines = result.stdout.strip().splitlines()
-                output.append("STDOUT:")
-                output.extend(lines[:30])  # Max 30 lines
+                out.append("STDOUT:")
+                out.extend(result.stdout.strip().splitlines()[:30])
             if result.stderr:
-                lines = result.stderr.strip().splitlines()
-                output.append("STDERR:")
-                output.extend(lines[:10])  # Max 10 lines stderr
-            if not output:
-                output = ["(sin salida)"]
-
-            return {
-                "comando": command,
-                "salida": "\n".join(output),
-                "codigo_retorno": result.returncode,
-                "truncado": len(result.stdout.splitlines()) > 30
-                            or len(result.stderr.splitlines()) > 10,
-            }
+                out.append("STDERR:")
+                out.extend(result.stderr.strip().splitlines()[:10])
+            return {"comando": command, "salida": "\n".join(out) if out else "(sin salida)", "codigo_retorno": result.returncode}
         except subprocess.TimeoutExpired:
-            return {
-                "error": f"Comando agoto el timeout de {timeout}s",
-                "comando": command,
-            }
+            return {"error": f"Timeout de {timeout}s", "comando": command}
         except Exception as e:
-            return {"error": f"Error ejecutando comando: {e}"}
+            return {"error": f"Error: {e}"}
 
     skill.register_action(
         name="run_command",
         description="Ejecuta un comando de shell y devuelve la salida.",
         handler=_run_command,
         parameters={
-            "command": {
-                "type": "string",
-                "description": "Comando a ejecutar (ej: 'ls -la', 'git log --oneline -5')",
-            },
-            "timeout": {
-                "type": "integer",
-                "description": "Timeout maximo en segundos (default 15)",
-                "default": 15,
-            },
+            "command": {"type": "string", "description": "Comando a ejecutar"},
+            "timeout": {"type": "integer", "description": "Timeout en segundos", "default": 15},
         },
     )
 
-    # ═══════════════════════════════════════════════════════════
-    #  6. python_eval — evalua una expresion Python
-    # ═══════════════════════════════════════════════════════════
+    # ─── 6. python_eval ─────────────────────────────────────────────
     def _python_eval(expression: str = ""):
-        """Evalua una expresion Python y devuelve el resultado.
-
-        Segura: solo permite expresiones literales (ast.literal_eval).
-        Para operaciones matematicas usa eval() en un entorno restringido.
-
-        Args:
-            expression: Expresion Python a evaluar
-        """
         if not expression:
             return {"error": "Especifica la expresion a evaluar"}
         try:
-            # Operaciones matematicas seguras
-            import ast
-            import operator as _op
+            import ast, operator as _op
+            safe_ops = {ast.Add: _op.add, ast.Sub: _op.sub, ast.Mult: _op.mul, ast.Div: _op.truediv,
+                        ast.FloorDiv: _op.floordiv, ast.Pow: _op.pow, ast.Mod: _op.mod, ast.USub: _op.neg, ast.UAdd: _op.pos}
 
-            # Whitelist de operadores
-            safe_ops = {
-                ast.Add: _op.add,
-                ast.Sub: _op.sub,
-                ast.Mult: _op.mul,
-                ast.Div: _op.truediv,
-                ast.FloorDiv: _op.floordiv,
-                ast.Pow: _op.pow,
-                ast.Mod: _op.mod,
-                ast.USub: _op.neg,
-                ast.UAdd: _op.pos,
-            }
-
-            def _safe_eval(node):
+            def _eval(node):
                 if isinstance(node, ast.Expression):
-                    return _safe_eval(node.body)
-                elif isinstance(node, ast.Constant):
+                    return _eval(node.body)
+                if isinstance(node, ast.Constant):
                     return node.value
-                elif isinstance(node, ast.BinOp):
-                    op_func = safe_ops.get(type(node.op))
-                    if op_func is None:
-                        raise ValueError(f"Operador no permitido: {type(node.op).__name__}")
-                    return op_func(_safe_eval(node.left), _safe_eval(node.right))
-                elif isinstance(node, ast.UnaryOp):
-                    op_func = safe_ops.get(type(node.op))
-                    if op_func is None:
-                        raise ValueError(f"Operador no permitido: {type(node.op).__name__}")
-                    return op_func(_safe_eval(node.operand))
-                elif isinstance(node, ast.List):
-                    return [_safe_eval(el) for el in node.elts]
-                elif isinstance(node, ast.Dict):
-                    return {_safe_eval(k): _safe_eval(v) for k, v in zip(node.keys, node.values)}
-                elif isinstance(node, ast.Tuple):
-                    return tuple(_safe_eval(el) for el in node.elts)
-                elif isinstance(node, ast.Name) and node.id in ("True", "False", "None"):
+                if isinstance(node, ast.BinOp):
+                    return safe_ops.get(type(node.op), lambda a, b: (_ for _ in ()).throw(ValueError(f"Op no permitido: {type(node.op).__name__}")))(_eval(node.left), _eval(node.right))
+                if isinstance(node, ast.UnaryOp):
+                    return safe_ops.get(type(node.op), lambda x: (_ for _ in ()).throw(ValueError(f"Op no permitido: {type(node.op).__name__}")))(_eval(node.operand))
+                if isinstance(node, (ast.List, ast.Tuple)):
+                    return type(node)(_eval(e) for e in node.elts)
+                if isinstance(node, ast.Dict):
+                    return {_eval(k): _eval(v) for k, v in zip(node.keys, node.values)}
+                if isinstance(node, ast.Name) and node.id in ("True", "False", "None"):
                     return {"True": True, "False": False, "None": None}[node.id]
-                elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                    if node.func.id in ("len", "str", "int", "float", "abs", "round", "min", "max", "sum", "list", "dict", "tuple", "set", "sorted", "reversed"):
-                        args = [_safe_eval(a) for a in node.args]
-                        kwargs = {k.arg: _safe_eval(k.value) for k in node.keywords}
-                        return globals()["__builtins__"][node.func.id](*args, **kwargs)
-                    raise ValueError(f"Funcion no permitida: {node.func.id}")
-                else:
-                    raise ValueError(f"Expresion no soportada: {type(node).__name__}")
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("len", "str", "int", "float", "abs", "round", "min", "max", "sum", "list", "dict", "tuple", "set", "sorted", "reversed"):
+                    return globals()["__builtins__"][node.func.id](*(_eval(a) for a in node.args))
+                raise ValueError(f"Expresion no soportada: {type(node).__name__}")
 
             tree = ast.parse(expression, mode="eval")
-            result = _safe_eval(tree.body)
-
-            return {
-                "expresion": expression,
-                "resultado": repr(result),
-                "tipo": type(result).__name__,
-            }
+            result = _eval(tree.body)
+            return {"expresion": expression, "resultado": repr(result), "tipo": type(result).__name__}
         except SyntaxError:
             return {"error": f"Error de sintaxis en: {expression}"}
-        except ValueError as e:
-            return {"error": str(e)}
         except Exception as e:
-            return {"error": f"Error evaluando expresion: {e}"}
+            return {"error": f"Error: {e}"}
 
     skill.register_action(
         name="python_eval",
         description="Evalua una expresion Python con operaciones matematicas y funciones basicas.",
         handler=_python_eval,
         parameters={
-            "expression": {
-                "type": "string",
-                "description": "Expresion Python a evaluar (ej: '2 + 2 * 3', 'len([1,2,3])')",
-            },
+            "expression": {"type": "string", "description": "Expresion Python a evaluar (ej: '2 + 2 * 3')"},
         },
     )
 
-    # ═══════════════════════════════════════════════════════════
-    #  7. browse_website — obtiene el contenido de una URL
-    # ═══════════════════════════════════════════════════════════
+    # ─── 7. browse_website ──────────────────────────────────────────
     def _browse_website(url: str = ""):
-        """Obtiene el contenido textual de una pagina web.
-
-        Args:
-            url: URL completa del sitio (ej: 'https://kudawa.com')
-        """
         if not url:
             return {"error": "Especifica la URL. Ej: 'https://kudawa.com'"}
         try:
             req = urllib.request.Request(
                 url,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/120.0.0.0 Safari/537.36"
-                    ),
-                },
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
             )
             with urllib.request.urlopen(req, timeout=15) as resp:
                 html = resp.read().decode("utf-8", errors="replace")
-
-            # Extraer titulo
-            title_match = _re.search(r'<title[^>]*>(.*?)</title>', html, _re.IGNORECASE | _re.DOTALL)
-            titulo = _re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else url
-
-            # Extraer texto significativo (parrafos, encabezados)
-            textos = _re.findall(
-                r'<(?:p|h[1-6]|li|div|span|article|section)[^>]*>'
-                r'(.*?)</(?:p|h[1-6]|li|div|span|article|section)>',
-                html, _re.IGNORECASE | _re.DOTALL
-            )
+            title_m = _re.search(r'<title[^>]*>(.*?)</title>', html, _re.IGNORECASE | _re.DOTALL)
+            titulo = _re.sub(r"<[^>]+>", "", title_m.group(1)).strip() if title_m else url
+            textos = _re.findall(r'<(?:p|h[1-6]|li|div|span|article|section)[^>]*>(.*?)</(?:p|h[1-6]|li|div|span|article|section)>', html, _re.IGNORECASE | _re.DOTALL)
             contenido = []
             for t in textos:
-                texto_limpio = _re.sub(r"<[^>]+>", "", t).strip()
-                texto_limpio = _re.sub(r'\s+', ' ', texto_limpio)
-                if len(texto_limpio) > 20:  # Solo fragmentos significativos
-                    contenido.append(texto_limpio)
-
+                clean = _re.sub(r"<[^>]+>", "", t).strip()
+                clean = _re.sub(r'\s+', ' ', clean)
+                if len(clean) > 20:
+                    contenido.append(clean)
             if not contenido:
-                # Si no encontro parrafos, devolver el body sin tags
                 body = _re.search(r'<body[^>]*>(.*?)</body>', html, _re.DOTALL)
                 if body:
                     texto = _re.sub(r"<[^>]+>", " ", body.group(1))
-                    texto = _re.sub(r'\s+', ' ', texto).strip()
-                    contenido = [texto[:2000]]
-
-            return {
-                "titulo": titulo,
-                "contenido": "\n".join(contenido[:30]) if contenido else "(sin contenido visible)",
-                "url": url,
-                "total_lineas": len(contenido),
-            }
+                    contenido = [_re.sub(r'\s+', ' ', texto).strip()[:2000]]
+            return {"titulo": titulo, "contenido": "\n".join(contenido[:30]) if contenido else "(sin contenido visible)", "url": url, "total_lineas": len(contenido)}
         except urllib.error.HTTPError as e:
             return {"error": f"HTTP {e.code}: {e.reason}"}
         except urllib.error.URLError:
@@ -624,10 +489,7 @@ def register() -> Skill:
         description="Obtiene el contenido textual de una pagina web a partir de una URL.",
         handler=_browse_website,
         parameters={
-            "url": {
-                "type": "string",
-                "description": "URL completa (ej: 'https://kudawa.com')",
-            },
+            "url": {"type": "string", "description": "URL completa (ej: 'https://kudawa.com')"},
         },
     )
 
