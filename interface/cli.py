@@ -57,6 +57,7 @@ class NexusCLI:
         self.core = nexus_core
         self.history = []
         self.running = True
+        self._git_info = self._load_git_info()
         self._setup_history()
 
     def _setup_history(self):
@@ -67,6 +68,29 @@ class NexusCLI:
                 self.history = hist_file.read_text().splitlines()
             except:
                 pass
+
+    def _load_git_info(self) -> str:
+        """Obtiene el último commit de git para mostrar en metadata."""
+        repo_base = Path(__file__).parent.parent
+        git_dir = repo_base / ".git"
+        if not git_dir.exists():
+            return ""
+        try:
+            head = git_dir / "HEAD"
+            if not head.exists():
+                return ""
+            ref = head.read_text().strip()
+            if ref.startswith("ref: "):
+                ref_path = git_dir / ref[5:]
+                if ref_path.exists():
+                    sha = ref_path.read_text().strip()[:7]
+                else:
+                    return ""
+            else:
+                sha = ref[:7]
+            return sha
+        except Exception:
+            return ""
 
     def _save_history(self, line: str):
         """Guarda comando en historial."""
@@ -127,10 +151,13 @@ class NexusCLI:
     def _show_response(self, response: str, metadata: dict):
         """Muestra la respuesta formateada con metadatos técnicos.
         
+        Línea 1: backend + tiempo + modelo + tokens
+        Línea 2: versión + git + skills + interacciones + confianza
+        
         Args:
             response: Texto de respuesta
-            metadata: Dict con backend, model, tokens_prompt, 
-                     tokens_generated, duration_ms, total_duration_ms
+            metadata: Dict con backend, model, tokens, version, 
+                     skills_count, phase, interactions, git
         """
         phase = self.core.state.get("nexus", "phase", default="Proto")
         
@@ -157,7 +184,7 @@ class NexusCLI:
         if line:
             print(f"  {line}")
         
-        # Footer con metadata técnica
+        # ─── Línea 1: backend + tiempo + modelo + tokens ─────────
         backend = metadata.get("backend", "symbolic")
         model = metadata.get("model", "")
         elapsed = metadata.get("duration_ms", 0) or metadata.get("total_duration_ms", 0)
@@ -170,7 +197,6 @@ class NexusCLI:
         else:
             badge = f"{Color.GRAY}φ{Color.RESET}"
         
-        # Línea técnica compacta
         tech_parts = [f"{badge} {elapsed:.0f}ms"]
         if model:
             tech_parts.append(f"· {model}")
@@ -179,10 +205,34 @@ class NexusCLI:
         if tokens_prompt:
             tech_parts.append(f"· {tokens_prompt} ctx")
         
+        print(f"{Color.DIM}  ─── {' '.join(tech_parts)}{Color.RESET}")
+        
+        # ─── Línea 2: versión + git + skills + interacciones ─────
+        ver = metadata.get("version", "")
+        skills_n = metadata.get("skills_count", 0)
+        interactions = metadata.get("interactions", 0)
+        mode = metadata.get("mode", "")
+        git = self._git_info
+        
+        sys_parts = []
+        if ver:
+            sys_parts.append(f"v{ver}")
+        if git:
+            sys_parts.append(f"#{git}")
+        if mode:
+            sys_parts.append(mode)
+        if skills_n:
+            sys_parts.append(f"{skills_n} tools")
+        if interactions:
+            sys_parts.append(f"{interactions} int")
+        
         conf = self.core.state.get("nexus", "confidence_level", default=0)
         bar = "█" * int(conf * 10) + "░" * (10 - int(conf * 10))
         
-        print(f"{Color.DIM}  ─── {' '.join(tech_parts)} · [{bar}] {conf:.0%}{Color.RESET}")
+        if sys_parts:
+            print(f"{Color.GRAY}  ─── {' · '.join(sys_parts)} · [{bar}] {conf:.0%}{Color.RESET}")
+        else:
+            print(f"{Color.GRAY}  ─── [{bar}] {conf:.0%}{Color.RESET}")
         print()
 
     def _handle_command(self, cmd: str):

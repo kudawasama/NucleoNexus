@@ -212,6 +212,13 @@ class NexusCore:
         self.state.record_interaction(success=True)
         self.state.evolve_phase()
 
+        # Enriquece metadata con info del sistema
+        metadata["version"] = self.state.get("nexus", "version", default="?")
+        metadata["skills_count"] = self.state.get("nexus", "total_skills", default=0)
+        metadata["phase"] = self.state.get("nexus", "phase", default="Proto")
+        metadata["interactions"] = self.state.get("nexus", "total_interactions", default=0)
+        metadata["mode"] = self.state.get("capabilities", "backend", default="symbolic")
+
         return response, metadata
 
     def _get_response(self, user_input: str) -> tuple:
