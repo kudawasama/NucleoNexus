@@ -556,4 +556,79 @@ def register() -> Skill:
         },
     )
 
+    # ═══════════════════════════════════════════════════════════
+    #  7. browse_website — obtiene el contenido de una URL
+    # ═══════════════════════════════════════════════════════════
+    def _browse_website(url: str = ""):
+        """Obtiene el contenido textual de una pagina web.
+
+        Args:
+            url: URL completa del sitio (ej: 'https://kudawa.com')
+        """
+        if not url:
+            return {"error": "Especifica la URL. Ej: 'https://kudawa.com'"}
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                },
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                html = resp.read().decode("utf-8", errors="replace")
+
+            # Extraer titulo
+            title_match = _re.search(r'<title[^>]*>(.*?)</title>', html, _re.IGNORECASE | _re.DOTALL)
+            titulo = _re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else url
+
+            # Extraer texto significativo (parrafos, encabezados)
+            textos = _re.findall(
+                r'<(?:p|h[1-6]|li|div|span|article|section)[^>]*>'
+                r'(.*?)</(?:p|h[1-6]|li|div|span|article|section)>',
+                html, _re.IGNORECASE | _re.DOTALL
+            )
+            contenido = []
+            for t in textos:
+                texto_limpio = _re.sub(r"<[^>]+>", "", t).strip()
+                texto_limpio = _re.sub(r'\s+', ' ', texto_limpio)
+                if len(texto_limpio) > 20:  # Solo fragmentos significativos
+                    contenido.append(texto_limpio)
+
+            if not contenido:
+                # Si no encontro parrafos, devolver el body sin tags
+                body = _re.search(r'<body[^>]*>(.*?)</body>', html, _re.DOTALL)
+                if body:
+                    texto = _re.sub(r"<[^>]+>", " ", body.group(1))
+                    texto = _re.sub(r'\s+', ' ', texto).strip()
+                    contenido = [texto[:2000]]
+
+            return {
+                "titulo": titulo,
+                "contenido": "\n".join(contenido[:30]) if contenido else "(sin contenido visible)",
+                "url": url,
+                "total_lineas": len(contenido),
+            }
+        except urllib.error.HTTPError as e:
+            return {"error": f"HTTP {e.code}: {e.reason}"}
+        except urllib.error.URLError:
+            return {"error": f"No se pudo conectar a {url}"}
+        except Exception as e:
+            return {"error": f"Error: {e}"}
+
+    skill.register_action(
+        name="browse_website",
+        description="Obtiene el contenido textual de una pagina web a partir de una URL.",
+        handler=_browse_website,
+        parameters={
+            "url": {
+                "type": "string",
+                "description": "URL completa (ej: 'https://kudawa.com')",
+            },
+        },
+    )
+
     return skill

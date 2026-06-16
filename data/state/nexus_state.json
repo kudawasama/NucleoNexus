@@ -3,10 +3,10 @@
     "version": "0.1.0",
     "phase": "Intermedio",
     "active_since": 1781626531.0590978,
-    "total_interactions": 142,
+    "total_interactions": 153,
     "total_learned_facts": 22,
     "total_skills": 3,
-    "confidence_level": 0.242,
+    "confidence_level": 0.253,
     "awake_time": 0
   },
   "personality": {
@@ -24,11 +24,11 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 132.2,
-    "responses_given": 142,
-    "successful_responses": 142,
+    "avg_response_time_ms": 122.7,
+    "responses_given": 153,
+    "successful_responses": 153,
     "failed_responses": 0,
-    "last_response_time": 1781641372.5756593
+    "last_response_time": 1781641929.4478705
   },
   "knowledge_stats": {
     "episodic_memories": 270,

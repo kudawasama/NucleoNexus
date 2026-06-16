@@ -246,7 +246,9 @@ class NexusCore:
         
         # Mapa de tool intents con su regex de deteccion
         tool_patterns = [
-            ("web_search", r'(?:busca|buscar|investiga|investigar|encuentra|encontrar|consulta|consultar)\s+(?:en la web|en internet|en google|online|en linea|en línea)'),
+            ("web_search", r'(?:busca|buscar|bsuca|vusca|buca|investiga|investigar|encuentra|encontrar|consulta|consultar)\s+(?:en la web|en internet|en google|online|en linea|en línea)'),
+            ("browse_url", r'(?:abre|abrir|navega|navegar|visita|visitar|browse|entra|entrar)\s+(?:a\s+|en\s+)?(?:la\s+)?(?:url|pagina|página|sitio|web|dominio)\s+(.+)'),
+            ("browse_url", r'\b(?:visita|visitar|abre|abrir|navega|navegar|browse)\s+(?:https?://)?[\w.-]+\.\w{2,}\b'),
             ("read_file", r'(?:lee|leer|abre|abrir|muestra|mostrar)\s+(?:el\s+)?(?:archivo|fichero|file)'),
             ("search_files", r'(?:busca|buscar|encuentra|encontrar)\s+(?:en|dentro\s+de)\s+(?:los\s+)?(?:archivos|ficheros|codigo|código)'),
             ("run_command", r'\b(ejecuta|ejecutar|corre|correr|run|terminal|comando)\s+'),
@@ -399,14 +401,17 @@ class NexusCore:
         import re as _re
 
         if intent == "web_search":
-            # Extraer query: "busca en la web [query]"
+            # Extraer query: "busca en la web [query]" — limpiar comandos extra
             m = _re.search(
-                r'(?:busca|buscar|investiga|investigar|encuentra|encontrar|consulta|consultar)'
+                r'(?:busca|buscar|bsuca|vusca|buca|investiga|investigar|encuentra|encontrar|consulta|consultar)'
                 r'\s+(?:en la web|en internet|en google|online|en linea|en línea)\s+(.+)',
                 user_input, _re.IGNORECASE
             )
             if m:
                 query = m.group(1).strip().rstrip('.?!,')
+                # Limpiar: quitar "y [acción]" del final (ej: "y crea un informe")
+                query = _re.split(r'\s+(?:y\s+(?:crea|crear|haz|hacer|genera|generar|prepara|preparar|elabora|elaborar|escribe|escribir)\s+)', query, maxsplit=1)[0]
+                query = _re.split(r'\s+y\s+su\s+contenido', query, maxsplit=1)[0]
                 result = self.actions.execute("web_search", query=query)
                 if result.get("success"):
                     data = result["result"]
@@ -427,6 +432,43 @@ class NexusCore:
                             return f"No pude buscar: {data['error']}"
                 return "No encontré resultados. ¿Quieres intentar con otra consulta?"
             return "No entendí qué buscar. Ej: 'busca en la web Python tutorial'"
+
+        elif intent == "browse_url":
+            # Extraer URL/dominio
+            m = _re.search(
+                r'(?:abre|abrir|navega|navegar|visita|visitar|browse|entra|entrar)'
+                r'\s+(?:a\s+|en\s+)?(?:la\s+)?(?:url|pagina|página|sitio|web|dominio)\s+(.+)',
+                user_input, _re.IGNORECASE
+            )
+            if not m:
+                # Forma simple: "visita kudawa.com"
+                m = _re.search(
+                    r'\b(?:visita|visitar|abre|abrir|navega|navegar|browse)\s+((?:https?://)?[\w.-]+\.\w{2,})',
+                    user_input, _re.IGNORECASE
+                )
+            if m:
+                url_text = m.group(1).strip().rstrip('.?!,')
+                url_text = _re.split(r'\s+(?:y\s+(?:crea|crear|haz|hacer|genera|generar|prepara|preparar|elabora|elaborar|escribe|escribir)\s+)', url_text, maxsplit=1)[0]
+                url_text = _re.split(r'\s+y\s+su\s+contenido', url_text, maxsplit=1)[0]
+                if not url_text.startswith(('http://', 'https://')):
+                    url_text = 'https://' + url_text
+                result = self.actions.execute("browse_website", url=url_text)
+                if result.get("success"):
+                    data = result["result"]
+                    if isinstance(data, dict):
+                        if "error" in data:
+                            return f"Error: {data['error']}"
+                        title = data.get("titulo", "")
+                        content = data.get("contenido", data.get("texto", ""))
+                        lines = content.splitlines() if isinstance(content, str) else content
+                        resp = f"🌐 {title}\n"
+                        for line in lines[:20]:
+                            resp += f"  {line[:150]}\n"
+                        if len(lines) > 20:
+                            resp += f"  ... ({len(lines) - 20} líneas más)\n"
+                        return resp.strip()
+                return "No pude acceder a esa URL."
+            return "Especifica qué sitio visitar. Ej: 'visita kudawa.com'"
 
         elif intent == "read_file":
             # Extraer path: "lee el archivo [path]" o "muestra [path]"
