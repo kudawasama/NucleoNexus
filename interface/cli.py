@@ -107,15 +107,18 @@ class NexusCLI:
         print(NEXUS_ASCII)
         phase = self.core.state.get("nexus", "phase", default="Proto")
         version = self.core.state.get("nexus", "version", default="0.1.0")
+        commit = self.core.state.get("nexus", "commit", default="?")
         backend = self.core.state.get("capabilities", "backend", default="symbolic")
-        print(f"{Color.CYAN}╔═══════════════════════════════════════════╗{Color.RESET}")
-        print(f"{Color.CYAN}║{Color.RESET}  Fase: {Color.YELLOW}{phase}{Color.RESET}                 "
-              f"v{version}      {Color.CYAN}║{Color.RESET}")
+        repo = "github.com/kudawasama/NucleoNexus"
+        print(f"{Color.CYAN}╔══════════════════════════════════════════════════╗{Color.RESET}")
+        print(f"{Color.CYAN}║{Color.RESET}  Fase: {Color.YELLOW}{phase}{Color.RESET}     "
+              f"{Color.DIM}v{version}{Color.RESET}  " 
+              f"{Color.DIM}#{commit}{Color.RESET}   {Color.CYAN}║{Color.RESET}")
         print(f"{Color.CYAN}║{Color.RESET}  Backend: {Color.GREEN}{backend}{Color.RESET}"
-              f"                           {Color.CYAN}║{Color.RESET}")
+              f"            {Color.DIM}{repo}{Color.RESET}  {Color.CYAN}║{Color.RESET}")
         print(f"{Color.CYAN}║{Color.RESET}  Escribe '{Color.GREEN}/help{Color.RESET}' para comandos  "
               f"'{Color.GREEN}/exit{Color.RESET}' para salir {Color.CYAN}║{Color.RESET}")
-        print(f"{Color.CYAN}╚═══════════════════════════════════════════╝{Color.RESET}")
+        print(f"{Color.CYAN}╚══════════════════════════════════════════════════╝{Color.RESET}")
         print()
 
     def run(self):
@@ -260,6 +263,7 @@ class NexusCLI:
             "/personalidad": self._cmd_personality,
             "/backend": self._cmd_backend,
             "/export": self._cmd_export,
+            "/version": self._cmd_version,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -283,6 +287,7 @@ class NexusCLI:
 {Color.GREEN}/personalidad{Color.RESET} Ver/ajustar personalidad
 {Color.GREEN}/backend{Color.RESET}      Cambiar backend (symbolic/slm)
 {Color.GREEN}/export{Color.RESET}       Exportar estado como JSON
+{Color.GREEN}/version{Color.RESET}      Versión, commit y build info
 {Color.GREEN}/clear{Color.RESET}        Limpiar pantalla
 {Color.GREEN}/reset{Color.RESET}        Resetear Nexus
 {Color.GREEN}/exit{Color.RESET}         Salir
@@ -488,6 +493,23 @@ class NexusCLI:
         print(f"\n{Color.CYAN}╔══ Exportar Estado ══╗{Color.RESET}")
         print(output)
         print()
+
+    def _cmd_version(self, cmd: str = ""):
+        s = self.core.state.get_snapshot()
+        n = s['nexus']
+        ver = n.get('version', '?')
+        commit = n.get('commit', '?')
+        interactions = n.get('total_interactions', 0)
+        phase = n.get('phase', '?')
+        skills = n.get('total_skills', 0)
+        print(f"""
+{Color.CYAN}╔══ Versión ══╗{Color.RESET}
+  {Color.YELLOW}Versión:{Color.RESET}  {ver}
+  {Color.YELLOW}Commit:{Color.RESET}   #{commit}
+  {Color.YELLOW}Fase:{Color.RESET}     {phase}
+  {Color.YELLOW}Build:{Color.RESET}    {interactions} interacciones · {skills} skills
+  {Color.YELLOW}Repo:{Color.RESET}    github.com/kudawasama/NucleoNexus
+        """)
 
     def _cmd_reset(self, cmd: str = ""):
         # Confirmación simple

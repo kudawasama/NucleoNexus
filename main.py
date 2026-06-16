@@ -261,7 +261,7 @@ class NexusCore:
                 break
         
         if tool_intent:
-            result = self._handle_tool_intent(tool_intent, user_input)
+            result = self._handle_tool_intent(tool_intent, user_input, metadata)
             if result:
                 metadata["backend"] = "symbolic"
                 metadata["tool_called"] = tool_intent
@@ -392,7 +392,7 @@ class NexusCore:
 
     # ─── Tool Intents: ejecucion directa sin SLM ─────────────
 
-    def _handle_tool_intent(self, intent: str, user_input: str) -> str | None:
+    def _handle_tool_intent(self, intent: str, user_input: str, metadata: dict = None) -> str | None:
         """Ejecuta una herramienta directamente desde el intent detectado.
         
         Extrae parámetros del texto del usuario con regex y llama
@@ -412,6 +412,36 @@ class NexusCore:
                 # Limpiar: quitar "y [acción]" del final (ej: "y crea un informe")
                 query = _re.split(r'\s+(?:y\s+(?:crea|crear|haz|hacer|genera|generar|prepara|preparar|elabora|elaborar|escribe|escribir)\s+)', query, maxsplit=1)[0]
                 query = _re.split(r'\s+y\s+su\s+contenido', query, maxsplit=1)[0]
+                
+                # Si el query es un dominio (.com, .org, .io, .net, .dev, .app)
+                # navegarlo directamente en vez de buscar
+                domain_match = _re.match(
+                    r'^(?:el\s+)?(?:dominio\s+|sitio\s+|web\s+)?'
+                    r'([\w-]+\.\w{2,})(?:[/\s].*)?$',
+                    query, _re.IGNORECASE
+                )
+                if domain_match:
+                    domain = domain_match.group(1)
+                    if not domain.startswith(('http://', 'https://')):
+                        domain = 'https://' + domain
+                    result = self.actions.execute("browse_website", url=domain)
+                    if result.get("success"):
+                        data = result["result"]
+                        if isinstance(data, dict) and "error" not in data:
+                            title = data.get("titulo", domain)
+                            content = data.get("contenido", "")
+                            lines = content.splitlines() if isinstance(content, str) else content
+                            resp = f"🌐 {title}\n"
+                            for line in lines[:15]:
+                                resp += f"  {line[:150]}\n"
+                            if len(lines) > 15:
+                                resp += f"  ... ({len(lines) - 15} líneas más)"
+                            metadata["tool_called"] = "browse_website"
+                            return resp.strip()
+                        elif "error" in data:
+                            # Fallback: buscar normal si no se pudo navegar
+                            pass
+                
                 result = self.actions.execute("web_search", query=query)
                 if result.get("success"):
                     data = result["result"]

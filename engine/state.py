@@ -13,12 +13,16 @@ import logging
 from pathlib import Path
 from copy import deepcopy
 
+# Version del sistema
+import config as _cfg
+
 logger = logging.getLogger("nexus.engine.state")
 
 # ─── Estado por defecto del sistema ──────────────────────────
 DEFAULT_STATE = {
     "nexus": {
-        "version": "0.1.0",
+        "version": _cfg.SYSTEM["version"],
+        "commit": _cfg.SYSTEM.get("commit", "?"),
         "phase": "Proto",          # Proto → Básico → Intermedio → Avanzado → Pro
         "active_since": None,
         "total_interactions": 0,
@@ -85,6 +89,9 @@ class StateEngine:
                 # Merge con defaults (para agregar campos nuevos)
                 self._state = deepcopy(DEFAULT_STATE)
                 self._deep_merge(self._state, stored)
+                # Preservar version y commit de DEFAULT_STATE (no del JSON viejo)
+                self._state["nexus"]["version"] = DEFAULT_STATE["nexus"]["version"]
+                self._state["nexus"]["commit"] = DEFAULT_STATE["nexus"]["commit"]
                 logger.info(f"Estado cargado: {self.state_file}")
             except (json.JSONDecodeError, Exception) as e:
                 logger.warning(f"Error cargando estado: {e}. Usando defaults.")

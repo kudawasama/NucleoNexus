@@ -8,6 +8,9 @@ A medida que Nexus evoluciona, aqui se agregan nuevas opciones.
 import os
 from pathlib import Path
 
+# Versionado automatico desde git
+from version import FULL_VERSION, COMMIT
+
 # --- Rutas base -----------------------------------------------
 BASE_DIR = Path(__file__).parent.resolve()
 DATA_DIR = BASE_DIR / "data"
@@ -85,8 +88,10 @@ LOG_FILE = str(LOGS_DIR / "nexus.log")
 # --- Estado del sistema ---------------------------------------
 SYSTEM = {
     "name": "Nucleo Nexus",
-    "version": "0.1.0",
+    "version": FULL_VERSION,
+    "commit": COMMIT,
     "phase": "Proto",
     "author": "Jose Cespedes",
     "description": "Sistema de IA ultraligero con aprendizaje incremental",
+    "repository": "https://github.com/kudawasama/NucleoNexus",
 }
