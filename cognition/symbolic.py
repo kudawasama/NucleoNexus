@@ -137,7 +137,7 @@ class SymbolicEngine:
             "agradecimiento": r'\b(gracias|thank|thanks|graciass)\b',
             "presentacion": r'\b(quién eres|quien eres|que eres|qué eres|presentate|presentate|capacidades|que puedes hacer|qué puedes hacer|que sabes hacer)\b',
             "estado": r'\b(estado|status|cómo estás|como estas|que tal|qué tal)\b',
-            "aprender": r'\b(aprend[a-z]{2,}|enseñ[ae]|nuev[ao]|saber|conocimiento|recuerd[ae])\b',
+            "aprender": r'\b(aprend[a-z]+|enseñ[ae]|nuev[ao]|saber|conocimiento|recuerd[ae])\b',
             "fase": r'\b(fase|evolución|evolucion|nivel|progreso|level|phase)\b',
             "calcular": r'\b(cuanto es|cuánto es|calcula|calcular|suma|resta|multiplica|divide|\d+\s*[+\-*/]\s*\d+)\b',
             "ayuda": r'\b(ayuda|help|comando|command|qué puedes|que puedes|skills)\b',
