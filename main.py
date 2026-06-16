@@ -186,16 +186,19 @@ class NexusCore:
             self.actions.register(action)
             logger.debug(f"Accion de skill registrada: {action.name}")
 
-    def process(self, user_input: str) -> str:
+    def process(self, user_input: str) -> tuple:
         """Procesa la entrada del usuario y genera respuesta.
 
         Modos de operacion:
         - symbolic:   solo motor simbolico (sin modelo, sin internet)
         - slm:        solo SLM local (modelo responde todo)
         - hybrid:     intents rapidas en simbolico, general en SLM
+
+        Returns:
+            Tuple (response_str, metadata_dict)
         """
         # 1. Generar respuesta según el backend activo
-        response = self._get_response(user_input)
+        response, metadata = self._get_response(user_input)
 
         # 2. Aprender de la interacción (solo desde input del usuario, no del SLM)
         learned_input = learn_from_user_input(user_input, self.memory)
@@ -209,10 +212,23 @@ class NexusCore:
         self.state.record_interaction(success=True)
         self.state.evolve_phase()
 
-        return response
+        return response, metadata
 
-    def _get_response(self, user_input: str) -> str:
-        """Selecciona y ejecuta el backend adecuado según el modo actual."""
+    def _get_response(self, user_input: str) -> tuple:
+        """Selecciona y ejecuta el backend adecuado según el modo actual.
+        
+        Returns:
+            Tuple (response_str, metadata_dict)
+        """
+        # Metadata base
+        metadata = {
+            "backend": "symbolic",
+            "model": None,
+            "tokens_prompt": 0,
+            "tokens_generated": 0,
+            "duration_ms": 0,
+            "total_duration_ms": 0,
+        }
         backend_mode = self.state.get("capabilities", "backend", default="symbolic")
 
         # --- HYBRID: intent -> simbolico, resto -> SLM (ReAct) ---
@@ -227,14 +243,18 @@ class NexusCore:
                 if intent == "calcular" and not re.search(r'\d+\s*[+\-*/]\s*\d+', user_input):
                     pass  # Dejar que caiga al SLM o búsqueda en memoria
                 else:
-                    return self.symbolic.process(user_input, actions_registry=self.actions,
+                    response = self.symbolic.process(user_input, actions_registry=self.actions,
                                                 skip_bookkeeping=True)
+                    metadata["backend"] = "symbolic"
+                    return response, metadata
 
             # Pregunta sin intent rápido: ver si hay hechos en memoria
             facts = self.memory.query_knowledge(user_input, top_k=2)
             if facts and any(f.get("score", 0) >= 0.15 for f in facts):
-                return self.symbolic.process(user_input, actions_registry=self.actions,
+                response = self.symbolic.process(user_input, actions_registry=self.actions,
                                             skip_bookkeeping=True)
+                metadata["backend"] = "symbolic"
+                return response, metadata
 
             # Sin hechos → SLM con contexto de memoria (structured output)
             try:
@@ -246,9 +266,17 @@ class NexusCore:
                     memory_records=mem_records,
                 )
                 # Generar con JSON mode forzado
-                raw_json = self.slm.generate(user_input, system_prompt=prompt,
+                slm_result = self.slm.generate(user_input, system_prompt=prompt,
                                             structured=True)
-                if raw_json:
+                if slm_result:
+                    raw_json = slm_result["response"]
+                    metadata["backend"] = "slm"
+                    metadata["model"] = slm_result.get("model")
+                    metadata["tokens_prompt"] = slm_result.get("tokens_prompt", 0)
+                    metadata["tokens_generated"] = slm_result.get("tokens_generated", 0)
+                    metadata["duration_ms"] = slm_result.get("duration_ms", 0)
+                    metadata["total_duration_ms"] = slm_result.get("total_duration_ms", 0)
+
                     # Parsear JSON
                     import json as _json
                     try:
@@ -273,10 +301,10 @@ class NexusCore:
                                     context={"backend": "react"})
 
                         if respuesta:
-                            return respuesta
+                            return respuesta, metadata
                     except _json.JSONDecodeError:
                         # Fallback: usar raw si no es JSON válido
-                        return raw_json
+                        return raw_json, metadata
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
 
@@ -284,15 +312,22 @@ class NexusCore:
         if backend_mode == "slm" and self.slm and self.slm.loaded:
             try:
                 system_prompt = self.context.build(user_input)
-                response = self.slm.generate(user_input, system_prompt=system_prompt)
-                if response:
-                    return response
+                slm_result = self.slm.generate(user_input, system_prompt=system_prompt)
+                if slm_result:
+                    metadata["backend"] = "slm"
+                    metadata["model"] = slm_result.get("model")
+                    metadata["tokens_prompt"] = slm_result.get("tokens_prompt", 0)
+                    metadata["tokens_generated"] = slm_result.get("tokens_generated", 0)
+                    metadata["duration_ms"] = slm_result.get("duration_ms", 0)
+                    metadata["total_duration_ms"] = slm_result.get("total_duration_ms", 0)
+                    return slm_result["response"], metadata
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
 
         # --- Modo simbolico (default o fallback) ---
-        return self.symbolic.process(user_input, actions_registry=self.actions,
+        response = self.symbolic.process(user_input, actions_registry=self.actions,
                                     skip_bookkeeping=True)
+        return response, metadata
 
     # ─── ReAct: acciones embebidas en respuesta del SLM ─────────
 

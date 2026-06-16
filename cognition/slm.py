@@ -114,7 +114,7 @@ class SLMBackend:
         return False
 
     def generate(self, prompt: str, system_prompt: str = None,
-                 structured: bool = False) -> Optional[str]:
+                 structured: bool = False) -> Optional[dict]:
         """Genera una respuesta usando el SLM cargado.
         
         Args:
@@ -123,7 +123,8 @@ class SLMBackend:
             structured: Si True, fuerza salida JSON (Ollama format mode)
             
         Returns:
-            Texto de respuesta, o None si falla
+            Dict con 'response', 'model', 'tokens_prompt', 'tokens_generated',
+            'duration_ms', o None si falla
         """
         if not self.loaded:
             logger.warning("SLM no cargado. Usa load() primero.")
@@ -140,8 +141,8 @@ class SLMBackend:
             return self._generate_llamacpp(prompt, system_prompt)
         return None
 
-    def _generate_ollama_structured(self, prompt: str, system_prompt: str = None) -> Optional[str]:
-        """Genera respuesta via Ollama con formato JSON forzado."""
+    def _generate_ollama_structured(self, prompt: str, system_prompt: str = None) -> Optional[dict]:
+        """Genera respuesta via Ollama con formato JSON forzado y metadata."""
         try:
             import requests
             # Sistema + instrucción de formato JSON
@@ -166,12 +167,20 @@ class SLMBackend:
             r = requests.post("http://localhost:11434/api/generate",
                             json=payload, timeout=45)
             if r.status_code == 200:
-                raw = r.json().get("response", "")
+                data = r.json()
+                raw = data.get("response", "")
                 # Verificar que es JSON válido
                 import json as _json
                 try:
                     _json.loads(raw)
-                    return raw  # JSON válido, devolver raw
+                    return {
+                        "response": raw,
+                        "model": data.get("model", self.model_name),
+                        "tokens_prompt": data.get("prompt_eval_count", 0),
+                        "tokens_generated": data.get("eval_count", 0),
+                        "duration_ms": round(data.get("eval_duration", 0) / 1_000_000, 1),
+                        "total_duration_ms": round(data.get("total_duration", 0) / 1_000_000, 1),
+                    }
                 except _json.JSONDecodeError:
                     logger.warning(f"JSON inválido del SLM: {raw[:60]}")
                     return None
@@ -180,8 +189,8 @@ class SLMBackend:
             logger.error(f"Error en generación Ollama estructurada: {e}")
             return None
 
-    def _generate_ollama(self, prompt: str, system_prompt: str = None) -> Optional[str]:
-        """Genera respuesta via Ollama."""
+    def _generate_ollama(self, prompt: str, system_prompt: str = None) -> Optional[dict]:
+        """Genera respuesta via Ollama con metadata de tokens."""
         try:
             import requests
             payload = {
@@ -199,7 +208,16 @@ class SLMBackend:
             r = requests.post("http://localhost:11434/api/generate",
                             json=payload, timeout=30)
             if r.status_code == 200:
-                return r.json().get("response", "")
+                data = r.json()
+                response = data.get("response", "")
+                return {
+                    "response": response,
+                    "model": data.get("model", self.model_name),
+                    "tokens_prompt": data.get("prompt_eval_count", 0),
+                    "tokens_generated": data.get("eval_count", 0),
+                    "duration_ms": round(data.get("eval_duration", 0) / 1_000_000, 1),
+                    "total_duration_ms": round(data.get("total_duration", 0) / 1_000_000, 1),
+                }
         except Exception as e:
             logger.error(f"Error en generación Ollama: {e}")
         return None

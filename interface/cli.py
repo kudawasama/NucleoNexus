@@ -119,15 +119,19 @@ class NexusCLI:
                 continue
 
             # Procesar input con Nexus
-            start = time.time()
-            response = self.core.process(user_input)
-            elapsed = (time.time() - start) * 1000
+            response, metadata = self.core.process(user_input)
 
             # Mostrar respuesta con estilo
-            self._show_response(response, elapsed)
+            self._show_response(response, metadata)
 
-    def _show_response(self, response: str, elapsed_ms: float):
-        """Muestra la respuesta formateada."""
+    def _show_response(self, response: str, metadata: dict):
+        """Muestra la respuesta formateada con metadatos técnicos.
+        
+        Args:
+            response: Texto de respuesta
+            metadata: Dict con backend, model, tokens_prompt, 
+                     tokens_generated, duration_ms, total_duration_ms
+        """
         phase = self.core.state.get("nexus", "phase", default="Proto")
         
         # Indicador de fase
@@ -153,11 +157,32 @@ class NexusCLI:
         if line:
             print(f"  {line}")
         
-        # Footer con tiempo
+        # Footer con metadata técnica
+        backend = metadata.get("backend", "symbolic")
+        model = metadata.get("model", "")
+        elapsed = metadata.get("duration_ms", 0) or metadata.get("total_duration_ms", 0)
+        tokens_prompt = metadata.get("tokens_prompt", 0)
+        tokens_gen = metadata.get("tokens_generated", 0)
+        
+        # Badge de backend
+        if backend == "slm":
+            badge = f"{Color.rgb(255, 165, 0)}SLM{Color.RESET}"
+        else:
+            badge = f"{Color.GRAY}φ{Color.RESET}"
+        
+        # Línea técnica compacta
+        tech_parts = [f"{badge} {elapsed:.0f}ms"]
+        if model:
+            tech_parts.append(f"· {model}")
+        if tokens_gen:
+            tech_parts.append(f"· {tokens_gen} tok")
+        if tokens_prompt:
+            tech_parts.append(f"· {tokens_prompt} ctx")
+        
         conf = self.core.state.get("nexus", "confidence_level", default=0)
         bar = "█" * int(conf * 10) + "░" * (10 - int(conf * 10))
         
-        print(f"{Color.DIM}  ─── {elapsed_ms:.0f}ms · [{bar}] {conf:.0%} confianza{Color.RESET}")
+        print(f"{Color.DIM}  ─── {' '.join(tech_parts)} · [{bar}] {conf:.0%}{Color.RESET}")
         print()
 
     def _handle_command(self, cmd: str):
