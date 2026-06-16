@@ -62,8 +62,32 @@ class SemanticMemory:
             return True
 
     def query_knowledge(self, query: str, top_k: int = 3) -> list[dict]:
-        """Búsqueda por coincidencia de términos (sin TF-IDF)."""
+        """Busca hechos por coincidencia de términos.
+        Si query está vacío, devuelve los hechos más recientes.
+        """
         cur = self.conn.cursor()
+
+        if not query or not query.strip():
+            cur.execute(
+                "SELECT id, fact, category, confidence, source, created_at "
+                "FROM semantic ORDER BY confidence DESC, created_at DESC LIMIT ?",
+                (top_k * 3,)
+            )
+            results = []
+            for row in cur.fetchall():
+                results.append({
+                    "doc_id": f"sem_{row['id']}",
+                    "text": row['fact'],
+                    "metadata": {
+                        "category": row['category'],
+                        "type": "semantic",
+                        "confidence": row['confidence'],
+                        "source": row['source'],
+                    },
+                    "score": row['confidence'],
+                })
+            return results[:top_k]
+
         terms = query.lower().split()
         results = []
         for term in terms:

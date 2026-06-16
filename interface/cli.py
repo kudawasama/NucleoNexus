@@ -292,20 +292,21 @@ class NexusCLI:
         if category:
             facts = self.core.memory.get_facts_by_category(category)
         else:
-            # Todos los hechos
-            facts = self.core.memory.semantic.query_knowledge("", top_k=20)
+            # Todos los hechos - usar query vacío para obtener todos
+            facts = self.core.memory.semantic.query_knowledge("", top_k=50)
         
         if not facts:
             print(f"{Color.DIM}Aún no hay hechos aprendidos.{Color.RESET}")
             return
         
-        print(f"\n{Color.CYAN}╔══ Hechos aprendidos ══╗{Color.RESET}")
-        for f in facts:
+        print(f"\n{Color.CYAN}╔══ Hechos aprendidos ({len(facts)}) ══╗{Color.RESET}")
+        for i, f in enumerate(facts, 1):
             if isinstance(f, dict):
-                text = f.get('fact', f.get('text', ''))[:60]
-                conf = f.get('confidence', 0)
+                text = f.get('fact', f.get('text', ''))
+                conf = f.get('confidence', f.get('metadata', {}).get('confidence', 0))
                 cat = f.get('category', f.get('metadata', {}).get('category', '?'))
-                print(f"  {Color.GREEN}[{cat}]{Color.RESET} {text} {Color.DIM}({conf:.0%}){Color.RESET}")
+                print(f"  {i:2d}. {Color.GREEN}[{cat}]{Color.RESET} {text[:80]} "
+                      f"{Color.DIM}({conf:.0%}){Color.RESET}")
         print()
 
     def _cmd_skills(self, cmd: str = ""):

@@ -137,8 +137,9 @@ class SymbolicEngine:
             "agradecimiento": r'\b(gracias|thank|thanks|graciass)\b',
             "presentacion": r'\b(quién eres|quien eres|que eres|qué eres|presentate|presentate|capacidades|que puedes hacer|qué puedes hacer|que sabes hacer)\b',
             "estado": r'\b(estado|status|cómo estás|como estas|que tal|qué tal)\b',
-            "aprender": r'\b(aprend[aeio]|enseñ[ae]|nuev[ao]|saber|conocimiento|recuerd[ae])\b',
+            "aprender": r'\b(aprend[a-z]{2,}|enseñ[ae]|nuev[ao]|saber|conocimiento|recuerd[ae])\b',
             "fase": r'\b(fase|evolución|evolucion|nivel|progreso|level|phase)\b',
+            "calcular": r'\b(cuanto es|cuánto es|calcula|calcular|suma|resta|multiplica|divide|\d+\s*[+\-*/]\s*\d+)\b',
             "ayuda": r'\b(ayuda|help|comando|command|qué puedes|que puedes|skills)\b',
             "memoria": r'\b(recuerda[s]?|memoria|olvid|acuerd[ao])\b',
             "nombre": r'\b(cómo me llamo|como me llamo|sabes mi nombre|sabes quién soy|quién soy|me llamo|mi nombre es)\b',
@@ -191,6 +192,7 @@ class SymbolicEngine:
             "estado": self._handle_status,
             "aprender": self._handle_learn,
             "fase": self._handle_phase,
+            "calcular": self._handle_calculate,
             "ayuda": self._handle_help,
             "memoria": self._handle_memory,
             "nombre": self._handle_name,
@@ -414,6 +416,47 @@ class SymbolicEngine:
             "  'Me llamo [tu nombre]'"
         )
 
+    def _handle_calculate(self, text: str, memories: list, facts: list) -> str:
+        """Evalua expresiones matematicas simples."""
+        # Buscar patron de operacion: "2+2", "cuanto es 5 * 3"
+        expr_match = re.search(r'(\d+\s*[+\-*/]\s*\d+)', text)
+        if not expr_match:
+            return (
+                "Puedo hacer calculos basicos. Por ejemplo:\n"
+                "  'Cuanto es 2+2'\n"
+                "  'Calcula 15 * 3'\n"
+                "  'Cuanto es 100 / 4'"
+            )
+
+        expr = expr_match.group(1).strip()
+        try:
+            # Evaluar solo operaciones aritmeticas basicas
+            # Usar un parser seguro, no eval()
+            import operator
+            ops = {
+                '+': operator.add,
+                '-': operator.sub,
+                '*': operator.mul,
+                '/': operator.truediv,
+            }
+            # Parsear la expresion
+            for op_char in ['+', '-', '*', '/']:
+                if op_char in expr:
+                    parts = expr.split(op_char)
+                    if len(parts) == 2:
+                        a, b = float(parts[0].strip()), float(parts[1].strip())
+                        result = ops[op_char](a, b)
+                        # Formatear resultado
+                        if result == int(result):
+                            result_str = str(int(result))
+                        else:
+                            result_str = f"{result:.2f}"
+                        return f"{expr} = **{result_str}**"
+        except (ValueError, ZeroDivisionError) as e:
+            return f"Error en el calculo: {e}"
+
+        return "No pude interpretar la expresion matematica."
+
     def _handle_conversation(self, text: str, memories: list, facts: list) -> str:
         """Respuesta general que busca activamente en memoria."""
         text_lower = text.lower()
@@ -472,7 +515,19 @@ class SymbolicEngine:
             # Buscar en memoria episodica (conversacion previa)
             mem_recall = self.memory.recall(text, top_k=5)
             if mem_recall:
-                relevant = [m for m in mem_recall if m.get("score", 0) > 0.1]
+                # Filtrar: umbral mas alto + al menos una palabra significativa en comun
+                stop_words = {'como', 'que', 'qué', 'es', 'son', 'las', 'los', 'mas',
+                             'por', 'para', 'con', 'del', 'una', 'uno', 'sus', 'le'}
+                query_words = set(re.findall(r'\b[a-z]{4,}\b', text_lower)) - stop_words
+                relevant = []
+                for m in mem_recall:
+                    score = m.get("score", 0)
+                    if score < 0.25:
+                        continue
+                    mem_words = set(re.findall(r'\b[a-z]{4,}\b',
+                                     m.get("text", "").lower())) - stop_words
+                    if query_words & mem_words:
+                        relevant.append(m)
                 if relevant:
                     best = relevant[0].get("text", "")[:120]
                     return (
