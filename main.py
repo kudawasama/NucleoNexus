@@ -90,9 +90,10 @@ class NexusCore:
         self._load_skills()
         logger.info("OK Skills")
 
-        # 4. Registro de Acciones
+        # 4. Registro de Acciones (nucleo + skills)
         self.actions = ActionRegistry()
         self._register_core_actions()
+        self._register_skill_actions()
         logger.info("OK Acciones")
 
         # 5. Backend SLM (opcional)
@@ -160,6 +161,17 @@ class NexusCore:
             description="Obtiene el estado completo de Nexus",
             handler=_get_status,
         )
+
+    def _register_skill_actions(self):
+        """Registra las acciones de todas las skills en el registro central.
+        
+        Esto permite que el puente intent->skill action en el motor simbolico
+        encuentre y ejecute acciones de cualquier skill cargada.
+        """
+        all_skill_actions = self.skills.get_all_actions()
+        for action in all_skill_actions.list():
+            self.actions.register(action)
+            logger.debug(f"Accion de skill registrada: {action.name}")
 
     def process(self, user_input: str) -> str:
         """Procesa la entrada del usuario y genera respuesta.

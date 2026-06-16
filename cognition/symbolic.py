@@ -93,6 +93,15 @@ class SymbolicEngine:
         self._patterns = []
         self._load_patterns()
 
+        # --- Puente: intencion -> accion de skill ---
+        # Cuando se detecta una intent, se busca una skill action que la maneje
+        # Esto permite que las skills extiendan las capacidades de Nexus
+        self.INTENT_TO_ACTION = {
+            "hora": "get_time",
+            "estado": "get_nexus_status",
+            "clima": "get_weather",
+        }
+
     def _load_patterns(self):
         """Carga patrones procedurales desde la memoria."""
         # Los patrones se cargan dinámicamente de la DB procedural
@@ -121,7 +130,8 @@ class SymbolicEngine:
         facts = self.memory.query_knowledge(input_lower, top_k=2)
 
         # 5. Generar respuesta según intención + contexto
-        response = self._generate_response(intent, input_lower, memories, facts)
+        response = self._generate_response(intent, input_lower, memories, facts,
+                                          actions_registry=actions_registry)
 
         # 6. Aprender de esta interacción
         self._learn_from_interaction(input_lower, response)
@@ -161,6 +171,7 @@ class SymbolicEngine:
             "fase": r'\b(fase|evolución|evolucion|nivel|progreso|level|phase)\b',
             "calcular": r'\b(cuanto es|cuánto es|calcula|calcular|suma|resta|multiplica|divide|\d+\s*[+\-*/]\s*\d+)\b',
             "ayuda": r'\b(ayud[a-z]+|help|comando|command|qué puedes|que puedes|skills)\b',
+            "clima": r'\b(clima|temperatura|lluvia|pronóstico|pronostico|tiempo atmosferico|huechuraba|santiago)\b',
             "hora": r'\b(hora|que hora es|qué hora es|reloj|tiempo actual|fecha actual|get_time)\b',
             "memoria": r'\b(recuerda[s]?|memoria|olvid|acuerd[ao])\b',
             "nombre": r'\b(cómo me llamo|como me llamo|sabes mi nombre|sabes quién soy|quién soy|me llamo|mi nombre es)\b',
@@ -191,9 +202,34 @@ class SymbolicEngine:
         return None
 
     def _generate_response(self, intent: str, text: str, memories: list,
-                           facts: list) -> str:
-        """Genera la respuesta según intención y contexto disponible."""
+                           facts: list, actions_registry=None) -> str:
+        """Genera la respuesta segun intencion y contexto disponible.
+        
+        Primero verifica si hay una skill action registrada para esta intent.
+        Si la hay, la ejecuta y devuelve el resultado formateado.
+        Si no, usa el handler hardcodeado.
+        """
         phase = self.state.get("nexus", "phase", default="Proto")
+
+        # --- PUENTE: intent -> skill action ---
+        # Si hay una skill action registrada para esta intent, ejecutarla
+        if actions_registry and intent in self.INTENT_TO_ACTION:
+            action_name = self.INTENT_TO_ACTION[intent]
+            action = actions_registry.get(action_name)
+            if action:
+                result = action.execute(text=text)
+                if result.get("success"):
+                    output = result.get("result")
+                    # Formatear segun el tipo de resultado
+                    if isinstance(output, dict):
+                        # Si tiene clave "respuesta", usarla directamente
+                        if "respuesta" in output:
+                            return output["respuesta"]
+                        # Si no, convertir a texto legible
+                        lines = [f"{k}: {v}" for k, v in output.items()
+                                 if not k.startswith("_")]
+                        return "\n".join(lines)
+                    return str(output)
 
         # Patrones procedurales primero
         pattern = self.memory.find_pattern(text)
@@ -215,6 +251,7 @@ class SymbolicEngine:
             "fase": self._handle_phase,
             "calcular": self._handle_calculate,
             "hora": self._handle_time,
+            "clima": self._handle_clima,
             "ayuda": self._handle_help,
             "memoria": self._handle_memory,
             "nombre": self._handle_name,
@@ -453,6 +490,14 @@ class SymbolicEngine:
         fecha = f"{now.tm_mday}/{now.tm_mon}/{now.tm_year}"
         hora = f"{now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}"
         return f"Son las **{hora}** del **{fecha}**."
+
+    def _handle_clima(self, text: str, memories: list, facts: list) -> str:
+        """Fallback para consultas de clima cuando no hay skill cargada."""
+        return (
+            "No tengo una skill de clima cargada aun. "
+            "Si instalas la skill 'weather', podre consultar "
+            "el clima en cualquier ciudad. ¿Quieres que la cree?"
+        )
 
     def _handle_calculate(self, text: str, memories: list, facts: list) -> str:
         """Evalua expresiones matematicas simples."""

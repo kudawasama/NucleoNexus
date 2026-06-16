@@ -1,12 +1,12 @@
 {
   "nexus": {
     "version": "0.1.0",
-    "phase": "Básico",
+    "phase": "Intermedio",
     "active_since": 1781626531.0590978,
-    "total_interactions": 46,
+    "total_interactions": 61,
     "total_learned_facts": 4,
-    "total_skills": 1,
-    "confidence_level": 0.146,
+    "total_skills": 2,
+    "confidence_level": 0.161,
     "awake_time": 0
   },
   "personality": {
@@ -24,16 +24,16 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 33.61,
-    "responses_given": 46,
-    "successful_responses": 46,
+    "avg_response_time_ms": 161.07,
+    "responses_given": 61,
+    "successful_responses": 61,
     "failed_responses": 0,
-    "last_response_time": 1781627731.8694408
+    "last_response_time": 1781628150.5764377
   },
   "knowledge_stats": {
-    "episodic_memories": 92,
+    "episodic_memories": 122,
     "semantic_facts": 4,
     "procedural_patterns": 0,
-    "skills_learned": 1
+    "skills_learned": 2
   }
 }
