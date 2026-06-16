@@ -186,6 +186,10 @@ class SymbolicEngine:
             "reset": r'\b(reset|reiniciar|borrar|limpiar|empezar de nuevo)\b',
             "personalidad": r'\b(personalidad|tono|voz|estilo|forma[l]?|ser)\b',
             "confianza": r'\b(confianza|seguro|certeza|cuanto sabes|qué tanto sabes)\b',
+            "web_search": r'\b(busca|buscar|investiga|investigar|consulta|consultar|encuentra|encontrar)\s+(en la web|en internet|en google|online|en linea|en línea)\b',
+            "read_file": r'\b(lee|leer|abre|abrir|muestra|mostrar)\s+(el\s+)?(archivo|fichero|file)\b',
+            "search_files": r'\b(busca|buscar|encuentra|encontrar)\s+(en|dentro\s+de)\s+(los\s+)?(archivos|ficheros|codigo|código)\b',
+            "run_command": r'\b(ejecuta|ejecutar|corre|correr|run|terminal|comando)\b',
         }
 
         for intent, pattern in patterns.items():

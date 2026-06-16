@@ -289,9 +289,9 @@ class NexusCore:
                     try:
                         parsed = _json.loads(raw_json)
                         respuesta = parsed.get("respuesta", "")
-                        accion = parsed.get("accion", "ninguna")
+                        accion = parsed.get("accion", "responder")
 
-                        # Ejecutar acción si aplica
+                        # Ejecutar acción según el tipo
                         if accion == "buscar_memoria":
                             tema = parsed.get("tema", user_input)
                             res = self.memory.query_knowledge(tema, top_k=3)
@@ -306,6 +306,31 @@ class NexusCore:
                                 self.memory.remember("nexus",
                                     f"[calculo: {expr}]",
                                     context={"backend": "react"})
+                        elif accion == "usar_herramienta":
+                            herramienta = parsed.get("herramienta", "")
+                            parametros = parsed.get("parametros", {})
+                            if herramienta:
+                                metadata["tool_called"] = herramienta
+                                # Ejecutar la herramienta via ActionRegistry
+                                tool_result = self.actions.execute(herramienta, **parametros)
+                                if tool_result.get("success"):
+                                    result_data = tool_result.get("result", {})
+                                    if isinstance(result_data, dict):
+                                        # Si la herramienta ya dio formato, usarla
+                                        if "respuesta" in result_data:
+                                            respuesta = result_data["respuesta"]
+                                        elif "resultados" in result_data:
+                                            items = result_data["resultados"]
+                                            respuesta = (
+                                                f"Resultados de {herramienta}:\\n"
+                                                + "\\n".join(str(i) for i in items[:5])
+                                            )
+                                        elif "salida" in result_data:
+                                            respuesta = result_data["salida"][:500]
+                                        else:
+                                            respuesta = str(result_data)[:500]
+                                    else:
+                                        respuesta = str(result_data)[:500]
 
                         if respuesta:
                             return respuesta, metadata

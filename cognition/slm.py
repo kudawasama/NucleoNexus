@@ -147,8 +147,21 @@ class SLMBackend:
             import requests
             # Sistema + instrucción de formato JSON
             json_instruction = (
-                "Responde SOLO con JSON valido: "
-                '{"respuesta": "tu respuesta", "accion": "ninguna|buscar_memoria|calcular"}'
+                "Responde SOLO con JSON valido. El campo 'accion' determina "
+                "que hace Nexus con tu respuesta:\n"
+                '- "responder": solo responde al usuario (mas comun)\n'
+                '- "buscar_memoria": busca un tema en la base de conocimiento\n'
+                '- "calcular": evalua una expresion matematica\n'
+                '- "usar_herramienta": ejecuta una herramienta del sistema '
+                "(web_search, read_file, write_file, search_files, "
+                "run_command, python_eval)\n\n"
+                "Esquema:\n"
+                '{"respuesta": "texto al usuario", '
+                '"accion": "responder|buscar_memoria|calcular|usar_herramienta", '
+                '"tema": "tema a buscar (si accion=buscar_memoria)", '
+                '"expresion": "2+2 (si accion=calcular)", '
+                '"herramienta": "web_search (si accion=usar_herramienta)", '
+                '"parametros": {"query": "termino busqueda"}}'
             )
             full_system = f"{system_prompt}\n\n{json_instruction}" if system_prompt else json_instruction
 

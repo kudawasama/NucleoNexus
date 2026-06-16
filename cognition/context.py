@@ -136,18 +136,44 @@ Reglas de oro:
         """Construye el bloque de skills disponibles."""
         if not self.skills:
             return ""
+
+        lines = ["=== HERRAMIENTAS DISPONIBLES ==="]
+        lines.append("Puedes ordenar que ejecute estas herramientas:")
+        
+        # Tools (prioritarias)
+        tool_actions = [
+            ("web_search", "Buscar en la web (DuckDuckGo, gratis)"),
+            ("read_file", "Leer contenido de un archivo"),
+            ("write_file", "Escribir o crear un archivo"),
+            ("search_files", "Buscar texto dentro de archivos (grep)"),
+            ("run_command", "Ejecutar un comando de shell"),
+            ("python_eval", "Evaluar una expresion matematica Python"),
+        ]
+        for name, desc in tool_actions:
+            lines.append(f"  → {name}: {desc}")
+        
+        # Otras skills
         all_actions = self.skills.get_all_actions()
-        actions = all_actions.list()
+        for action in all_actions.list():
+            if action.name not in [a[0] for a in tool_actions]:
+                lines.append(f"  → {action.name}: {action.description}")
+        
+        lines.append("")
+        lines.append("Cuando generes JSON, usa accion='usar_herramienta', "
+                     "herramienta='nombre', parametros={...}")
+        lines.append("=== FIN HERRAMIENTAS ===")
+        return "\n".join(lines)
 
-        if not actions:
-            return ""
-
-        lines = ["=== SKILLS DISPONIBLES ==="]
-        lines.append("Puedes usar estas acciones si es necesario:")
-        for action in actions[:10]:  # Top 10 para no saturar
-            lines.append(f"  → {action.name}: {action.description}")
-        lines.append("Para usar una acción, responde con: [[accion:nombre(parametros)]]")
-        lines.append("=== FIN SKILLS ===")
+    def _build_tools_block(self) -> str:
+        """Bloque compacto de herramientas para inyectar al prompt del SLM."""
+        lines = ["=== HERRAMIENTAS ==="]
+        lines.append("Puedes usar: web_search (web), read_file, write_file, "
+                     "search_files (grep), run_command (shell), python_eval")
+        lines.append(
+            'Para usarlas: {"accion": "usar_herramienta", '
+            '"herramienta": "web_search", "parametros": {"query": "..."}}'
+        )
+        lines.append("=== FIN ===")
         return "\n".join(lines)
 
     def _build_directives(self) -> str:
@@ -182,9 +208,15 @@ Eres Nexus, asistente en fase {phase}.
 
     def build_react(self, user_input: str, memory_facts: list = None,
                     memory_records: list = None) -> str:
-        """Construye un prompt con contexto mínimo (reservado para futuro ReAct)."""
+        """Construye un prompt con herramientas y contexto de memoria."""
         parts = []
         parts.append(self._build_light_directives())
+        
+        # Herramientas disponibles (compacto para el SLM)
+        tools_block = self._build_tools_block()
+        if tools_block:
+            parts.append(tools_block)
+        
         if memory_facts or memory_records:
             lines = ["=== CONTEXTO DE MEMORIA ==="]
             if memory_facts:

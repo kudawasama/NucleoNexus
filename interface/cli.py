@@ -190,14 +190,17 @@ class NexusCLI:
         elapsed = metadata.get("duration_ms", 0) or metadata.get("total_duration_ms", 0)
         tokens_prompt = metadata.get("tokens_prompt", 0)
         tokens_gen = metadata.get("tokens_generated", 0)
+        tool = metadata.get("tool_called", "")
         
-        # Badge de backend
+        # Badge de backend + tool
         if backend == "slm":
             badge = f"{Color.rgb(255, 165, 0)}SLM{Color.RESET}"
         else:
             badge = f"{Color.GRAY}φ{Color.RESET}"
         
         tech_parts = [f"{badge} {elapsed:.0f}ms"]
+        if tool:
+            tech_parts.append(f"🔧 {tool}")
         if model:
             tech_parts.append(f"· {model}")
         if tokens_gen:
