@@ -399,10 +399,16 @@ class NexusCore:
                     if isinstance(data, dict):
                         if "resultados" in data:
                             items = data["resultados"]
-                            lines = ["🔍 Resultados de búsqueda web:"]
-                            for i, item in enumerate(items[:5], 1):
-                                lines.append(f"  {i}. {str(item)[:130]}")
-                            return "\n".join(lines)
+                            if items:
+                                fuente = data.get("fuente", "web")
+                                lines = [f"🔍 Resultados ({fuente}):"]
+                                for i, item in enumerate(items[:5], 1):
+                                    lines.append(f"  {i}. {str(item)[:150]}")
+                                return "\n".join(lines)
+                            elif "mensaje" in data:
+                                return f"🔍 {data['mensaje']}"
+                            else:
+                                return "🔍 No se encontraron resultados."
                         elif "error" in data:
                             return f"No pude buscar: {data['error']}"
                 return "No encontré resultados. ¿Quieres intentar con otra consulta?"

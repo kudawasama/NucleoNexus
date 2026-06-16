@@ -75,11 +75,9 @@ def register() -> Skill:
                         if "Text" in sub:
                             results.append(f"• {sub['Text']}")
 
+            # Si la API instantanea no dio resultados, usar busqueda HTML
             if not results:
-                return {
-                    "resultados": [],
-                    "mensaje": f"No encontre resultados para '{query}'",
-                }
+                return _web_search_html(query, max_results)
 
             return {
                 "resultados": results[:max_results],
@@ -91,9 +89,115 @@ def register() -> Skill:
         except Exception as e:
             return {"error": f"Error en busqueda web: {e}"}
 
+    def _web_search_html(query: str, max_results: int = 5) -> dict:
+        """Busqueda via Wikipedia API (fallback cuando DuckDuckGo no da resultados)."""
+        try:
+            # Wikipedia API — gratuita, sin API key, sin bloqueo
+            wiki_url = (
+                "https://en.wikipedia.org/w/api.php"
+                "?action=query&list=search&srsearch="
+                f"{urllib.parse.quote(query)}"
+                "&format=json&srlimit=5&utf8=1"
+            )
+            req = urllib.request.Request(
+                wiki_url,
+                headers={"User-Agent": "NexusAI/1.0 (local research assistant)"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+
+            search_results = data.get("query", {}).get("search", [])
+            if not search_results:
+                # Fallback: GitHub API (publica, sin auth para busquedas)
+                try:
+                    # 1. Busqueda general
+                    gh_url = (
+                        "https://api.github.com/search/repositories"
+                        f"?q={urllib.parse.quote(query)}&per_page=5&sort=updated"
+                    )
+                    gh_req = urllib.request.Request(
+                        gh_url,
+                        headers={
+                            "User-Agent": "NexusAI/1.0",
+                            "Accept": "application/vnd.github.v3+json",
+                        },
+                    )
+                    with urllib.request.urlopen(gh_req, timeout=10) as resp:
+                        gh_data = json.loads(resp.read().decode())
+
+                    gh_items = gh_data.get("items", [])
+                    
+                    # 2. Si el query parece un username, buscar sus repos directamente
+                    if not gh_items and not query.startswith("user:"):
+                        import re as gh_re
+                        # Detectar si el query es un username de GitHub
+                        user_match = gh_re.match(r'^([a-zA-Z0-9_-]+)$', query.strip())
+                        if user_match:
+                            username = user_match.group(1)
+                            try:
+                                user_url = (
+                                    f"https://api.github.com/users/{username}/repos"
+                                    "?per_page=5&sort=updated"
+                                )
+                                user_req = urllib.request.Request(
+                                    user_url,
+                                    headers={
+                                        "User-Agent": "NexusAI/1.0",
+                                        "Accept": "application/vnd.github.v3+json",
+                                    },
+                                )
+                                with urllib.request.urlopen(user_req, timeout=10) as resp:
+                                    user_repos = json.loads(resp.read().decode())
+                                if isinstance(user_repos, list) and user_repos:
+                                    gh_items = user_repos
+
+                            except Exception:
+                                pass
+
+                    if gh_items:
+                        results = []
+                        for r in gh_items[:max_results]:
+                            name = r.get("full_name", "") or r.get("name", "")
+                            desc = r.get("description", "") or "(sin descripcion)"
+                            stars = r.get("stargazers_count", 0)
+                            url_r = r.get("html_url", "") or f"https://github.com/{name}"
+                            results.append(
+                                f"• {name} ⭐{stars} — {desc[:120]} ({url_r})"
+                            )
+                        return {
+                            "resultados": results[:max_results],
+                            "total": len(results),
+                            "consulta": query,
+                            "fuente": "GitHub",
+                        }
+                except Exception:
+                    pass  # Si GitHub falla, continuar con mensaje vacio
+
+                return {
+                    "resultados": [],
+                    "mensaje": f"No encontre resultados para '{query}'",
+                }
+
+            results = []
+            for r in search_results[:max_results]:
+                title = r.get("title", "")
+                snippet = _re.sub(r"<[^>]+>", "", r.get("snippet", ""))
+                page_id = r.get("pageid", "")
+                url_result = f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+                results.append(f"• {title} — {snippet[:150]} ({url_result})")
+
+            return {
+                "resultados": results[:max_results],
+                "total": len(results),
+                "consulta": query,
+                "fuente": "Wikipedia",
+            }
+        except Exception as e:
+            return {"error": f"Error en busqueda: {e}"}
+
     skill.register_action(
         name="web_search",
-        description="Busca informacion en la web. Usa DuckDuckGo (gratis, sin API key).",
+        description="Busca informacion en la web. Usa DuckDuckGo + Wikipedia.",
         handler=_web_search,
         parameters={
             "query": {
