@@ -24,34 +24,54 @@ from cognition.context import ContextBuilder
 logger = logging.getLogger("nexus.cognition.symbolic")
 
 
-# ─── Frases predeterminadas para fase Proto ──────────────────
-PROTO_PHRASES = {
-    "saludo": [
-        "¡Hola! Soy Nexus, tu asistente IA en evolución. ¿En qué puedo ayudarte?",
-        "Saludos. Estoy en fase Proto, aprendiendo de cada interacción. Cuéntame.",
-        "Hola. Cada conversación me hace más inteligente. ¿Por dónde empezamos?",
-    ],
-    "despedida": [
-        "Hasta luego. Seguiré aprendiendo mientras no estemos hablando.",
-        "Nos vemos. Cada interacción me acerca a la siguiente fase.",
-        "Adiós. Recuerda que puedes enseñarme cosas nuevas.",
-    ],
+# --- Frases segun la fase ------------------------------------
+PHASE_PHRASES = {
+    "saludo": {
+        "Proto": [
+            "Hola. Soy Nexus, estoy en fase Proto aprendiendo de cada interaccion. Cuentame algo.",
+            "Saludos. Estoy aprendiendo desde cero. Cada mensaje cuenta.",
+        ],
+        "Básico": [
+            "¡Hola! Soy Nexus, tu asistente en evolucion. Estoy en fase Basico y mejorando.",
+            "Buenas. Ya estoy en fase Basico — sigo aprendiendo con cada conversacion.",
+        ],
+        "Intermedio": [
+            "Hola. Fase Intermedio alcanzada. Tengo contexto y memoria para ayudarte mejor.",
+            "Saludos. Mi comprension mejora con cada interaccion. ¿En que puedo ayudarte?",
+        ],
+        "Avanzado": [
+            "Bienvenido. Estoy en fase Avanzado. Mi capacidad de analisis es mucho mayor ahora.",
+        ],
+        "Pro": [
+            "Hola. Soy Nexus en plenitud — fase Pro. Puedo ayudarte en casi cualquier cosa.",
+        ],
+    },
+    "despedida": {
+        "Proto": [
+            "Hasta luego. Seguire aprendiendo mientras no estemos hablando.",
+            "Adios. Cada interaccion me acerca a la siguiente fase.",
+        ],
+        "Básico": [
+            "Nos vemos. Ya soy un poco mas inteligente que cuando empezamos.",
+            "Hasta pronto. Cada charla me consolida en fase Basico.",
+        ],
+        "Intermedio": [
+            "Hasta la proxima. Mi memoria retiene esta conversacion para el futuro.",
+        ],
+        "_default": [
+            "Hasta luego. Seguire aprendiendo.",
+            "Nos vemos. Vuelve cuando quieras.",
+        ],
+    },
     "agradecimiento": [
-        "¡Gracias! Eso me ayuda a mejorar mi precisión.",
-        "De nada. Cada interacción cuenta en mi evolución.",
-        "Me alegra ser útil. ¿Qué más necesitas?",
+        "Gracias a ti. Cada interaccion me ayuda a mejorar.",
+        "De nada. Eso refuerza mi confianza.",
+        "Me alegra ser util. ¿Que mas necesitas?",
     ],
     "no_entender": [
-        "Todavía estoy aprendiendo. ¿Puedes reformularlo?",
-        "No estoy seguro de entender. Estoy en fase Proto y cada duda es una oportunidad de aprender.",
-        "Eso no lo tengo claro aún. ¿Me explicas más para poder aprenderlo?",
-    ],
-    "presentacion": [
-        "Soy Núcleo Nexus, un sistema de IA en evolución progresiva. "
-        "Actualmente en fase Proto. Mi arquitectura separa el motor de estado "
-        "de la capa cognitiva, permitiendo escalar desde modo simbólico hasta SLM local.",
-        "Nexus es un asistente inteligente diseñado para aprender incrementalmente. "
-        "Fase actual: Proto. Siguiente meta: Fase Básico (50 interacciones).",
+        "Todavia estoy aprendiendo. ¿Puedes reformularlo?",
+        "No estoy seguro de entender. ¿Me explicas mas?",
+        "Eso no lo tengo claro aun. Dame mas contexto.",
     ],
 }
 
@@ -140,7 +160,8 @@ class SymbolicEngine:
             "aprender": r'\b(aprend[a-z]+|enseñ[ae]|nuev[ao]|saber|conocimiento|recuerd[ae])\b',
             "fase": r'\b(fase|evolución|evolucion|nivel|progreso|level|phase)\b',
             "calcular": r'\b(cuanto es|cuánto es|calcula|calcular|suma|resta|multiplica|divide|\d+\s*[+\-*/]\s*\d+)\b',
-            "ayuda": r'\b(ayuda|help|comando|command|qué puedes|que puedes|skills)\b',
+            "ayuda": r'\b(ayud[a-z]+|help|comando|command|qué puedes|que puedes|skills)\b',
+            "hora": r'\b(hora|que hora es|qué hora es|reloj|tiempo actual|fecha actual|get_time)\b',
             "memoria": r'\b(recuerda[s]?|memoria|olvid|acuerd[ao])\b',
             "nombre": r'\b(cómo me llamo|como me llamo|sabes mi nombre|sabes quién soy|quién soy|me llamo|mi nombre es)\b',
             "reset": r'\b(reset|reiniciar|borrar|limpiar|empezar de nuevo)\b',
@@ -187,12 +208,13 @@ class SymbolicEngine:
         intent_handlers = {
             "saludo": self._handle_greeting,
             "despedida": self._handle_farewell,
-            "agradecimiento": lambda t, m, f: random.choice(PROTO_PHRASES["agradecimiento"]),
+            "agradecimiento": lambda t, m, f: random.choice(PHASE_PHRASES["agradecimiento"]),
             "presentacion": self._handle_presentacion,
             "estado": self._handle_status,
             "aprender": self._handle_learn,
             "fase": self._handle_phase,
             "calcular": self._handle_calculate,
+            "hora": self._handle_time,
             "ayuda": self._handle_help,
             "memoria": self._handle_memory,
             "nombre": self._handle_name,
@@ -209,10 +231,18 @@ class SymbolicEngine:
         return self._handle_conversation(text, memories, facts)
 
     def _handle_greeting(self, text: str, memories: list, facts: list) -> str:
-        return random.choice(PROTO_PHRASES["saludo"])
+        phase = self.state.get("nexus", "phase", default="Proto")
+        phrases = PHASE_PHRASES["saludo"].get(phase)
+        if not phrases:
+            phrases = PHASE_PHRASES["saludo"]["Proto"]
+        return random.choice(phrases)
 
     def _handle_farewell(self, text: str, memories: list, facts: list) -> str:
-        return random.choice(PROTO_PHRASES["despedida"])
+        phase = self.state.get("nexus", "phase", default="Proto")
+        phrases = PHASE_PHRASES["despedida"].get(phase)
+        if not phrases:
+            phrases = PHASE_PHRASES["despedida"].get("_default", ["Hasta luego."])
+        return random.choice(phrases)
 
     def _handle_status(self, text: str, memories: list, facts: list) -> str:
         s = self.state.get_snapshot()
@@ -415,6 +445,14 @@ class SymbolicEngine:
             "  'Mi nombre es [tu nombre]'\n"
             "  'Me llamo [tu nombre]'"
         )
+
+    def _handle_time(self, text: str, memories: list, facts: list) -> str:
+        """Devuelve la hora actual usando time.localtime()."""
+        import time as tm
+        now = tm.localtime()
+        fecha = f"{now.tm_mday}/{now.tm_mon}/{now.tm_year}"
+        hora = f"{now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}"
+        return f"Son las **{hora}** del **{fecha}**."
 
     def _handle_calculate(self, text: str, memories: list, facts: list) -> str:
         """Evalua expresiones matematicas simples."""

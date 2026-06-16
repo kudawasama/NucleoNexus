@@ -177,6 +177,8 @@ class NexusCLI:
             "/hechos": self._cmd_facts,
             "/skills": self._cmd_skills,
             "/skill": self._cmd_skills,
+            "/hora": self._cmd_time,
+            "/tiempo": self._cmd_time,
             "/personalidad": self._cmd_personality,
             "/backend": self._cmd_backend,
             "/export": self._cmd_export,
@@ -196,6 +198,7 @@ class NexusCLI:
 {Color.GREEN}/status{Color.RESET}       Estado completo del sistema
 {Color.GREEN}/stats{Color.RESET}        Estadísticas de memoria
 {Color.GREEN}/fase{Color.RESET}         Progreso de evolución
+{Color.GREEN}/hora{Color.RESET}         Fecha y hora actual
 {Color.GREEN}/memoria{Color.RESET}      Últimos recuerdos
 {Color.GREEN}/hechos{Color.RESET}       Hechos aprendidos
 {Color.GREEN}/skills{Color.RESET}       Skills cargadas
@@ -272,6 +275,15 @@ class NexusCLI:
   {Color.YELLOW}Progreso:{Color.RESET} [{Color.GREEN}{bar}{Color.RESET}]
   {Color.YELLOW}Siguiente:{Color.RESET} {next_phase}{f' ({max(0, remaining)} interacciones restantes)' if remaining > 0 else ''}
         """)
+
+    def _cmd_time(self, cmd: str = ""):
+        import time as tm
+        now = tm.localtime()
+        fecha = f"{now.tm_mday}/{now.tm_mon}/{now.tm_year}"
+        hora = f"{now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}"
+        print(f"\n{Color.CYAN}╔══ Hora actual ══╗{Color.RESET}")
+        print(f"  {Color.YELLOW}{hora}{Color.RESET} del {Color.GREEN}{fecha}{Color.RESET}")
+        print()
 
     def _cmd_memory(self, cmd: str = ""):
         recent = self.core.memory.get_recent(limit=10)
