@@ -113,11 +113,24 @@ class SLMBackend:
             logger.warning(f"No se pudo conectar a API OpenAI: {e}")
         return False
 
-    def generate(self, prompt: str, system_prompt: str = None) -> Optional[str]:
-        """Genera una respuesta usando el SLM cargado."""
+    def generate(self, prompt: str, system_prompt: str = None,
+                 structured: bool = False) -> Optional[str]:
+        """Genera una respuesta usando el SLM cargado.
+        
+        Args:
+            prompt: Texto del usuario
+            system_prompt: Contexto del sistema (opcional)
+            structured: Si True, fuerza salida JSON (Ollama format mode)
+            
+        Returns:
+            Texto de respuesta, o None si falla
+        """
         if not self.loaded:
             logger.warning("SLM no cargado. Usa load() primero.")
             return None
+
+        if structured and self.mode == "ollama":
+            return self._generate_ollama_structured(prompt, system_prompt)
 
         if self.mode == "ollama":
             return self._generate_ollama(prompt, system_prompt)
@@ -126,6 +139,46 @@ class SLMBackend:
         elif self.mode == "llamacpp":
             return self._generate_llamacpp(prompt, system_prompt)
         return None
+
+    def _generate_ollama_structured(self, prompt: str, system_prompt: str = None) -> Optional[str]:
+        """Genera respuesta via Ollama con formato JSON forzado."""
+        try:
+            import requests
+            # Sistema + instrucción de formato JSON
+            json_instruction = (
+                "Responde SOLO con JSON valido: "
+                '{"respuesta": "tu respuesta", "accion": "ninguna|buscar_memoria|calcular"}'
+            )
+            full_system = f"{system_prompt}\n\n{json_instruction}" if system_prompt else json_instruction
+
+            payload = {
+                "model": self.model_name,
+                "prompt": prompt,
+                "system": full_system,
+                "format": "json",
+                "stream": False,
+                "options": {
+                    "num_predict": self.max_tokens,
+                    "temperature": self.temperature,
+                }
+            }
+
+            r = requests.post("http://localhost:11434/api/generate",
+                            json=payload, timeout=45)
+            if r.status_code == 200:
+                raw = r.json().get("response", "")
+                # Verificar que es JSON válido
+                import json as _json
+                try:
+                    _json.loads(raw)
+                    return raw  # JSON válido, devolver raw
+                except _json.JSONDecodeError:
+                    logger.warning(f"JSON inválido del SLM: {raw[:60]}")
+                    return None
+            return None
+        except Exception as e:
+            logger.error(f"Error en generación Ollama estructurada: {e}")
+            return None
 
     def _generate_ollama(self, prompt: str, system_prompt: str = None) -> Optional[str]:
         """Genera respuesta via Ollama."""

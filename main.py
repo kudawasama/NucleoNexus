@@ -236,7 +236,7 @@ class NexusCore:
                 return self.symbolic.process(user_input, actions_registry=self.actions,
                                             skip_bookkeeping=True)
 
-            # Sin hechos → SLM con contexto de memoria
+            # Sin hechos → SLM con contexto de memoria (structured output)
             try:
                 mem_facts = self.memory.query_knowledge(user_input, top_k=3)
                 mem_records = self.memory.recall(user_input, top_k=2)
@@ -245,11 +245,38 @@ class NexusCore:
                     memory_facts=mem_facts,
                     memory_records=mem_records,
                 )
-                response = self.slm.generate(user_input, system_prompt=prompt)
-                if response:
-                    # Detectar y ejecutar acciones embebidas [[accion:...]]
-                    self._execute_react_actions(response, user_input)
-                    return response
+                # Generar con JSON mode forzado
+                raw_json = self.slm.generate(user_input, system_prompt=prompt,
+                                            structured=True)
+                if raw_json:
+                    # Parsear JSON
+                    import json as _json
+                    try:
+                        parsed = _json.loads(raw_json)
+                        respuesta = parsed.get("respuesta", "")
+                        accion = parsed.get("accion", "ninguna")
+
+                        # Ejecutar acción si aplica
+                        if accion == "buscar_memoria":
+                            tema = parsed.get("tema", user_input)
+                            res = self.memory.query_knowledge(tema, top_k=3)
+                            if res:
+                                for r in res:
+                                    self.memory.learn_fact(
+                                        r["text"], category="react",
+                                        confidence=0.3, source="react_busqueda")
+                        elif accion == "calcular":
+                            expr = parsed.get("expresion", "")
+                            if expr:
+                                self.memory.remember("nexus",
+                                    f"[calculo: {expr}]",
+                                    context={"backend": "react"})
+
+                        if respuesta:
+                            return respuesta
+                    except _json.JSONDecodeError:
+                        # Fallback: usar raw si no es JSON válido
+                        return raw_json
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
 
