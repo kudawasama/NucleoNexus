@@ -238,6 +238,19 @@ class NexusCore:
         }
         backend_mode = self.state.get("capabilities", "backend", default="symbolic")
 
+        # ─────────────────────────────────────────────────────────
+        # TOOL INTENTS: ejecutar directamente sin SLM
+        # (Qwen 0.5B no genera reliablemente accion=usar_herramienta)
+        # ─────────────────────────────────────────────────────────
+        intent = self.symbolic.detect_intent(user_input.lower().strip())
+        tool_intents = {"web_search", "read_file", "search_files", "run_command"}
+        if intent in tool_intents:
+            result = self._handle_tool_intent(intent, user_input)
+            if result:
+                metadata["backend"] = "symbolic"
+                metadata["tool_called"] = intent
+                return result, metadata
+
         # --- HYBRID: intent -> simbolico, resto -> SLM (ReAct) ---
         if backend_mode == "hybrid" and self.slm and self.slm.loaded:
             intent = self.symbolic.detect_intent(user_input.lower().strip())
@@ -255,15 +268,9 @@ class NexusCore:
                     metadata["backend"] = "symbolic"
                     return response, metadata
 
-            # Tool intents: van directo al SLM para usar herramientas
-            tool_intents = {"web_search", "read_file", "search_files", "run_command"}
-
             # Pregunta sin intent rápido: ver si hay hechos en memoria
-            # (saltear para tool intents, deben llegar al SLM)
-            should_check_memory = intent not in tool_intents
-            if should_check_memory:
-                facts = self.memory.query_knowledge(user_input, top_k=2)
-                if facts and any(f.get("score", 0) >= 0.15 for f in facts):
+            facts = self.memory.query_knowledge(user_input, top_k=2)
+            if facts and any(f.get("score", 0) >= 0.15 for f in facts):
                     response = self.symbolic.process(user_input, actions_registry=self.actions,
                                                 skip_bookkeeping=True)
                     metadata["backend"] = "symbolic"
@@ -366,6 +373,122 @@ class NexusCore:
         response = self.symbolic.process(user_input, actions_registry=self.actions,
                                     skip_bookkeeping=True)
         return response, metadata
+
+    # ─── Tool Intents: ejecucion directa sin SLM ─────────────
+
+    def _handle_tool_intent(self, intent: str, user_input: str) -> str | None:
+        """Ejecuta una herramienta directamente desde el intent detectado.
+        
+        Extrae parámetros del texto del usuario con regex y llama
+        a la acción correspondiente via ActionRegistry.
+        """
+        import re as _re
+
+        if intent == "web_search":
+            # Extraer query: "busca en la web [query]"
+            m = _re.search(
+                r'(?:busca|buscar|investiga|investigar|encuentra|encontrar|consulta|consultar)'
+                r'\s+(?:en la web|en internet|en google|online|en linea|en línea)\s+(.+)',
+                user_input, _re.IGNORECASE
+            )
+            if m:
+                query = m.group(1).strip().rstrip('.?!,')
+                result = self.actions.execute("web_search", query=query)
+                if result.get("success"):
+                    data = result["result"]
+                    if isinstance(data, dict):
+                        if "resultados" in data:
+                            items = data["resultados"]
+                            lines = ["🔍 Resultados de búsqueda web:"]
+                            for i, item in enumerate(items[:5], 1):
+                                lines.append(f"  {i}. {str(item)[:130]}")
+                            return "\n".join(lines)
+                        elif "error" in data:
+                            return f"No pude buscar: {data['error']}"
+                return "No encontré resultados. ¿Quieres intentar con otra consulta?"
+            return "No entendí qué buscar. Ej: 'busca en la web Python tutorial'"
+
+        elif intent == "read_file":
+            # Extraer path: "lee el archivo [path]" o "muestra [path]"
+            m = _re.search(
+                r'(?:lee|leer|abre|abrir|muestra|mostrar)\s+(?:el\s+)?(?:archivo|fichero|file)\s+(.+)',
+                user_input, _re.IGNORECASE
+            )
+            if not m:
+                m = _re.search(
+                    r'(?:muestra|mostrar|enseña|enseñar)\s+(.+)',
+                    user_input, _re.IGNORECASE
+                )
+            if m:
+                path = m.group(1).strip().rstrip('.?!,').split()[0]
+                result = self.actions.execute("read_file", path=path, max_lines=30)
+                if result.get("success"):
+                    data = result["result"]
+                    if isinstance(data, dict):
+                        if "error" in data:
+                            return f"Error: {data['error']}"
+                        lines = data.get("lineas", [])
+                        archivo = data.get("archivo", path)
+                        total = data.get("total_lineas", 0)
+                        resp = f"📄 {archivo} ({total} líneas):\n"
+                        resp += "\n".join(f"  {i+1}| {l}" for i, l in enumerate(lines))
+                        if data.get("truncado"):
+                            resp += f"\n  ... ({total - len(lines)} líneas más)"
+                        return resp
+                return "No pude leer ese archivo."
+            return "Especifica qué archivo leer. Ej: 'lee el archivo config.py'"
+
+        elif intent == "search_files":
+            # Extraer patrón: "busca en archivos [patrón]"
+            m = _re.search(
+                r'(?:busca|buscar|encuentra|encontrar)'
+                r'\s+(?:en|dentro\s+de)\s+(?:los\s+)?(?:archivos|ficheros|codigo|código)\s+(.+)',
+                user_input, _re.IGNORECASE
+            )
+            if m:
+                pattern = m.group(1).strip().rstrip('.?!,')
+                result = self.actions.execute("search_files", pattern=pattern)
+                if result.get("success"):
+                    data = result["result"]
+                    if isinstance(data, dict):
+                        if "error" in data:
+                            return f"Error: {data['error']}"
+                        matches = data.get("resultados", [])
+                        total = data.get("total_encontrados", 0)
+                        if not matches:
+                            return f"No encontré '{pattern}' en ningún archivo."
+                        lines = [f"🔍 '{pattern}' encontrado {total} vez/veces:"]
+                        for m in matches[:8]:
+                            lines.append(f"  {m['archivo']}:{m['linea']}  {m['texto'][:80]}")
+                        return "\n".join(lines)
+                return "No pude buscar en archivos."
+            return "Especifica qué buscar. Ej: 'busca en archivos def main'"
+
+        elif intent == "run_command":
+            # Extraer comando: "ejecuta [comando]" o "corre [comando]"
+            m = _re.search(
+                r'(?:ejecuta|ejecutar|corre|correr|run)\s+(.+)',
+                user_input, _re.IGNORECASE
+            )
+            if m:
+                cmd = m.group(1).strip().rstrip('.?!,')
+                result = self.actions.execute("run_command", command=cmd)
+                if result.get("success"):
+                    data = result["result"]
+                    if isinstance(data, dict):
+                        if "error" in data:
+                            return f"Error: {data['error']}"
+                        salida = data.get("salida", "")
+                        codigo = data.get("codigo_retorno", 0)
+                        status = "✅" if codigo == 0 else "⚠️"
+                        resp = f"  {status} Exit code: {codigo}\n"
+                        if salida:
+                            resp += salida[:500]
+                        return resp
+                return "No pude ejecutar ese comando."
+            return "Especifica qué comando ejecutar. Ej: 'ejecuta ls -la'"
+
+        return None
 
     # ─── ReAct: acciones embebidas en respuesta del SLM ─────────
 
