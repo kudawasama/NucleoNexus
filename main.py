@@ -255,13 +255,19 @@ class NexusCore:
                     metadata["backend"] = "symbolic"
                     return response, metadata
 
+            # Tool intents: van directo al SLM para usar herramientas
+            tool_intents = {"web_search", "read_file", "search_files", "run_command"}
+
             # Pregunta sin intent rápido: ver si hay hechos en memoria
-            facts = self.memory.query_knowledge(user_input, top_k=2)
-            if facts and any(f.get("score", 0) >= 0.15 for f in facts):
-                response = self.symbolic.process(user_input, actions_registry=self.actions,
-                                            skip_bookkeeping=True)
-                metadata["backend"] = "symbolic"
-                return response, metadata
+            # (saltear para tool intents, deben llegar al SLM)
+            should_check_memory = intent not in tool_intents
+            if should_check_memory:
+                facts = self.memory.query_knowledge(user_input, top_k=2)
+                if facts and any(f.get("score", 0) >= 0.15 for f in facts):
+                    response = self.symbolic.process(user_input, actions_registry=self.actions,
+                                                skip_bookkeeping=True)
+                    metadata["backend"] = "symbolic"
+                    return response, metadata
 
             # Sin hechos → SLM con contexto de memoria (structured output)
             try:
