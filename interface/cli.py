@@ -416,6 +416,11 @@ class NexusCLI:
             "/analiza": self._cmd_analyze,
             "/limpiar-web": self._cmd_clean_web,
             "/agent": self._cmd_agent,
+            # Comandos de Notebook Guide
+            "/documento": self._cmd_ingest,
+            "/ingiere": self._cmd_ingest,
+            "/guia": self._cmd_guide,
+            "/faq": self._cmd_faq,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -1455,3 +1460,131 @@ class NexusCLI:
         print(f"║   sesión. 👋                     ║")
         print(f"╚══════════════════════════════════╝{Color.RESET}")
         print()
+
+    # ─── Comandos Notebook Guide ─────────────────────────────
+
+    def _cmd_ingest(self, cmd: str = ""):
+        """Ingiere un documento en memoria. Uso: /documento <ruta> o texto directo"""
+        arg = cmd.split(" ", 1)[1] if " " in cmd else ""
+        if not arg:
+            print(f"{Color.YELLOW}Uso:{Color.RESET} /documento <ruta_archivo>")
+            print(f"  O pega el texto directamente después del comando.")
+            print(f"  Ej: /documento C:/ruta/documento.txt")
+            print(f"  Ej: /documento El texto completo del documento...")
+            return
+
+        # Verificar si es una ruta de archivo
+        from knowledge.ingester import ingest_text, chunk_text
+        import os as _os
+
+        if _os.path.exists(arg):
+            try:
+                with open(arg, "r", encoding="utf-8") as f:
+                    text = f.read()
+                titulo = _os.path.basename(arg)
+                print(f"{Color.DIM}  Leyendo archivo: {arg} ({len(text)} chars){Color.RESET}")
+            except Exception as e:
+                print(f"{Color.RED}Error leyendo archivo: {e}{Color.RESET}")
+                return
+        else:
+            # Es texto directo
+            text = arg
+            titulo = f"Texto_{len(text)}chars"
+
+        # Chunkear y mostrar preview
+        chunks = chunk_text(text)
+        print(f"{Color.GREEN}✓ Documento dividido en {len(chunks)} secciones{Color.RESET}")
+
+        # Confirmar ingesta
+        print(f"{Color.DIM}  Ingenierdo '{titulo}' en memoria...{Color.RESET}")
+        count = ingest_text(text, self.core.memory, titulo=titulo)
+        print(f"{Color.GREEN}✓ {count} fragmentos almacenados en memoria{Color.RESET}")
+        print(f"\n{Color.CYAN}Ahora puedes generar una guía con:{Color.RESET}")
+        print(f"  {Color.GREEN}/guia {titulo}{Color.RESET}")
+        print(f"  {Color.GREEN}/faq {titulo}{Color.RESET}")
+
+    def _cmd_guide(self, cmd: str = ""):
+        """Genera una guía (briefing + FAQ + conceptos) de un documento. Uso: /guia <titulo>"""
+        arg = cmd.split(" ", 1)[1] if " " in cmd else ""
+        if not arg:
+            print(f"{Color.YELLOW}Uso: /guia <titulo_del_documento>{Color.RESET}")
+            print(f"  El documento debe haber sido ingerido antes con /documento")
+            return
+
+        from knowledge.guide import generate_guide
+
+        print(f"{Color.DIM}  Generando guía para '{arg}'... (puede tomar unos segundos){Color.RESET}")
+        
+        guide = generate_guide(self.core.slm, self.core.memory, titulo=arg)
+        if not guide:
+            print(f"{Color.RED}No se pudo generar la guía. ¿El documento está ingerido?{Color.RESET}")
+            return
+
+        # Mostrar resultados
+        titulo = guide.get("titulo", arg)
+        print(f"\n{Color.CYAN}╔══ Guía: {titulo} ══╗{Color.RESET}")
+
+        # Briefing
+        briefing = guide.get("briefing", "")
+        if briefing:
+            print(f"\n{Color.YELLOW}📋 BRIEFING (Resumen Ejecutivo){Color.RESET}")
+            print(f"  {briefing[:600]}")
+
+        # FAQ
+        faq = guide.get("faq", [])
+        if faq:
+            print(f"\n{Color.YELLOW}❓ FAQ ({len(faq)} preguntas){Color.RESET}")
+            for i, item in enumerate(faq, 1):
+                if isinstance(item, dict):
+                    q = item.get("pregunta", item.get("question", ""))
+                    a = item.get("respuesta", item.get("answer", ""))
+                    print(f"\n  {Color.GREEN}{i}. {q}{Color.RESET}")
+                    print(f"     {a[:200]}")
+
+        # Conceptos clave
+        conceptos = guide.get("conceptos", guide.get("key_concepts", []))
+        if conceptos:
+            print(f"\n{Color.YELLOW}📌 CONCEPTOS CLAVE ({len(conceptos)}){Color.RESET}")
+            for item in conceptos:
+                if isinstance(item, dict):
+                    term = item.get("termino", item.get("term", item.get("concept", "")))
+                    defn = item.get("definicion", item.get("definition", ""))
+                    print(f"  {Color.GREEN}• {term}:{Color.RESET} {defn[:150]}")
+
+        # Timeline
+        timeline = guide.get("timeline", [])
+        if timeline:
+            print(f"\n{Color.YELLOW}📅 TIMELINE{Color.RESET}")
+            for item in timeline:
+                if isinstance(item, dict):
+                    fecha = item.get("fecha", item.get("date", ""))
+                    evento = item.get("evento", item.get("event", ""))
+                    print(f"  {Color.GREEN}{fecha}{Color.RESET} → {evento[:150]}")
+
+        print(f"\n{Color.CYAN}╚══ Fin de la guía ══╝{Color.RESET}")
+
+    def _cmd_faq(self, cmd: str = ""):
+        """Genera FAQ sobre un tema. Uso: /faq <tema>"""
+        arg = cmd.split(" ", 1)[1] if " " in cmd else ""
+        if not arg:
+            print(f"{Color.YELLOW}Uso: /faq <tema>{Color.RESET}")
+            print(f"  Ej: /faq fotosintesis")
+            return
+
+        from knowledge.guide import generate_faq
+
+        print(f"{Color.DIM}  Generando FAQ sobre '{arg}'...{Color.RESET}")
+        faq = generate_faq(self.core.slm, arg, self.core.memory)
+        if not faq:
+            print(f"{Color.YELLOW}No hay suficiente información en memoria sobre '{arg}'.{Color.RESET}")
+            print(f"  Prueba primero con /documento o /aprende para añadir información.")
+            return
+
+        print(f"\n{Color.CYAN}╔══ FAQ: {arg} ══╗{Color.RESET}")
+        for i, item in enumerate(faq, 1):
+            if isinstance(item, dict):
+                q = item.get("pregunta", item.get("question", ""))
+                a = item.get("respuesta", item.get("answer", ""))
+                print(f"\n{Color.GREEN}{i}. {q}{Color.RESET}")
+                print(f"     {a[:300]}")
+        print(f"\n{Color.CYAN}╚══ Fin FAQ ══╝{Color.RESET}")

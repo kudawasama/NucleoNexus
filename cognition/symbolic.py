@@ -108,6 +108,7 @@ class SymbolicEngine:
             "luna": "fase_actual",
             "tareas": "listar_tareas",
             "csv": "leer_csv",
+            "imagen": "leer_imagen",
             "autoskill": "analizar_correccion",
         }
 
@@ -208,6 +209,7 @@ class SymbolicEngine:
             "luna": r'\b(luna|fase lunar|luna llena|luna nueva|cuarto creciente|menguante)\b',
             "tareas": r'\b(tareas|pendientes|todo list|que tengo que hacer|qué tengo que hacer)\b',
             "csv": r'\b(csv|archivo csv|leer csv|tabla csv)\b',
+            "imagen": r'\b(imagen|imagenes|imágenes|foto|fotos|imágen|ilustración|ilustracion|dibujo|captura)\b',
             "autoskill": r'\b(autoskill|aprende de esto|corrigeme|corrige eso|aprende de tu error|eso no es correcto|está mal eso|deberías haber|mejor haz|asi no es)\b',
             "ayuda": r'\b(ayud[a-z]+|help|comando[s]?)\s*$|^\/(help|ayuda)',
             "clima": r'\b(clima|temperatura|pronóstico|pronostico)\b',

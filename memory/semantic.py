@@ -32,21 +32,54 @@ class SemanticMemory:
                 source      TEXT,
                 created_at  REAL,
                 updated_at  REAL,
-                access_count INTEGER DEFAULT 0
+                access_count INTEGER DEFAULT 0,
+                embedding   BLOB
             )
         """)
+        # Migracion: agregar columna embedding si no existe
+        try:
+            cur.execute("ALTER TABLE semantic ADD COLUMN embedding BLOB")
+            self.conn.commit()
+            logger.info("Tabla semantic migrada: columna embedding agregada")
+        except sqlite3.OperationalError:
+            # La columna ya existe
+            pass
         self.conn.commit()
 
     def learn_fact(self, fact: str, category: str = "general",
                    confidence: float = 0.5, source: str = None) -> bool:
+        """Aprende un hecho. Si ya existe, refuerza confianza.
+
+        Si el modelo de embeddings esta disponible, tambien guarda
+        el vector del hecho para busqueda semantica.
+        """
         cur = self.conn.cursor()
         now = time.time()
+
+        # Generar embedding (si esta disponible)
+        embedding_blob = None
         try:
-            cur.execute(
-                "INSERT INTO semantic (fact, category, confidence, source, "
-                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (fact, category, confidence, source, now, now)
-            )
+            from memory.embeddings import get_embedding
+            vec = get_embedding(fact)
+            if vec:
+                import json as _json
+                embedding_blob = _json.dumps(vec).encode("utf-8")
+        except Exception:
+            pass
+
+        try:
+            if embedding_blob:
+                cur.execute(
+                    "INSERT INTO semantic (fact, category, confidence, source, "
+                    "created_at, updated_at, embedding) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (fact, category, confidence, source, now, now, embedding_blob)
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO semantic (fact, category, confidence, source, "
+                    "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (fact, category, confidence, source, now, now)
+                )
             self.conn.commit()
             logger.info(f"Nuevo hecho aprendido [{category}]: {fact[:60]}...")
             return True
@@ -188,6 +221,87 @@ class SemanticMemory:
 
         # Ordenar por relevancia, luego por confianza
         results.sort(key=lambda x: (x['score'], x['metadata']['confidence']), reverse=True)
+
+        # ── FASE 3: Busqueda por embeddings (complementa TF-IDF) ──
+        # Si los resultados de TF-IDF son pocos o vacios, usar embeddings.
+        # Si hay resultados de TF-IDF, los embeddings se usan como BOOST
+        # para reordenar y encontrar hechos semanticamente similares.
+        try:
+            from memory.embeddings import get_embedding, cosine_similarity, is_available
+            if is_available():
+                query_vec = get_embedding(query)
+                if query_vec:
+                    import json as _json
+                    # Cargar todos los hechos con embedding
+                    cur.execute(
+                        "SELECT id, fact, category, confidence, source, embedding "
+                        "FROM semantic WHERE embedding IS NOT NULL"
+                    )
+                    emb_rows = cur.fetchall()
+
+                    # Calcular similitud coseno para cada uno
+                    emb_results = []
+                    for row in emb_rows:
+                        try:
+                            vec = _json.loads(row['embedding'].decode("utf-8"))
+                            sim = cosine_similarity(query_vec, vec)
+                            if sim > 0.3:  # Umbral minimo de similitud
+                                emb_results.append({
+                                    "id": row['id'],
+                                    "text": row['fact'],
+                                    "sim": sim,
+                                    "category": row['category'],
+                                    "confidence": row['confidence'],
+                                    "source": row['source'],
+                                })
+                        except Exception:
+                            continue
+
+                    # Ordenar por similitud
+                    emb_results.sort(key=lambda x: x['sim'], reverse=True)
+
+                    # Combinar: si TF-IDF no encontro nada, devolver embedding results
+                    if not results and emb_results:
+                        for r in emb_results[:top_k]:
+                            results.append({
+                                "doc_id": f"sem_{r['id']}",
+                                "text": r['text'],
+                                "metadata": {
+                                    "category": r['category'],
+                                    "type": "semantic",
+                                    "confidence": r['confidence'],
+                                    "source": r['source'],
+                                },
+                                "score": round(r['sim'], 4),
+                            })
+                    # Si TF-IDF encontro algo, agregar los embedding results
+                    # que no esten ya (boost semantico)
+                    elif emb_results:
+                        existing_texts = {r['text'] for r in results}
+                        for r in emb_results[:top_k * 2]:
+                            if r['text'] not in existing_texts and r['sim'] > 0.5:
+                                results.append({
+                                    "doc_id": f"sem_{r['id']}",
+                                    "text": r['text'],
+                                    "metadata": {
+                                        "category": r['category'],
+                                        "type": "semantic",
+                                        "confidence": r['confidence'],
+                                        "source": r['source'],
+                                    },
+                                    "score": round(r['sim'] * 0.8, 4),  # Factor 0.8 (menor que TF-IDF exacto)
+                                })
+                                existing_texts.add(r['text'])
+                                if len(results) >= top_k * 2:
+                                    break
+
+                    # Re-ordenar despues de combinar
+                    results.sort(key=lambda x: x['score'], reverse=True)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"Error en busqueda por embeddings: {e}")
+
         return results[:top_k]
 
     def get_facts_by_category(self, category: str) -> list[dict]:
