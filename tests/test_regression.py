@@ -420,6 +420,123 @@ test("self-consistency OFF para modelos grandes", test_self_consistency_off_for_
 
 
 # ===================================================================
+# Tests del agente que encadena tools (/agent)
+# ===================================================================
+section("AGENTE: /agent encadena web_search + browse + learn")
+
+
+def test_agent_runs_without_error():
+    """El agente ejecuta sin lanzar excepciones."""
+    from cognition.agent import NexusAgent
+    agent = NexusAgent(nexus)
+    result = agent.run("investiga sobre el agua")
+    assert result is not None, "agente no retorna resultado"
+    assert len(result.steps) > 0, "agente no ejecuto pasos"
+
+
+def test_agent_investigate_uses_web_search():
+    """Tarea 'investiga' usa web_search."""
+    from cognition.agent import NexusAgent
+    agent = NexusAgent(nexus)
+    result = agent.run("investiga sobre los dinosaurios")
+    tools_used = [s.tool for s in result.steps]
+    assert "web_search" in tools_used, f"web_search no usado, tools: {tools_used}"
+
+
+def test_agent_extracts_topic():
+    """El agente extrae el tema del task correctamente."""
+    from cognition.agent import NexusAgent
+    agent = NexusAgent(nexus)
+    # Probar diferentes formatos
+    assert "fotosintesis" in agent._extract_topic("investiga sobre la fotosintesis").lower()
+    assert "python" in agent._extract_topic("que es python").lower()
+    assert "maquina" in agent._extract_topic("como funciona una maquina").lower()
+
+
+def test_agent_detects_task_type():
+    """El agente detecta el tipo de tarea."""
+    from cognition.agent import NexusAgent
+    agent = NexusAgent(nexus)
+    assert agent._detect_task_type("investiga sobre X") == "investigate"
+    assert agent._detect_task_type("explica como funciona X") == "explain"
+    assert agent._detect_task_type("busca en codigo X") == "code_search"
+
+
+def test_agent_investigate_learns_facts():
+    """El agente 'investiga' guarda hechos en memoria."""
+    from cognition.agent import NexusAgent
+    import sqlite3
+
+    # Limpiar primero
+    cur = nexus.memory.semantic.conn.cursor()
+    cur.execute("DELETE FROM semantic WHERE source = 'auto_web_agent'")
+    nexus.memory.semantic.conn.commit()
+
+    # Ejecutar agente
+    agent = NexusAgent(nexus)
+    result = agent.run("investiga sobre los volcanes")
+
+    # Verificar que se guardaron hechos
+    cur.execute(
+        "SELECT COUNT(*) FROM semantic WHERE source = 'auto_web_agent'"
+    )
+    count = cur.fetchone()[0]
+    # El agente deberia haber aprendido al menos 1 hecho
+    assert result.facts_learned > 0 or count > 0, \
+        f"agente no aprendio hechos. facts_learned={result.facts_learned}, count={count}"
+
+
+def test_agent_executes_tools_via_action_registry():
+    """El agente usa ActionRegistry para ejecutar tools."""
+    from cognition.agent import NexusAgent
+    agent = NexusAgent(nexus)
+    assert agent.actions is not None, "agente sin ActionRegistry"
+    # Ejecutar una tool via el agente
+    step = agent._execute_tool("get_time", "")
+    assert step.tool == "get_time", f"tool no ejecutada: {step}"
+
+
+def test_agent_summarizes_steps():
+    """El agente genera un resumen de los pasos ejecutados."""
+    from cognition.agent import NexusAgent
+    agent = NexusAgent(nexus)
+    result = agent.run("investiga sobre las plantas")
+    assert result.summary != "", "agente no genero resumen"
+    assert "Paso" in result.summary, f"resumen sin estructura: {result.summary}"
+
+
+def test_agent_handles_empty_task_gracefully():
+    """El agente maneja tareas invalidas sin crashear."""
+    from cognition.agent import NexusAgent
+    agent = NexusAgent(nexus)
+    # Task con solo espacios
+    result = agent.run("   ")
+    # No debe crashear; el resumen indica el problema o devuelve sin pasos
+    assert result is not None
+
+
+def test_agent_command_in_cli():
+    """El comando /agent esta registrado en el CLI."""
+    # Inicializar CLI y verificar
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    assert hasattr(cli, "_cmd_agent"), "CLI no tiene _cmd_agent"
+    # Verificar que el comando /agent esta en el dict
+    # (se inicializa en run() pero podemos verificar el metodo)
+
+
+test("agente ejecuta sin error", test_agent_runs_without_error)
+test("'investiga' usa web_search", test_agent_investigate_uses_web_search)
+test("extrae tema del task", test_agent_extracts_topic)
+test("detecta tipo de tarea", test_agent_detects_task_type)
+test("'investiga' guarda hechos", test_agent_investigate_learns_facts)
+test("agente usa ActionRegistry", test_agent_executes_tools_via_action_registry)
+test("agente genera resumen", test_agent_summarizes_steps)
+test("agente maneja task vacio", test_agent_handles_empty_task_gracefully)
+test("comando /agent en CLI", test_agent_command_in_cli)
+
+
+# ===================================================================
 # Tests de los nuevos comandos de aprendizaje (commit e04f122+)
 # ===================================================================
 section("COMANDOS: /buscar, /aprende, /analiza, /olvida")

@@ -1,0 +1,418 @@
+"""
+Núcleo Nexus — Agente que encadena tools
+=========================================
+Similar a Hermes Agent: el agente planifica y ejecuta una
+secuencia de herramientas para responder una tarea compleja.
+
+Diferencia con Hermes:
+- Hermes: el LLM decide iterativamente
+- Nexus: reglas deterministicas (rapido, no depende del SLM)
+
+Flujo del agente:
+1. PLAN: analizar la tarea, decidir que tools usar
+2. EXECUTE: ejecutar las tools en secuencia
+3. LEARN: guardar resultados utiles en memoria
+4. SUMMARIZE: sintetizar una respuesta
+
+Vision: 'Inteligencia por arquitectura, no por tamaño'
+El agente hace lo que un LLM grande haria, pero sin SLM.
+"""
+
+import re
+import logging
+from dataclasses import dataclass, field
+from typing import Optional
+
+logger = logging.getLogger("nexus.cognition.agent")
+
+
+@dataclass
+class AgentStep:
+    """Un paso ejecutado por el agente."""
+    tool: str
+    input: str
+    output: str
+    success: bool
+    duration_ms: int = 0
+
+
+@dataclass
+class AgentResult:
+    """Resultado completo de la ejecucion del agente."""
+    task: str
+    steps: list = field(default_factory=list)
+    summary: str = ""
+    facts_learned: int = 0
+    success: bool = True
+    error: str = ""
+
+
+class NexusAgent:
+    """Agente que orquesta tools en secuencia para tareas complejas.
+
+    A diferencia del flujo normal (1 tool por turno), el agente
+    puede ejecutar multiples tools en una sola pasada.
+
+    Tipos de tareas que maneja:
+    - "investiga X"     -> web_search + learn
+    - "explica X"        -> web_search + browse_url + learn
+    - "documenta X"      -> web_search + search_files + read_file
+    - "busca en web y archivos" -> web_search + search_files
+    """
+
+    # Palabras clave para detectar tipo de tarea
+    INVESTIGATE_KEYWORDS = [
+        "investiga", "busca informacion", "aprende sobre",
+        "que es", "que son", "definicion de", "informacion sobre",
+    ]
+    EXPLAIN_KEYWORDS = [
+        "explica", "detalla", "describe", "como funciona",
+        "cual es la diferencia", "por que",
+    ]
+    DOCUMENT_KEYWORDS = [
+        "documenta", "docuementa", "crea documentacion",
+        "genera reporte", "escribe informe",
+    ]
+    CODE_KEYWORDS = [
+        "busca en codigo", "busca en archivos", "encuentra en el codigo",
+        "donde esta", "como se usa",
+    ]
+
+    def __init__(self, nexus_core):
+        """Inicializa con referencia a NexusCore para acceder a tools y memoria."""
+        self.core = nexus_core
+        self.actions = nexus_core.actions
+        self.memory = nexus_core.memory
+
+    def run(self, task: str) -> AgentResult:
+        """Ejecuta el agente sobre una tarea.
+
+        Args:
+            task: Descripcion de lo que el usuario quiere
+
+        Returns:
+            AgentResult con los pasos ejecutados, resumen, etc
+        """
+        result = AgentResult(task=task)
+
+        # 1. PLAN: detectar tipo de tarea
+        task_type = self._detect_task_type(task)
+        logger.info(f"Agent task type: {task_type}")
+
+        # 2. EXECUTE: ejecutar el plan segun el tipo
+        try:
+            if task_type == "investigate":
+                self._plan_investigate(task, result)
+            elif task_type == "explain":
+                self._plan_explain(task, result)
+            elif task_type == "document":
+                self._plan_document(task, result)
+            elif task_type == "code_search":
+                self._plan_code_search(task, result)
+            else:
+                # Default: investigar (web search)
+                self._plan_investigate(task, result)
+        except Exception as e:
+            result.success = False
+            result.error = str(e)
+            logger.error(f"Agent error: {e}")
+
+        # 3. SUMMARIZE: generar resumen
+        if result.success:
+            result.summary = self._summarize(task, result.steps)
+
+        return result
+
+    def _detect_task_type(self, task: str) -> str:
+        """Detecta el tipo de tarea basandose en palabras clave."""
+        task_lower = task.lower()
+
+        # Prioridad: code_search > document > explain > investigate
+        for kw in self.CODE_KEYWORDS:
+            if kw in task_lower:
+                return "code_search"
+        for kw in self.DOCUMENT_KEYWORDS:
+            if kw in task_lower:
+                return "document"
+        for kw in self.EXPLAIN_KEYWORDS:
+            if kw in task_lower:
+                return "explain"
+        for kw in self.INVESTIGATE_KEYWORDS:
+            if kw in task_lower:
+                return "investigate"
+
+        # Default
+        return "investigate"
+
+    # ─── Plan: Investigar (web search + learn) ──────────────
+    def _plan_investigate(self, task: str, result: AgentResult):
+        """Plan: web_search el tema, aprender los resultados."""
+        # Extraer el tema del task (quitar el verbo "investiga")
+        topic = self._extract_topic(task)
+        if not topic:
+            result.success = False
+            result.error = "No pude entender el tema a investigar"
+            return
+
+        # Paso 1: web_search
+        search_step = self._execute_tool("web_search", query=topic)
+        result.steps.append(search_step)
+
+        if not search_step.success:
+            return
+
+        # Paso 2: aprender de los resultados (auto-learning)
+        try:
+            # Los resultados vienen en search_step.output
+            # Extraer items de la busqueda
+            items = self._parse_search_results(search_step.output)
+            if items:
+                # Aprender cada item como hecho (sin filtros de GitHub)
+                learned = 0
+                for item in items[:3]:
+                    if len(item) > 30 and "http" not in item[:50]:
+                        # Filtrar items tipo "github.com/user/repo"
+                        if "github.com/" in item and " — " in item:
+                            continue
+                        self.memory.learn_fact(
+                            item,
+                            category="aprendido_web",
+                            confidence=0.5,
+                            source="auto_web_agent",
+                        )
+                        learned += 1
+                result.facts_learned = learned
+        except Exception as e:
+            logger.warning(f"Learn step error: {e}")
+
+    # ─── Plan: Explicar (web_search + browse_url) ──────────
+    def _plan_explain(self, task: str, result: AgentResult):
+        """Plan: web_search para encontrar URLs, luego browse las mejores."""
+        topic = self._extract_topic(task)
+        if not topic:
+            topic = task  # fallback
+
+        # Paso 1: web_search
+        search_step = self._execute_tool("web_search", query=topic)
+        result.steps.append(search_step)
+
+        if not search_step.success:
+            return
+
+        # Paso 2: extraer URLs de los resultados y visitar la primera
+        urls = self._extract_urls_from_results(search_step.output)
+        if urls:
+            # Visitar la primera URL
+            browse_step = self._execute_tool("browse_website", url=urls[0])
+            result.steps.append(browse_step)
+
+            # Aprender de la busqueda
+            items = self._parse_search_results(search_step.output)
+            if items:
+                learned = 0
+                for item in items[:3]:
+                    if len(item) > 30 and "http" not in item[:50]:
+                        if "github.com/" in item and " — " in item:
+                            continue
+                        self.memory.learn_fact(
+                            item, category="aprendido_web",
+                            confidence=0.5, source="auto_web_agent",
+                        )
+                        learned += 1
+                result.facts_learned = learned
+
+    # ─── Plan: Documentar (web_search + search_files) ─────
+    def _plan_document(self, task: str, result: AgentResult):
+        """Plan: web_search el tema, buscar archivos locales relacionados."""
+        topic = self._extract_topic(task)
+        if not topic:
+            topic = task
+
+        # Paso 1: web_search
+        search_step = self._execute_tool("web_search", query=topic)
+        result.steps.append(search_step)
+
+        if not search_step.success:
+            return
+
+        # Paso 2: search_files local
+        search_local = self._execute_tool("search_files", pattern=topic)
+        result.steps.append(search_local)
+
+        # Aprender
+        items = self._parse_search_results(search_step.output)
+        if items:
+            learned = 0
+            for item in items[:3]:
+                if len(item) > 30 and "http" not in item[:50]:
+                    if "github.com/" in item and " — " in item:
+                        continue
+                    self.memory.learn_fact(
+                        item, category="aprendido_web",
+                        confidence=0.5, source="auto_web_agent",
+                    )
+                    learned += 1
+            result.facts_learned = learned
+
+    # ─── Plan: Buscar en codigo (search_files + read_file) ───
+    def _plan_code_search(self, task: str, result: AgentResult):
+        """Plan: buscar archivos locales que coincidan con el tema."""
+        topic = self._extract_topic(task)
+        if not topic:
+            topic = task
+
+        # Paso 1: search_files
+        search_step = self._execute_tool("search_files", pattern=topic)
+        result.steps.append(search_step)
+
+        if not search_step.success:
+            return
+
+        # Paso 2: si encontro archivos, leer el primero
+        files = self._parse_file_results(search_step.output)
+        if files:
+            read_step = self._execute_tool("read_file", path=files[0])
+            result.steps.append(read_step)
+
+    # ─── Helpers ──────────────────────────────────────────
+
+    def _extract_topic(self, task: str) -> str:
+        """Extrae el tema principal de un task.
+
+        'investiga sobre fotosintesis' -> 'fotosintesis'
+        'explica como funciona X' -> 'X' (despues de 'como funciona')
+        """
+        task_lower = task.lower().strip()
+
+        # Quitar prefijos comunes
+        prefixes_to_remove = [
+            r"^investiga\s+(?:sobre |acerca de )?",
+            r"^busca\s+(?:informacion\s+)?(?:sobre |acerca de )?",
+            r"^explica\s+",
+            r"^describe\s+",
+            r"^documenta\s+",
+            r"^que es\s+",
+            r"^que son\s+",
+            r"^como\s+(?:funciona\s+)?",
+            r"^donde\s+esta\s+",
+            r"^por\s+que\s+",
+            r"^aprende\s+(?:sobre )?",
+        ]
+        for p in prefixes_to_remove:
+            topic = re.sub(p, "", task_lower, flags=re.IGNORECASE)
+            if topic != task_lower:
+                return topic.strip().rstrip("?!.")
+
+        # Default: devolver el task completo
+        return task.strip().rstrip("?!.")
+
+    def _execute_tool(self, tool: str, **kwargs) -> AgentStep:
+        """Ejecuta una tool via ActionRegistry."""
+        import time
+        start = time.time()
+        try:
+            result = self.actions.execute(tool, **kwargs)
+            duration = int((time.time() - start) * 1000)
+            success = result.get("success", False)
+            output = str(result.get("result", result.get("error", "")))
+            return AgentStep(
+                tool=tool,
+                input=str(kwargs),
+                output=output[:2000],  # Limitar output
+                success=success,
+                duration_ms=duration,
+            )
+        except Exception as e:
+            duration = int((time.time() - start) * 1000)
+            return AgentStep(
+                tool=tool,
+                input=str(kwargs),
+                output=f"Error: {e}",
+                success=False,
+                duration_ms=duration,
+            )
+
+    def _parse_search_results(self, output: str) -> list:
+        """Extrae items de busqueda del output string.
+
+        El output puede ser:
+        - Un string con "• item1\n• item2" (formato CLI)
+        - Un string con un dict: "{'resultados': ['• item1', '• item2']}"
+        - O con comillas dobles: '{"resultados": ["• item1", "• item2"]}'
+        - Cualquier combinacion
+        """
+        items = []
+
+        # Intentar parsear como dict (puede ser un Python dict stringificado)
+        # Acepta tanto comillas simples como dobles
+        try:
+            # Buscar patron de lista de strings con •
+            # Acepta ' o " para las comillas
+            match = re.search(
+                r"['\"]resultados['\"]:\s*\[(.*?)\](?=\s*$|\s*[,\}])",
+                output, re.DOTALL
+            )
+            if match:
+                list_content = match.group(1)
+                # Extraer cada string (con • al inicio) - acepta ambas comillas
+                for item_match in re.finditer(r"['\"](•[^'\"]{20,})['\"]", list_content):
+                    item = item_match.group(1)
+                    # Limpiar el item
+                    if item.startswith("•"):
+                        item = item[1:].strip()
+                    items.append(item)
+                if items:
+                    return items[:5]
+        except Exception:
+            pass
+
+        # Fallback: buscar lineas que empiecen con •
+        for line in output.split("\n"):
+            line = line.strip()
+            if line.startswith("•"):
+                items.append(line[1:].strip())
+
+        return items[:5]
+
+    def _extract_urls_from_results(self, output: str) -> list:
+        """Extrae URLs del output de busqueda."""
+        urls = []
+        # Buscar URLs entre parentesis
+        for match in re.finditer(r"\((https?://[^\)]+)\)", output):
+            urls.append(match.group(1))
+        return urls[:3]
+
+    def _parse_file_results(self, output: str) -> list:
+        """Extrae paths de archivos del output de search_files."""
+        files = []
+        for line in output.split("\n"):
+            line = line.strip()
+            # Formato comun: "archivo.py: linea X" o "ruta/al/archivo"
+            if line and not line.startswith("="):
+                # Tomar lo que esta antes de ":" o espacio
+                match = re.match(r"^([^\s:]+\.[a-z]+)", line)
+                if match:
+                    files.append(match.group(1))
+        return files[:3]
+
+    def _summarize(self, task: str, steps: list) -> str:
+        """Genera un resumen estructurado de los pasos ejecutados."""
+        lines = [f"\nResultados de la investigacion:\n"]
+
+        successful = [s for s in steps if s.success]
+        failed = [s for s in steps if not s.success]
+
+        for i, step in enumerate(steps, 1):
+            status = "✓" if step.success else "✗"
+            lines.append(f"{status} Paso {i}: {step.tool} ({step.duration_ms}ms)")
+            # Mostrar preview del output
+            preview = step.output.split("\n")[0][:120]
+            if preview:
+                lines.append(f"   → {preview}")
+
+        if successful:
+            lines.append(f"\nResumen: {len(successful)}/{len(steps)} pasos exitosos.")
+        if failed:
+            lines.append(f"Errores: {len(failed)} pasos fallaron.")
+
+        return "\n".join(lines)

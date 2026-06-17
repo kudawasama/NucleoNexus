@@ -466,7 +466,7 @@ class NexusCore:
                             "estado", "clima", "nota", "buscar", "archivo",
                             "moneda", "recordatorio", "ip", "luna", "tareas",
                             "csv", "web_search", "browse_url", "read_file",
-                            "search_files", "run_command"}
+                            "search_files", "run_command", "autoskill"}
             if intent in fast_intents:
                 # Excepción: "calcular" sin números → es conceptual (explicación), no operación
                 if intent == "calcular" and not re.search(r'\d+\s*[+\-*/]\s*\d+', user_input):

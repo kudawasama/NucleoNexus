@@ -196,6 +196,7 @@ class NexusCLI:
             ("23", "/clear",      "Limpiar pantalla"),
             ("24", "/reset",      "Resetear Nexus"),
             ("25", "/exit",       "Salir"),
+            ("26", "/agent X",    "Encadenar tools (investigar, explicar)"),
         ]
 
         print(f"\n{Color.CYAN}╔══════════════════════════════════════════════════════════╗{Color.RESET}")
@@ -389,6 +390,7 @@ class NexusCLI:
             "/personalidad": self._cmd_personality,
             "/backend": self._cmd_backend,
             "/model": self._cmd_model,
+            "/agent": self._cmd_agent,
             "/export": self._cmd_export,
             "/version": self._cmd_version,
             "/update": self._cmd_update,
@@ -400,6 +402,7 @@ class NexusCLI:
             "/recuerda": self._cmd_remember,
             "/analiza": self._cmd_analyze,
             "/limpiar-web": self._cmd_clean_web,
+            "/agent": self._cmd_agent,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -439,6 +442,7 @@ class NexusCLI:
 {Color.GREEN}/analiza{Color.RESET} <txt> Extraer hechos de un texto
 {Color.GREEN}/olvida{Color.RESET} <txt>  Borrar hecho de la memoria
 {Color.GREEN}/limpiar-web{Color.RESET}    Borrar hechos de web/GitHub contaminados
+{Color.GREEN}/agent{Color.RESET} <tarea> Encadenar tools (investigar, explicar, etc)
 
 {Color.DIM}Tip: Para enseñar algo a Nexus, escribe:{Color.RESET}
   "aprende que [hecho]"
@@ -527,6 +531,69 @@ class NexusCLI:
             content = r['content'][:70]
             print(f"  {role_icon} {content}")
         print()
+
+    def _cmd_agent(self, cmd: str = ""):
+        """Comando /agent que encadena tools automaticamente.
+
+        Similar a Hermes Agent: el agente orquesta web_search +
+        browse_url + read_file en secuencia para tareas complejas.
+
+        Uso:
+          /agent investiga sobre la fotosintesis
+          /agent explica como funciona X
+          /agent documenta el API REST
+          /agent busca en codigo la funcion X
+
+        Tipos de tareas (detectadas automaticamente):
+          - investigar: web_search + learn
+          - explicar: web_search + browse_url + learn
+          - documentar: web_search + search_files
+          - buscar en codigo: search_files + read_file
+        """
+        task = cmd.replace("/agent", "", 1).strip()
+        if not task:
+            print(f"{Color.YELLOW}Uso: /agent <tarea>{Color.RESET}")
+            print(f"  Ejemplos:")
+            print(f"    /agent investiga sobre la fotosintesis")
+            print(f"    /agent explica como funciona el aprendizaje automatico")
+            print(f"    /agent documenta la arquitectura de Nexus")
+            print(f"    /agent busca en codigo la funcion query_knowledge")
+            return
+
+        print(f"{Color.CYAN}Ejecutando agente: '{task}'{Color.RESET}")
+        print()
+
+        try:
+            from cognition.agent import NexusAgent
+            agent = NexusAgent(self.core)
+            result = agent.run(task)
+
+            if not result.success:
+                print(f"{Color.RED}Error: {result.error}{Color.RESET}")
+                return
+
+            # Mostrar pasos ejecutados
+            for i, step in enumerate(result.steps, 1):
+                status = f"{Color.GREEN}OK{Color.RESET}" if step.success else f"{Color.RED}FAIL{Color.RESET}"
+                print(f"  {Color.DIM}[{i}]{Color.RESET} {step.tool} → {status} ({step.duration_ms}ms)")
+
+            # Mostrar resumen
+            print()
+            print(f"{Color.GREEN}Resumen:{Color.RESET}")
+            if result.facts_learned > 0:
+                print(f"  📚 Aprendi {result.facts_learned} hechos nuevos")
+            if result.steps:
+                first_output = result.steps[0].output
+                if first_output and len(first_output) > 20:
+                    # Mostrar preview
+                    preview = first_output[:400]
+                    if len(first_output) > 400:
+                        preview += "..."
+                    print(f"\n{Color.DIM}Preview del primer paso:{Color.RESET}")
+                    print(f"  {preview}")
+
+        except Exception as e:
+            print(f"{Color.RED}Error ejecutando agente: {e}{Color.RESET}")
 
     def _cmd_clean_web(self, cmd: str = ""):
         """Borra los hechos aprendidos de la web que son nombres de repos/URLs.
