@@ -63,13 +63,28 @@ from interface.cli import NexusCLI
 
 
 # --- Logging ---------------------------------------------------
+# Los logs a archivo siempre, a stream solo en modo verbose
+# (para no spamear la salida del usuario en el CLI)
+_VERBOSE = os.environ.get("NEXUS_VERBOSE", "0") == "1"
+_LOG_LEVEL = getattr(logging, LOG_LEVEL, logging.INFO)
+
+if not _VERBOSE:
+    # Reducir logs a stream: solo WARNING+ por defecto
+    _stream_level = logging.WARNING
+else:
+    _stream_level = _LOG_LEVEL
+
 logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    level=_LOG_LEVEL,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(),
-    ] if LOG_FILE else [logging.StreamHandler()],
+        logging.StreamHandler(sys.stderr) if _VERBOSE
+        else logging.NullHandler(),  # silencio en stream por defecto
+    ] if LOG_FILE else [
+        logging.StreamHandler(sys.stderr) if _VERBOSE
+        else logging.NullHandler(),
+    ],
 )
 logger = logging.getLogger("nexus")
 

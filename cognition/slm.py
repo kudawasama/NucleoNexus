@@ -40,6 +40,7 @@ class SLMBackend:
         self.temperature = config.get("temperature", 0.7)
         self.loaded = False
         self._process = None
+        self._ollama_available_models = []  # cache de modelos Ollama disponibles
         self._api_key = config.get("api_key")
         # Fallback: leer de variables de entorno
         if not self._api_key:
@@ -107,8 +108,13 @@ class SLMBackend:
                 models = r.json().get("models", [])
                 model_names = [m["name"] for m in models]
                 if self.model_name not in model_names:
+                    # Intentar hacer pull automatico si es razonable
                     logger.warning(f"Modelo '{self.model_name}' no encontrado en Ollama. "
                                    f"Disponibles: {model_names[:5]}")
+                    # No marcar como loaded — el modelo no esta disponible
+                    self.loaded = False
+                    self._ollama_available_models = model_names
+                    return False
                 self.loaded = True
                 logger.info(f"Ollama conectado. Modelo: {self.model_name}")
                 return True

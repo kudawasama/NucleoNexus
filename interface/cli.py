@@ -4,6 +4,7 @@ Núcleo Nexus — Interfaz CLI Interactiva
 Terminal interactiva con colores, historial y comandos.
 """
 
+import json
 import logging
 import os
 import subprocess
@@ -267,6 +268,7 @@ class NexusCLI:
             "/export": self._cmd_export,
             "/version": self._cmd_version,
             "/update": self._cmd_update,
+            "/verbose": self._cmd_verbose,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -680,94 +682,126 @@ class NexusCLI:
                 print(f"{Color.GREEN}✓ Backend cambiado a: {backend} ({model_name}){Color.RESET}")
                 print(f"{Color.DIM}  Persistido en estado. Sobrevive entre sesiones.{Color.RESET}")
             else:
-                print(f"{Color.YELLOW}⚠ Backend {backend} no se pudo cargar{Color.RESET}")
-                print(f"  Verifica que el servicio este corriendo:")
-                if backend == "ollama":
-                    print(f"    ollama serve (puerto 11434)")
+                print(f"{Color.RED}✗ Backend {backend} no se pudo cargar{Color.RESET}")
+                # Mostrar modelos disponibles si es ollama
+                if backend == "ollama" and hasattr(new_slm, "_ollama_available_models"):
+                    available = new_slm._ollama_available_models
+                    if available:
+                        print(f"  {Color.YELLOW}Modelos Ollama disponibles:{Color.RESET}")
+                        for m in available[:5]:
+                            print(f"    - {m}")
+                        print(f"\n  {Color.DIM}Prueba: /model use ollama {available[0]}{Color.RESET}")
+                    else:
+                        print(f"  Verifica que el servicio este corriendo:")
+                        print(f"    ollama serve (puerto 11434)")
                 elif backend == "llamacpp":
+                    print(f"  Verifica que el servicio este corriendo:")
                     print(f"    llama-server -m modelo.gguf (puerto 8713)")
                 elif backend == "opencode":
+                    print(f"  Verifica:")
                     print(f"    set OPENCODE_GO_API_KEY=tu_key")
         except Exception as e:
             print(f"{Color.RED}Error cambiando backend: {e}{Color.RESET}")
 
     def _run_model_comparison(self, query: str):
         """Compara el mismo query contra todos los backends disponibles."""
+        import time as _t
+        import urllib.request
+        import urllib.error
+
         print(f"{Color.CYAN}Comparando backends con query:{Color.RESET} \"{query}\"\n")
 
-        backends = [
-            ("opencode", "https://opencode.ai/zen/go/v1", "deepseek-v4-flash"),
-            ("ollama", "http://localhost:11434/v1", "qwen2.5:0.5b"),
-        ]
+        # Detectar que backends estan disponibles
+        backends = []
+
+        # 1. OpenCode: usar la misma API key que el SLM principal
+        api_key = os.environ.get("OPENCODE_GO_API_KEY", "")
+        oc_url = "https://opencode.ai/zen/go/v1"
+        if api_key:
+            backends.append((
+                "opencode", oc_url, "deepseek-v4-flash", api_key
+            ))
+
+        # 2. Ollama: detectar modelos instalados via /api/tags
+        ollama_url = "http://localhost:11434/v1"
+        ollama_api = "http://localhost:11434/api/tags"
+        installed_models = []
+        try:
+            req = urllib.request.Request(ollama_api, method="GET")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read())
+                installed_models = [m["name"] for m in data.get("models", [])]
+        except Exception:
+            pass
+
+        if installed_models:
+            # Preferir modelos de chat (no embeddings)
+            chat_models = [m for m in installed_models
+                           if "embed" not in m.lower() and "nomic-embed" not in m.lower()]
+            for m in chat_models[:3]:  # hasta 3 modelos para no demorar
+                backends.append(("ollama", ollama_url, m, "not-needed"))
+        else:
+            print(f"  {Color.GRAY}Ollama no detectado en localhost:11434{Color.RESET}")
+
+        if not backends:
+            print(f"  {Color.RED}No hay backends disponibles{Color.RESET}")
+            return
 
         results = []
-        for backend, url, default_model in backends:
-            import urllib.request, urllib.error, json as _json
-            print(f"  {Color.YELLOW}Probando {backend}...{Color.RESET}", end=" ", flush=True)
-            try:
-                # Health check rapido via API
-                req = urllib.request.Request(f"{url}/models",
-                    headers={"Authorization": "Bearer not-needed"})
-                with urllib.request.urlopen(req, timeout=3) as resp:
-                    health = "🟢 online"
-            except Exception:
-                health = "🔴 offline (skipped)"
-
-            if "offline" in health:
-                print(health)
-                results.append((backend, None, "offline", None, None))
-                continue
-
-            # Test real con el query
-            import time as _t
-            import requests as _req
+        for backend, url, model_name, api_key_for_call in backends:
+            print(f"  {Color.YELLOW}Probando {backend}/{model_name}...{Color.RESET}", end=" ", flush=True)
             start = _t.time()
             try:
-                api_key = "not-needed"
-                if backend == "opencode":
-                    api_key = os.environ.get("OPENCODE_GO_API_KEY", "")
-
                 payload = {
-                    "model": default_model,
+                    "model": model_name,
                     "messages": [{"role": "user", "content": query}],
                     "max_tokens": 200,
                     "temperature": 0.7,
                 }
-                r = _req.post(
+                req = urllib.request.Request(
                     f"{url}/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}",
-                             "Content-Type": "application/json"},
-                    json=payload, timeout=20,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {api_key_for_call}",
+                        "Content-Type": "application/json",
+                    },
                 )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read())
                 elapsed = _t.time() - start
-                if r.status_code == 200:
-                    data = r.json()
-                    content = data["choices"][0]["message"]["content"]
-                    tokens = data.get("usage", {}).get("completion_tokens", 0)
-                    print(f"🟢 {elapsed:.2f}s, {tokens} tok")
-                    results.append((backend, default_model, "ok", content, elapsed))
-                else:
-                    print(f"🔴 HTTP {r.status_code}")
-                    results.append((backend, default_model, f"HTTP {r.status_code}", None, elapsed))
+                content = data["choices"][0]["message"]["content"]
+                tokens = data.get("usage", {}).get("completion_tokens", 0)
+                print(f"🟢 {elapsed:.2f}s, {tokens} tok")
+                results.append((backend, model_name, "ok", content, elapsed))
+            except urllib.error.HTTPError as e:
+                elapsed = _t.time() - start
+                body = e.read().decode("utf-8", errors="replace")[:80]
+                print(f"🔴 HTTP {e.code}: {body}")
+                results.append((backend, model_name, f"HTTP {e.code}", None, elapsed))
             except Exception as e:
-                print(f"🔴 {e}")
-                results.append((backend, default_model, str(e)[:50], None, None))
+                elapsed = _t.time() - start if "_t" in dir() else 0
+                print(f"🔴 {type(e).__name__}: {str(e)[:60]}")
+                results.append((backend, model_name, f"{type(e).__name__}", None, elapsed))
 
         # Resumen
         print(f"\n{Color.CYAN}╔══ Resumen ══╗{Color.RESET}")
+        ok_results = [r for r in results if r[2] == "ok"]
         for backend, model, status, content, elapsed in results:
             if status == "ok":
-                preview = content[:100].replace("\n", " ") if content else ""
-                print(f"\n  {Color.GREEN}{backend}{Color.RESET} ({model}) — {elapsed:.2f}s")
-                print(f"    {Color.DIM}\"{preview}{'...' if len(content or '') > 100 else ''}\"{Color.RESET}")
+                preview = content[:120].replace("\n", " ") if content else ""
+                tps = (ok_results and len([r for r in ok_results if r[0] == backend])
+                       and "") or ""
+                print(f"\n  {Color.GREEN}✓ {backend}{Color.RESET} / {Color.YELLOW}{model}{Color.RESET} — {elapsed:.2f}s, {content and len(content.split())} palabras")
+                print(f"    {Color.DIM}\"{preview}{'...' if content and len(content) > 120 else ''}\"{Color.RESET}")
             else:
-                print(f"\n  {Color.GRAY}{backend}{Color.RESET} ({model}) — {status}")
+                print(f"\n  {Color.GRAY}✗ {backend}{Color.RESET} / {model} — {status}")
 
-        # Veredicto
-        ok_results = [r for r in results if r[2] == "ok"]
         if len(ok_results) > 1:
             fastest = min(ok_results, key=lambda r: r[4])
-            print(f"\n  {Color.YELLOW}→ Mas rapido: {fastest[0]} ({fastest[4]:.2f}s){Color.RESET}")
+            print(f"\n  {Color.YELLOW}→ Mas rapido: {fastest[0]}/{fastest[1]} ({fastest[4]:.2f}s){Color.RESET}")
+        elif len(ok_results) == 1:
+            r = ok_results[0]
+            print(f"\n  {Color.YELLOW}→ Unico backend funcionando: {r[0]}/{r[1]} ({r[4]:.2f}s){Color.RESET}")
         print()
 
     def _cmd_export(self, cmd: str = ""):
@@ -792,6 +826,39 @@ class NexusCLI:
   {Color.YELLOW}Build:{Color.RESET}    {interactions} interacciones · {skills} skills
   {Color.YELLOW}Repo:{Color.RESET}    github.com/kudawasama/NucleoNexus
         """)
+
+    def _cmd_verbose(self, cmd: str = ""):
+        """Alterna el modo verbose (mostrar logs de INFO en pantalla).
+
+        Por defecto, los logs solo van al archivo. Con /verbose, tambien
+        aparecen en la terminal (stderr). Util para debug.
+        """
+        import logging as _log
+        # Leer estado actual del root logger
+        root = _log.getLogger()
+        has_stream_handler = any(
+            isinstance(h, _log.StreamHandler) and not isinstance(h, _log.NullHandler)
+            for h in root.handlers
+        )
+
+        if has_stream_handler:
+            # Apagar: poner NullHandler en lugar de StreamHandler
+            for h in list(root.handlers):
+                if isinstance(h, _log.StreamHandler):
+                    root.removeHandler(h)
+            root.addHandler(_log.NullHandler())
+            print(f"{Color.GREEN}✓ Modo verbose: OFF{Color.RESET}")
+            print(f"  {Color.DIM}Los logs solo van al archivo.{Color.RESET}")
+        else:
+            # Encender: agregar StreamHandler a stderr
+            for h in list(root.handlers):
+                if isinstance(h, _log.NullHandler):
+                    root.removeHandler(h)
+            sh = _log.StreamHandler()
+            sh.setFormatter(_log.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+            root.addHandler(sh)
+            print(f"{Color.GREEN}✓ Modo verbose: ON{Color.RESET}")
+            print(f"  {Color.DIM}Los logs ahora se ven en la terminal (stderr).{Color.RESET}")
 
     def _cmd_update(self, cmd: str = ""):
         """Actualiza Nexus via git pull."""
