@@ -485,11 +485,27 @@ class SymbolicEngine:
                                 and len(text) > 30
                                 and "http" not in text[:50]
                                 and (not query_terms or any(term in text_norm for term in query_terms))):
-                                self.memory.learn_fact(
-                                    text, category=f"aprendido_{topic[:15]}",
-                                    confidence=0.5, source="auto_web"
-                                )
-                                learned += 1
+                                # Procesar con extractor (separa listas)
+                                from learning.extractor import extract_facts_from_text as _extract
+                                extracted = _extract(text)
+                                if extracted:
+                                    for ex_fact in extracted[:3]:
+                                        if len(ex_fact) > 15:
+                                            self.memory.learn_fact(
+                                                ex_fact,
+                                                category=f"aprendido_{topic[:15]}",
+                                                confidence=0.5,
+                                                source="auto_web",
+                                            )
+                                            learned += 1
+                                else:
+                                    self.memory.learn_fact(
+                                        text,
+                                        category=f"aprendido_{topic[:15]}",
+                                        confidence=0.5,
+                                        source="auto_web",
+                                    )
+                                    learned += 1
 
                         # Mostrar resumen al usuario
                         preview = "\n".join(

@@ -375,13 +375,33 @@ class NexusCore:
             if (len(fact_text) > 30
                 and "http" not in fact_text[:50]
                 and (not query_terms or any(term in fact_text_norm for term in query_terms))):
-                self.memory.learn_fact(
-                    fact_text,
-                    category="aprendido_web",
-                    confidence=0.4,
-                    source="auto_web",
-                )
-                learned += 1
+                # ─── Procesar el snippet con el extractor ANTES de guardar ───
+                # Esto separa listas ("X son A, B, C") en hechos individuales
+                # y filtra las partes que son ruido del snippet.
+                from learning.extractor import extract_facts_from_text
+                extracted = extract_facts_from_text(fact_text)
+                if extracted:
+                    # Guardar cada hecho extraido (pueden ser varios)
+                    # El extractor ya expande "X son A, B, C" en A, B, C
+                    for ex_fact in extracted[:3]:  # max 3 por snippet
+                        if len(ex_fact) > 15:
+                            self.memory.learn_fact(
+                                ex_fact,
+                                category="aprendido_web",
+                                confidence=0.4,
+                                source="auto_web",
+                            )
+                            learned += 1
+                else:
+                    # Si el extractor no encontro nada, guardar el snippet
+                    # tal cual (mejor tener algo que nada)
+                    self.memory.learn_fact(
+                        fact_text,
+                        category="aprendido_web",
+                        confidence=0.4,
+                        source="auto_web",
+                    )
+                    learned += 1
 
         if learned:
             logger.info(f"Aprendidos {learned} hechos de la web (query: {query[:50]})")

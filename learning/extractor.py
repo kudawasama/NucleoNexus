@@ -14,29 +14,25 @@ logger = logging.getLogger("nexus.learning.extractor")
 # Doc 05-APRENDIZAJE lista los patrones gramaticales soportados.
 # Cada patron tiene el grupo (X, Y, ...) - la primera captura es el sujeto.
 FACT_PATTERNS = [
-    # "X es/son Y" o "X es una forma de Y" (con o sin articulo)
-    r'(?:^|[\.\?\!]\s+)(?:(?:el|la|los|las|un|una)\s+)?([a-záéíóúñü]{2,}(?:\s+[a-záéíóúñü]{2,}){0,5})\s+(?:es|son)\s+(?:un|una|el|la|los|las\s+)?([a-záéíóúñü].{3,80})',
-    # "X significa Y" / "X quiere decir Y"
-    r'\b([a-záéíóúñü]{2,20})\s+(?:significa|quiere decir|se refiere a)\s+([a-záéíóúñü].{3,80})',
+    # "X es/son Y" - declaracion simple
+    r'\b([a-záéíóúñü]{2,}(?:\s+[a-záéíóúñü]{2,}){0,4})\s+(?:es|son|son:)\s+([^.;]{3,150})',
+    # "X son/son: A, B, C" - LISTA de cosas
+    r'((?:los|las|los\s+\w+|\w+s)\s+son:?)\s+([^.;]+\.)',
+    # "X significa Y"
+    r'\b([a-záéíóúñü]{2,30})\s+(?:significa|quiere decir)\s+([^.;]{3,80})',
     # "X se usa para Y"
-    r'\b([a-záéíóúñü]{2,30})\s+se\s+(?:usa|utiliza|ocupa)\s+(?:para|en)\s+([a-záéíóúñü].{3,80})',
-    # "X tiene/contiene/incluye Y"
-    r'\b(?:(?:el|la|los|las)\s+)?([a-záéíóúñü]{2,30}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:tiene|contiene|incluye|posee|alberga)\s+([a-záéíóúñü].{3,80})',
+    r'\b([a-záéíóúñü]{2,30})\s+se\s+(?:usa|utiliza)\s+(?:para|en)\s+([^.;]{3,80})',
+    # "X tiene/contiene Y"
+    r'\b(?:(?:el|la|los|las)\s+)?([a-záéíóúñü]{2,30}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:tiene|contiene|incluye)\s+([^.;]{3,80})',
     # "X está compuesto por Y"
-    r'\b([a-záéíóúñü]{2,30}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:está|esta|están|estan)\s+(?:compuesto|compuesta|formado|formada|hecho|hecha)\s+(?:por|de)\s+([a-záéíóúñü].{3,80})',
-    # "X ocurre cuando Y"
-    r'\b([a-záéíóúñü]{2,30}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:ocurre|sucede|pasa|ocurren|suceden)\s+cuando\s+([a-záéíóúñü].{3,80})',
-    # "X nace/muere en Y" - tiempo/lugar
-    r'\b([a-záéíóúñü]{2,30})\s+(?:nació|muere|murió|nace|fue fundado|fue fundada|fue descubierta|fue inventada)\s+en\s+([a-záéíóúñü].{3,80})',
-    # "X está en Y" - ubicacion
-    r'\b([a-záéíóúñü]{2,30})\s+está\s+en\s+([a-záéíóúñü].{3,80})',
-    # "X descubrió/inventó Y" - logros
-    r'\b([a-záéíóúñü]{2,30})\s+(?:descubrió|descubrio|inventó|invento|creó|creo|escribió|escribio|pintó|pinto|compuso)\s+([a-záéíóúñü].{3,80})',
-    # Verbos de acción: "X hace/realiza/ejecuta Y"
-    r'\b(?:(?:el|la|los|las|un|una)\s+)?([a-záéíóúñü]{2,20}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:hace|hacen|realiza|realizan|ejecuta|ejecutan)\s+((?:[a-záéíóúñü]{2,}\s+){1,4}[a-záéíóñü]{2,})',
-    # Verbos de producción: "X produce/genera/convierte/transforma Y"
-    r'\b(?:(?:el|la|los|las|un|una)\s+)?([a-záéíóúñü]{2,20}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:produce|producen|genera|generan|crea|crean|convierte|convierten|transforma|transforman|fabrica|fabrican)\s+((?:[a-záéíóúñü]{2,}\s+){1,4}[a-záéíóñü]{2,})',
-    # Verbos biológicos: "X filtra/absorbe/transporta/elimina Y"
+    r'\b([a-záéíóúñü]{2,30}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:está|esta)\s+(?:compuesto|formado|hecho)\s+(?:por|de)\s+([^.;]{3,80})',
+    # "X descubrió/inventó Y"
+    r'\b([a-záéíóúñü]{2,30})\s+(?:descubrió|inventó|creó|escribió)\s+([^.;]{3,80})',
+    # "X hace/realiza Y"
+    r'\b(?:(?:el|la|los|las|un|una)\s+)?([a-záéíóúñü]{2,20}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:hace|realiza|ejecuta)\s+((?:\w+\s+){1,4}\w+)',
+    # "X produce/genera Y"
+    r'\b(?:(?:el|la|los|las|un|una)\s+)?([a-záéíóúñü]{2,20}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:produce|genera|crea|convierte|transforma)\s+((?:\w+\s+){1,4}\w+)',
+
     r'\b(?:(?:el|la|los|las|un|una)\s+)?([a-záéíóúñü]{2,20}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:filtra|filtran|absorbe|absorben|transporta|transportan|elimina|eliminan|expulsa|expulsan|bombea|bombean|limpia|limpian)\s+((?:[a-záéíóúñü]{2,}\s+){1,4}[a-záéíóñü]{2,})',
     # "X necesita/requiere Y para Z"
     r'\b(?:(?:el|la|los|las|un|una)\s+)?([a-záéíóúñü]{2,30}(?:\s+[a-záéíóúñü]{2,}){0,3})\s+(?:necesita|necesitan|requiere|requieren|utiliza|utilizan|usa|usan|ocupa|ocupan)\s+([a-záéíóúñü].{3,50})\s+(?:para|en)\s+([a-záéíóúñü].{3,60})',
@@ -124,9 +120,13 @@ def extract_facts_from_text(text: str, min_words: int = 3) -> list[str]:
             fact = _clean_fact_groups(match, text_lower)
             # Limpiar y validar
             fact = fact.strip().strip('.,;:!¿?¡')
-            # Quitar palabras conectoras al final
+            # Quitar palabras conectoras al final SOLO si son sueltas
+            # (si la ultima palabra es 'e' precedida de 'y' → parte de una lista "X y E", no quitar)
             words = fact.split()
-            while words and words[-1].lower() in FACT_SUFFIXES:
+            while words and len(words) > 1 and words[-1].lower() in FACT_SUFFIXES:
+                # No quitar "e" si la anterior es "y" (seria parte de "X y E")
+                if words[-1].lower() == "e" and len(words) >= 2 and words[-2].lower() == "y":
+                    break
                 words.pop()
             fact = " ".join(words)
             fact_words = fact.split()
@@ -135,7 +135,52 @@ def extract_facts_from_text(text: str, min_words: int = 3) -> list[str]:
                 if not any(fact == existing[:len(fact)] for existing in facts):
                     facts.append(fact)
 
-    return facts
+    # ─── Expansion: dividir listas en items individuales ───
+    # "Los principios son: A, B, C" -> guardar A, B, C por separado
+    # "Hay cinco fundamentos: A, B, C" -> tambien
+    # "Incluyen A, B, C" -> tambien
+    expanded = []
+    for fact in facts:
+        # Detectar patron "X son/son: A, B, C" o "X son A, B y C"
+        list_match = re.match(
+            r'^(.{5,80}?)\s+(?:son|es)\s*:?\s+(.+)$',
+            fact
+        )
+        # Tambien: "Hay N X: A, B, C" o "Incluyen A, B, C"
+        list_match2 = re.match(
+            r'^(?:hay|incluye|incluyen|tienen|son|tiene)\s+(?:cinco|cuatro|tres|dos|\d+)?\s*([\w\s]{3,40}?)[:\s]+(.+)$',
+            fact
+        )
+        items = None
+        subject = None
+        if list_match:
+            subject = list_match.group(1).strip()
+            list_text = list_match.group(2)
+            items = re.split(r',\s*|\s+y\s+', list_text)
+        elif list_match2:
+            subject = list_match2.group(1).strip()
+            list_text = list_match2.group(2)
+            items = re.split(r',\s*|\s+y\s+', list_text)
+
+        if items:
+            # Limpiar items: quitar puntuacion y espacios
+            # Filtro: longitud >= 2 (aceptar items cortos como "A, B" de tests)
+            items = [it.strip().strip('.,;:') for it in items if it.strip() and len(it.strip()) >= 2]
+            # Si tenemos 2+ items, expandir
+            if len(items) >= 2:
+                # Guardar el hecho completo tambien (para contexto)
+                expanded.append(fact)
+                # Guardar cada item por separado
+                for item in items[:8]:  # max 8 items
+                    item_fact = f"{subject} incluye: {item}"
+                    if len(item_fact) > 15 and item_fact not in expanded:
+                        expanded.append(item_fact)
+            else:
+                expanded.append(fact)
+        else:
+            expanded.append(fact)
+
+    return expanded
 
 
 def learn_from_user_input(text: str, memory) -> int:

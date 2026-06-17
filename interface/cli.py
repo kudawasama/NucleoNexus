@@ -127,7 +127,7 @@ class NexusCLI:
     def run(self):
         """Bucle principal de la CLI."""
         self.show_banner()
-        
+
         while self.running:
             try:
                 user_input = input(f"{Color.rgb(0, 180, 255)}Nexus{Color.RESET}"
@@ -139,6 +139,11 @@ class NexusCLI:
                 break
 
             if not user_input.strip():
+                continue
+
+            # ─── Menu interactivo: si escribe solo "/" → mostrar menu ───
+            if user_input.strip() == "/":
+                self._show_command_menu()
                 continue
 
             self._save_history(user_input)
@@ -154,15 +159,132 @@ class NexusCLI:
             # Mostrar respuesta con estilo
             self._show_response(response, metadata)
 
+    def _show_command_menu(self):
+        """Muestra un menu interactivo de comandos disponibles.
+
+        El usuario puede:
+        - Escribir el numero: ejecutar el comando
+        - Escribir el nombre (/help): ejecutar ese comando
+        - Escribir texto libre: usar eso como query de Nexus
+        - Enter vacio o 'q': salir del menu
+        """
+        import sys as _sys
+
+        commands_list = [
+            ("1",  "/help",       "Ver ayuda de todos los comandos"),
+            ("2",  "/status",     "Estado del sistema (fase, memoria, etc)"),
+            ("3",  "/stats",      "Estadisticas de memoria"),
+            ("4",  "/fase",       "Fase actual de Nexus"),
+            ("5",  "/hechos",     "Ver hechos aprendidos"),
+            ("6",  "/memoria",    "Ver ultimos recuerdos"),
+            ("7",  "/skills",     "Ver skills cargadas"),
+            ("8",  "/hora",       "Fecha y hora actual"),
+            ("9",  "/buscar X",   "Buscar en la web y aprender"),
+            ("10", "/aprende X",  "Guardar un hecho directo"),
+            ("11", "/aprende-web X", "Buscar y aprender sobre un tema"),
+            ("12", "/recuerda X", "Alias de /aprende"),
+            ("13", "/analiza X",  "Extraer hechos de un texto"),
+            ("14", "/olvida X",   "Borrar un hecho de la memoria"),
+            ("15", "/limpiar-web", "Borrar hechos contaminados de GitHub/web"),
+            ("16", "/model",      "Cambiar backend + modelo"),
+            ("17", "/model test X", "Comparar todos los backends"),
+            ("18", "/backend",    "Cambiar backend (symbolic/slm/hybrid)"),
+            ("19", "/personalidad", "Ver/ajustar personalidad"),
+            ("20", "/export",     "Exportar estado como JSON"),
+            ("21", "/version",    "Version, commit y build"),
+            ("22", "/update",     "git pull desde GitHub"),
+            ("23", "/clear",      "Limpiar pantalla"),
+            ("24", "/reset",      "Resetear Nexus"),
+            ("25", "/exit",       "Salir"),
+        ]
+
+        print(f"\n{Color.CYAN}╔══════════════════════════════════════════════════════════╗{Color.RESET}")
+        print(f"{Color.CYAN}║{Color.RESET}  {Color.BOLD}Comandos disponibles{Color.RESET}                                            {Color.CYAN}║{Color.RESET}")
+        print(f"{Color.CYAN}╠══════════════════════════════════════════════════════════╣{Color.RESET}")
+
+        # Agrupar en columnas de 3
+        per_col = 9
+        num_cols = 3
+        for i in range(0, len(commands_list), per_col):
+            row_items = commands_list[i:i+per_col]
+            line = f"{Color.CYAN}║{Color.RESET}  "
+            for item in row_items:
+                num, cmd, desc = item
+                cmd_str = f"{Color.YELLOW}{num:>2}{Color.RESET} {Color.GREEN}{cmd:<18}{Color.RESET}"
+                line += f"{cmd_str}"
+            # Rellenar si la fila esta incompleta
+            if len(row_items) < num_cols:
+                padding = (num_cols - len(row_items)) * 32
+                line += " " * padding
+            line += f"  {Color.CYAN}║{Color.RESET}"
+            print(line)
+        print(f"{Color.CYAN}╠══════════════════════════════════════════════════════════╣{Color.RESET}")
+        print(f"{Color.CYAN}║{Color.RESET}  {Color.DIM}Escribe el numero, el nombre (/help), texto libre, o 'q' para salir{Color.RESET}  {Color.CYAN}║{Color.RESET}")
+        print(f"{Color.CYAN}╚══════════════════════════════════════════════════════════╝{Color.RESET}")
+
+        # Diccionario de numeros a nombres de comando
+        num_to_cmd = {item[0]: item[1] for item in commands_list}
+        # Para comandos con argumentos
+        arg_commands = {
+            "9": "/buscar", "10": "/aprende", "11": "/aprende-web",
+            "12": "/recuerda", "13": "/analiza", "14": "/olvida",
+            "17": "/model test",
+        }
+
+        while True:
+            try:
+                sel = input(f"{Color.rgb(0, 180, 255)}menu>{Color.RESET} ")
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return
+
+            sel = sel.strip()
+            if not sel or sel.lower() in ("q", "quit", "salir", "exit"):
+                return
+
+            # Si es un numero
+            if sel in num_to_cmd:
+                cmd_name = num_to_cmd[sel]
+                # Si el comando necesita argumentos
+                if sel in arg_commands:
+                    # Limpiar cmd_name: quitar la "X" de "/buscar X" -> "/buscar"
+                    base_cmd = cmd_name.replace(" X", "").strip()
+                    arg = input(f"  {Color.DIM}Argumento para {base_cmd}:{Color.RESET} ").strip()
+                    if arg:
+                        cmd_name = f"{base_cmd} {arg}"
+                    else:
+                        cmd_name = base_cmd
+                print(f"  {Color.GREEN}→ Ejecutando: {cmd_name}{Color.RESET}")
+                self._handle_command(cmd_name)
+                return
+
+            # Si empieza con / es un comando directo
+            if sel.startswith("/"):
+                # Si necesita argumento
+                if sel in ("/buscar", "/aprende", "/aprende-web",
+                           "/recuerda", "/analiza", "/olvida"):
+                    arg = input(f"  {Color.DIM}Argumento para {sel}:{Color.RESET} ").strip()
+                    if arg:
+                        sel = f"{sel} {arg}"
+                print(f"  {Color.GREEN}→ Ejecutando: {sel}{Color.RESET}")
+                self._handle_command(sel)
+                return
+
+            # Si no es ni numero ni comando, tratarlo como query
+            print(f"  {Color.GREEN}→ Procesando como query:{Color.RESET} {sel}")
+            response, metadata = self.core.process(sel)
+            self._show_response(response, metadata)
+            return
+
     def _show_response(self, response: str, metadata: dict):
         """Muestra la respuesta formateada con metadatos técnicos.
-        
+
         Línea 1: backend + tiempo + modelo + tokens
         Línea 2: versión + git + skills + interacciones + confianza
-        
+
         Args:
             response: Texto de respuesta
-            metadata: Dict con backend, model, tokens, version, 
+            metadata: Dict con backend, model, tokens, version,
                      skills_count, phase, interactions, git
         """
         phase = self.core.state.get("nexus", "phase", default="Proto")
@@ -1026,11 +1148,25 @@ class NexusCLI:
                         and len(text) > 30
                         and "http" not in text[:50]
                         and (not query_terms or any(term in text_norm for term in query_terms))):
-                        self.core.memory.learn_fact(
-                            text, category=f"aprendido_{topic[:15]}",
-                            confidence=0.5, source="auto_web"
-                        )
-                        learned += 1
+                        # ─── Procesar con el extractor ANTES de guardar ───
+                        # Separa listas ("X son A, B, C") en items
+                        from learning.extractor import extract_facts_from_text
+                        extracted = extract_facts_from_text(text)
+                        if extracted:
+                            for ex_fact in extracted[:3]:
+                                if len(ex_fact) > 15:
+                                    self.core.memory.learn_fact(
+                                        ex_fact, category=f"aprendido_{topic[:15]}",
+                                        confidence=0.5, source="auto_web"
+                                    )
+                                    learned += 1
+                        else:
+                            # Fallback: guardar el snippet tal cual
+                            self.core.memory.learn_fact(
+                                text, category=f"aprendido_{topic[:15]}",
+                                confidence=0.5, source="auto_web"
+                            )
+                            learned += 1
                 if is_github:
                     print(f"\n{Color.YELLOW}Nota: Los resultados son de GitHub, no se guardaron{Color.RESET}")
                 print(f"\n{Color.GREEN}✓ Aprendí {learned} hechos sobre '{topic}':{Color.RESET}")
