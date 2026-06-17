@@ -81,15 +81,15 @@ CORRECTION_PATTERNS = [
 ]
 
 ACTION_EXTRACTION = [
-    (r'deber[ií]as?\s+haber\s+(.+?)(?:\.|,|$)', 'deberia haber hecho'),
-    (r'(?:deber[ií]as?|dev[ií]as?|tendr[ií]as?)\s+(?:haber\s+)?(.+?)(?:\.|,|$)', 'deberia hacer'),
+    (r'de[vb]er[ií]as?\s+haber\s+(.+?)(?:\.|,|$)', 'deberia haber hecho'),
+    (r'(?:de[vb]er[ií]as?|tendr[ií]as?)\s+(?:haber\s+)?(.+?)(?:\.|,|$)', 'deberia hacer'),
     (r'tienes\s+que\s+(.+?)(?:\.|,|$)', 'tiene que hacer'),
     (r'mejor\s+(?:haz|hagan|has|ser[ií]a|ser[aá])\s+(.+?)(?:\.|,|$)', 'mejor hacer'),
-    (r'no\s+(?:hagas|haga|deber[ií]as?)\s+(.+?)(?:\s*,\s*|\s+y\s+)(?:mejor\s+)?(?:haz|haga|hacer)\s+(.+?)(?:\.|,|$)', 'reemplazar'),
+    (r'no\s+(?:hagas|haga|de[vb]er[ií]as?)\s+(.+?)(?:\s*,\s*|\s+y\s+)(?:mejor\s+)?(?:haz|haga|hacer)\s+(.+?)(?:\.|,|$)', 'reemplazar'),
     (r'prefiero\s+que\s+(.+?)(?:\.|,|$)', 'preferencia'),
-    (r'(?:pr[oó]xim[ae]|siguiente)\s+(?:vez|ocasi[oó]n)\s+(?:haz|hagan|hace)\s+(.+?)(?:\.|,|$)', 'proxima vez'),
+    (r'(?:pr[oó]xim[ae]|siguiente)\s+(?:vez|ocasi[oó]n)\s+(?:haz|hagan|hace|pregunta|consulta|busca|dime|di|muestra|ens[eé]ñame|avisa|dame)\s+(.+?)(?:\.|,|$)', 'proxima vez'),
     # Fallback: capturar cualquier frase despues de "que" en correcciones
-    (r'(?:que\s+)?(?:deber[ií]as?|dev[ií]as?|tendr[ií]as?)\s+(.+?)(?:\.|,|$)', 'accion correctiva'),
+    (r'(?:que\s+)?(?:de[vb]er[ií]as?|tendr[ií]as?)\s+(.+?)(?:\.|,|$)', 'accion correctiva'),
 ]
 
 KEYWORD_TO_SKILL = {
