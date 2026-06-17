@@ -92,6 +92,9 @@ class NexusCore:
         facts_loaded = load_knowledge_to_memory(self.memory, str(KNOWLEDGE_DIR))
         self.state.set("knowledge_stats", "initial_facts", value=facts_loaded)
 
+        # 2c. Restaurar modelo persistido (si /model use se uso antes)
+        self._restore_persisted_model()
+
         # 3. Registro de Skills
         self.skills = SkillRegistry()
         self._load_skills()
@@ -103,7 +106,7 @@ class NexusCore:
         self._register_skill_actions()
         logger.info("OK Acciones")
 
-        # 5. Backend SLM (Ollama local)
+        # 5. Backend SLM
         self.slm = SLMBackend(ENGINE.get("llm", {}))
         if self.slm.load():
             logger.info(f"OK SLM cargado ({self.slm.mode}: {self.slm.model_name})")
@@ -126,6 +129,48 @@ class NexusCore:
         self.state.set("knowledge_stats", "skills_learned", value=len(self.skills.list()))
 
         logger.info(f"{SYSTEM['name']} listo. Fase: {self.state.get('nexus', 'phase')}")
+
+    def _restore_persisted_model(self):
+        """Restaura el modelo elegido via /model use en una sesion previa.
+
+        Si el usuario hizo /model use ollama qwen2.5:1.5b en sesion
+        anterior, la eleccion se guardo en state['model_state'].
+        Al iniciar, leemos eso y actualizamos config.py en memoria
+        ANTES de que SLMBackend se cree.
+        """
+        saved = self.state.get("model_state", default={})
+        saved_backend = saved.get("backend", "")
+        if not saved_backend or saved_backend == "symbolic":
+            return  # usar config por defecto
+
+        import config as _cfg
+        cur_backend = _cfg.ENGINE["llm"].get("backend")
+
+        if saved_backend == "opencode":
+            if cur_backend != "openai":
+                _cfg.ENGINE["llm"]["backend"] = "openai"
+                _cfg.ENGINE["llm"]["api_base"] = "https://opencode.ai/zen/go/v1"
+                _cfg.ENGINE["llm"]["api_key"] = None
+            new_model = saved.get("model_name", "deepseek-v4-flash")
+            if _cfg.ENGINE["llm"].get("model_name") != new_model:
+                _cfg.ENGINE["llm"]["model_name"] = new_model
+                logger.info(f"Modelo restaurado: opencode / {new_model}")
+
+        elif saved_backend == "ollama":
+            _cfg.ENGINE["llm"]["backend"] = "ollama"
+            _cfg.ENGINE["llm"]["api_base"] = "http://localhost:11434/v1"
+            _cfg.ENGINE["llm"]["api_key"] = "not-needed"
+            new_model = saved.get("model_name", "qwen2.5:0.5b")
+            if _cfg.ENGINE["llm"].get("model_name") != new_model:
+                _cfg.ENGINE["llm"]["model_name"] = new_model
+                logger.info(f"Modelo restaurado: ollama / {new_model}")
+
+        elif saved_backend == "llamacpp":
+            _cfg.ENGINE["llm"]["backend"] = "llamacpp"
+            new_model = saved.get("model_name", "")
+            if new_model:
+                _cfg.ENGINE["llm"]["model_name"] = new_model
+            logger.info(f"Modelo restaurado: llamacpp / {new_model}")
 
     def _load_skills(self):
         """Carga las skills nativas y las registra."""

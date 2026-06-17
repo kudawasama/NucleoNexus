@@ -6,6 +6,7 @@ Terminal interactiva con colores, historial y comandos.
 
 import logging
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -262,6 +263,7 @@ class NexusCLI:
             "/tiempo": self._cmd_time,
             "/personalidad": self._cmd_personality,
             "/backend": self._cmd_backend,
+            "/model": self._cmd_model,
             "/export": self._cmd_export,
             "/version": self._cmd_version,
             "/update": self._cmd_update,
@@ -289,6 +291,8 @@ class NexusCLI:
 {Color.GREEN}/backend{Color.RESET}      Cambiar backend (symbolic/slm)
 {Color.GREEN}/export{Color.RESET}       Exportar estado como JSON
 {Color.GREEN}/version{Color.RESET}      Versión, commit y build info
+{Color.GREEN}/model{Color.RESET}        Cambiar backend/modelo (opencode, ollama, llamacpp)
+{Color.GREEN}/update{Color.RESET}       git pull desde GitHub
 {Color.GREEN}/clear{Color.RESET}        Limpiar pantalla
 {Color.GREEN}/reset{Color.RESET}        Resetear Nexus
 {Color.GREEN}/exit{Color.RESET}         Salir
@@ -479,15 +483,292 @@ class NexusCLI:
             return
 
         current = self.core.state.get("capabilities", "backend", default="symbolic")
-        print(f"{Color.CYAN}╔══ Backend ══╗{Color.RESET}")
-        print(f"  Actual: {Color.GREEN}{current}{Color.RESET}")
-        print(f"  Opciones: {Color.YELLOW}symbolic{Color.RESET} (sin modelo), "
-              f"{Color.YELLOW}slm{Color.RESET} (modelo local), "
-              f"{Color.YELLOW}hybrid{Color.RESET} (combinado)")
+        print(f"""
+{Color.CYAN}╔══ Backend ══╗{Color.RESET}
+  Actual: {Color.GREEN}{current}{Color.RESET}
+  Opciones: {Color.YELLOW}symbolic{Color.RESET} (sin modelo),
+           {Color.YELLOW}slm{Color.RESET} (modelo local),
+           {Color.YELLOW}hybrid{Color.RESET} (combinado)""")
         if self.core.slm:
             slm_info = self.core.slm.get_info()
             print(f"  SLM: {'🟢 cargado' if slm_info['loaded'] else '🔴 no cargado'}")
             print(f"  Modo: {slm_info['mode']} | Modelo: {slm_info['model']}")
+        print(f"\n{Color.DIM}Usa /model para cambiar backend + modelo.{Color.RESET}\n")
+
+    def _cmd_model(self, cmd: str = ""):
+        """Comando /model para cambiar backend + modelo sin tocar config.
+
+        Uso:
+          /model                          # muestra config actual
+          /model list                     # muestra backends disponibles
+          /model use opencode             # cambia a OpenCode Go
+          /model use ollama qwen2.5:1.5b  # cambia a Ollama con modelo
+          /model test [pregunta]          # compara todos los backends
+        """
+        parts = cmd.split()
+        subcommand = parts[1] if len(parts) > 1 else "show"
+
+        if subcommand in ("help", "?"):
+            self._print_model_help()
+            return
+
+        if subcommand == "list":
+            self._print_model_list()
+            return
+
+        if subcommand == "test":
+            test_query = " ".join(parts[2:]) if len(parts) > 2 else "explicame brevemente que es la fotosintesis"
+            self._run_model_comparison(test_query)
+            return
+
+        if subcommand == "use":
+            if len(parts) < 3:
+                print(f"{Color.RED}Uso: /model use <backend> [modelo]{Color.RESET}")
+                print(f"  Backends: opencode, ollama, symbolic, llamacpp")
+                return
+            backend = parts[2].lower()
+            model_name = parts[3] if len(parts) > 3 else None
+            self._switch_model(backend, model_name)
+            return
+
+        if subcommand == "show":
+            self._show_current_model()
+            return
+
+        print(f"{Color.RED}Subcomando desconocido: {subcommand}{Color.RESET}")
+        self._print_model_help()
+
+    def _print_model_help(self):
+        print(f"""
+{Color.CYAN}╔══ /model — Gestión de Modelos ══╗{Color.RESET}
+
+  {Color.YELLOW}/model{Color.RESET}                          Muestra modelo actual
+  {Color.YELLOW}/model list{Color.RESET}                     Lista backends disponibles
+  {Color.YELLOW}/model use opencode{Color.RESET}             OpenCode Go (rapido, cloud)
+  {Color.YELLOW}/model use ollama qwen2.5:0.5b{Color.RESET} Ollama local (gratis, offline)
+  {Color.YELLOW}/model use ollama qwen2.5:1.5b{Color.RESET} Ollama local (mejor)
+  {Color.YELLOW}/model use ollama llama3.2:1b{Color.RESET}  Otro modelo
+  {Color.YELLOW}/model use llamacpp{Color.RESET}              llama.cpp (avanzado)
+  {Color.YELLOW}/model test [pregunta]{Color.RESET}          Compara todos los backends
+
+{Color.DIM}Persiste en data/state/nexus_state.json (sobrevive entre sesiones).{Color.RESET}
+        """)
+
+    def _print_model_list(self):
+        print(f"""
+{Color.CYAN}╔══ Backends disponibles ══╗{Color.RESET}
+
+  {Color.YELLOW}opencode{Color.RESET}    OpenCode Go (Nous Research)
+           Endpoint: https://opencode.ai/zen/go/v1
+           API key: $OPENCODE_GO_API_KEY
+           Modelos: deepseek-v4-flash (default), otros
+           Rapido, cloud, gratis con API key
+
+  {Color.YELLOW}ollama{Color.RESET}      Ollama local (offline)
+           Endpoint: http://localhost:11434/v1
+           Modelos: qwen2.5:0.5b, qwen2.5:1.5b, qwen2.5:3b,
+                    llama3.2:1b, llama3.2:3b, phi3:mini, etc.
+           Lento, local, gratis
+
+  {Color.YELLOW}llamacpp{Color.RESET}    llama.cpp server (avanzado)
+           Endpoint: http://localhost:8713/v1
+           Requiere: model_path en config.py
+
+  {Color.YELLOW}symbolic{Color.RESET}    Solo motor simbolico (sin SLM)
+           No usa modelo, solo reglas + memoria
+        """)
+
+    def _show_current_model(self):
+        s = self.core.state.get_snapshot()
+        cap = s.get("capabilities", {})
+        backend_mode = cap.get("backend", "symbolic")
+        slm = self.core.slm
+
+        print(f"""
+{Color.CYAN}╔══ Modelo Actual ══╗{Color.RESET}
+
+  {Color.YELLOW}Modo de operacion:{Color.RESET}   {backend_mode}
+  {Color.YELLOW}SLM cargado:{Color.RESET}        {'🟢 Si' if slm and slm.loaded else '🔴 No'}""")
+        if slm and slm.loaded:
+            info = slm.get_info()
+            print(f"  {Color.YELLOW}Backend SLM:{Color.RESET}       {info['mode']}")
+            print(f"  {Color.YELLOW}Modelo:{Color.RESET}            {info['model']}")
+            print(f"  {Color.YELLOW}Temperatura:{Color.RESET}       {info['temperature']}")
+            print(f"  {Color.YELLOW}Max tokens:{Color.RESET}        {info['max_tokens']}")
+
+        # Persistido
+        model_state = s.get("model_state", {})
+        if model_state:
+            print(f"\n  {Color.DIM}Persistente (sobrevive entre sesiones):{Color.RESET}")
+            print(f"    Backend: {model_state.get('backend', '?')}")
+            print(f"    Modelo:  {model_state.get('model_name', '?')}")
+        print()
+
+    def _switch_model(self, backend: str, model_name: str | None):
+        """Cambia el backend SLM y persiste en el estado."""
+        import config as _cfg
+        import importlib
+
+        # Mapear aliases a backend real
+        backend_aliases = {
+            "opencode": "openai",  # OpenCode Go usa API compatible OpenAI
+            "ollama": "ollama",
+            "llamacpp": "llamacpp",
+            "llama.cpp": "llamacpp",
+            "symbolic": None,  # sin SLM
+        }
+        real_backend = backend_aliases.get(backend)
+        if real_backend is None and backend != "symbolic":
+            print(f"{Color.RED}Backend desconocido: {backend}{Color.RESET}")
+            print(f"  Disponibles: opencode, ollama, llamacpp, symbolic")
+            return
+
+        # Configurar segun backend
+        if backend == "symbolic":
+            _cfg.ENGINE["llm"]["backend"] = None
+            _cfg.ENGINE["llm"]["model_name"] = "ninguno"
+            self.core.state.set("capabilities", "slm_loaded", value=False)
+            self.core.state.set("capabilities", "backend", value="symbolic")
+            self.core.state.set("model_state", "backend", value="symbolic")
+            self.core.state.set("model_state", "model_name", value="ninguno")
+            print(f"{Color.GREEN}✓ Modo cambiado a: symbolic (sin SLM){Color.RESET}")
+            return
+
+        # OpenCode
+        if backend == "opencode":
+            _cfg.ENGINE["llm"]["backend"] = "openai"
+            _cfg.ENGINE["llm"]["api_base"] = "https://opencode.ai/zen/go/v1"
+            if not model_name:
+                model_name = "deepseek-v4-flash"
+            _cfg.ENGINE["llm"]["model_name"] = model_name
+            _cfg.ENGINE["llm"]["api_key"] = None  # leer de env var
+
+        # Ollama
+        elif backend == "ollama":
+            _cfg.ENGINE["llm"]["backend"] = "ollama"
+            _cfg.ENGINE["llm"]["api_base"] = "http://localhost:11434/v1"
+            if not model_name:
+                model_name = "qwen2.5:0.5b"
+            _cfg.ENGINE["llm"]["model_name"] = model_name
+            _cfg.ENGINE["llm"]["api_key"] = "not-needed"
+
+        # llama.cpp
+        elif backend == "llamacpp":
+            _cfg.ENGINE["llm"]["backend"] = "llamacpp"
+            _cfg.ENGINE["llm"]["api_base"] = "http://localhost:8713/v1"
+            if model_name:
+                _cfg.ENGINE["llm"]["model_name"] = model_name
+
+        # Recargar SLMBackend con la nueva config
+        try:
+            from cognition.slm import SLMBackend
+            # Cerrar el actual
+            if self.core.slm:
+                try:
+                    self.core.slm.unload()
+                except Exception:
+                    pass
+            # Crear nuevo
+            new_slm = SLMBackend(_cfg.ENGINE["llm"])
+            new_slm.load()
+            if new_slm.loaded:
+                self.core.slm = new_slm
+                self.core.state.set("capabilities", "slm_loaded", value=True)
+                self.core.state.set("model_state", "backend", value=backend)
+                self.core.state.set("model_state", "model_name", value=_cfg.ENGINE["llm"]["model_name"])
+                self.core.state.set("capabilities", "backend", value="hybrid")
+                print(f"{Color.GREEN}✓ Backend cambiado a: {backend} ({model_name}){Color.RESET}")
+                print(f"{Color.DIM}  Persistido en estado. Sobrevive entre sesiones.{Color.RESET}")
+            else:
+                print(f"{Color.YELLOW}⚠ Backend {backend} no se pudo cargar{Color.RESET}")
+                print(f"  Verifica que el servicio este corriendo:")
+                if backend == "ollama":
+                    print(f"    ollama serve (puerto 11434)")
+                elif backend == "llamacpp":
+                    print(f"    llama-server -m modelo.gguf (puerto 8713)")
+                elif backend == "opencode":
+                    print(f"    set OPENCODE_GO_API_KEY=tu_key")
+        except Exception as e:
+            print(f"{Color.RED}Error cambiando backend: {e}{Color.RESET}")
+
+    def _run_model_comparison(self, query: str):
+        """Compara el mismo query contra todos los backends disponibles."""
+        print(f"{Color.CYAN}Comparando backends con query:{Color.RESET} \"{query}\"\n")
+
+        backends = [
+            ("opencode", "https://opencode.ai/zen/go/v1", "deepseek-v4-flash"),
+            ("ollama", "http://localhost:11434/v1", "qwen2.5:0.5b"),
+        ]
+
+        results = []
+        for backend, url, default_model in backends:
+            import urllib.request, urllib.error, json as _json
+            print(f"  {Color.YELLOW}Probando {backend}...{Color.RESET}", end=" ", flush=True)
+            try:
+                # Health check rapido via API
+                req = urllib.request.Request(f"{url}/models",
+                    headers={"Authorization": "Bearer not-needed"})
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    health = "🟢 online"
+            except Exception:
+                health = "🔴 offline (skipped)"
+
+            if "offline" in health:
+                print(health)
+                results.append((backend, None, "offline", None, None))
+                continue
+
+            # Test real con el query
+            import time as _t
+            import requests as _req
+            start = _t.time()
+            try:
+                api_key = "not-needed"
+                if backend == "opencode":
+                    api_key = os.environ.get("OPENCODE_GO_API_KEY", "")
+
+                payload = {
+                    "model": default_model,
+                    "messages": [{"role": "user", "content": query}],
+                    "max_tokens": 200,
+                    "temperature": 0.7,
+                }
+                r = _req.post(
+                    f"{url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}",
+                             "Content-Type": "application/json"},
+                    json=payload, timeout=20,
+                )
+                elapsed = _t.time() - start
+                if r.status_code == 200:
+                    data = r.json()
+                    content = data["choices"][0]["message"]["content"]
+                    tokens = data.get("usage", {}).get("completion_tokens", 0)
+                    print(f"🟢 {elapsed:.2f}s, {tokens} tok")
+                    results.append((backend, default_model, "ok", content, elapsed))
+                else:
+                    print(f"🔴 HTTP {r.status_code}")
+                    results.append((backend, default_model, f"HTTP {r.status_code}", None, elapsed))
+            except Exception as e:
+                print(f"🔴 {e}")
+                results.append((backend, default_model, str(e)[:50], None, None))
+
+        # Resumen
+        print(f"\n{Color.CYAN}╔══ Resumen ══╗{Color.RESET}")
+        for backend, model, status, content, elapsed in results:
+            if status == "ok":
+                preview = content[:100].replace("\n", " ") if content else ""
+                print(f"\n  {Color.GREEN}{backend}{Color.RESET} ({model}) — {elapsed:.2f}s")
+                print(f"    {Color.DIM}\"{preview}{'...' if len(content or '') > 100 else ''}\"{Color.RESET}")
+            else:
+                print(f"\n  {Color.GRAY}{backend}{Color.RESET} ({model}) — {status}")
+
+        # Veredicto
+        ok_results = [r for r in results if r[2] == "ok"]
+        if len(ok_results) > 1:
+            fastest = min(ok_results, key=lambda r: r[4])
+            print(f"\n  {Color.YELLOW}→ Mas rapido: {fastest[0]} ({fastest[4]:.2f}s){Color.RESET}")
+        print()
 
     def _cmd_export(self, cmd: str = ""):
         output = self.core.state.export_json()

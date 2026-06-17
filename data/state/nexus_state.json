@@ -1,13 +1,13 @@
 {
   "nexus": {
-    "version": "0.1.0+build.27",
-    "commit": "4b9233d",
+    "version": "0.1.0+build.28",
+    "commit": "6bb8003",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
-    "total_interactions": 599,
-    "total_learned_facts": 25,
+    "total_interactions": 602,
+    "total_learned_facts": 26,
     "total_skills": 3,
-    "confidence_level": 0.699,
+    "confidence_level": 0.702,
     "awake_time": 0
   },
   "personality": {
@@ -25,17 +25,21 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 31.35,
-    "responses_given": 599,
-    "successful_responses": 599,
+    "avg_response_time_ms": 31.2,
+    "responses_given": 602,
+    "successful_responses": 602,
     "failed_responses": 0,
-    "last_response_time": 1781705892.354207
+    "last_response_time": 1781706385.487399
   },
   "knowledge_stats": {
-    "episodic_memories": 1325,
-    "semantic_facts": 25,
+    "episodic_memories": 1335,
+    "semantic_facts": 26,
     "procedural_patterns": 0,
     "skills_learned": 3,
     "initial_facts": 22
+  },
+  "model_state": {
+    "backend": "opencode",
+    "model_name": "deepseek-v4-flash"
   }
 }
