@@ -300,6 +300,10 @@ class SymbolicEngine:
             return response
 
         # Respuestas por intención
+        # Para 'aprender' pasamos actions_registry (puede llamar web_search)
+        if intent == "aprender":
+            return self._handle_learn(text, memories, facts,
+                                     actions_registry=actions_registry)
         intent_handlers = {
             "saludo": self._handle_greeting,
             "despedida": self._handle_farewell,
@@ -360,28 +364,117 @@ class SymbolicEngine:
             f"{s['knowledge_stats']['semantic_facts']} hechos"
         )
 
-    def _handle_learn(self, text: str, memories: list, facts: list) -> str:
-        # Extrae posibles hechos del texto
-        # Busca patrones como: "aprende que X es Y" o "X es/son/tiene Y"
-        fact_patterns = [
-            r'que ([a-záéíóúñ]+ (?:es|son|tiene|puede|hace|significa) .+)',
-            r'aprend[aeio] (?:que )?(.+)',
-            r'enseñ[ae] (?:que )?(.+)',
-            r'recuerd[ae] (?:que )?(.+)',
-        ]
-        hechos = []
-        for pat in fact_patterns:
-            hechos = re.findall(pat, text.lower())
-            if hechos:
-                break
-        if hechos:
-            for hecho in hechos[:3]:
-                self.memory.learn_fact(hecho, category="aprendizaje",
-                                     confidence=0.3, source="usuario")
-            return f"¡He aprendido {len(hechos[:3])} cosas nuevas! 📚 Las almacenaré en mi memoria semántica."
+    def _handle_learn(self, text: str, memories: list, facts: list,
+                      actions_registry=None) -> str:
+        """Maneja el comando 'aprende [X]' del usuario.
+
+        Tres casos:
+        1. "aprende que X es Y" → guardar el hecho Y directamente
+        2. "aprende sobre X" → hacer web_search sobre X y aprender
+        3. "aprende X" sin contexto → mensaje pidiendo más info
+        """
+        text_lower = text.lower().strip()
+
+        # ─── Caso 1: "aprende que X" o "aprende: X" — hecho directo ───
+        # El usuario da la información explícitamente
+        m_direct = re.search(
+            r'(?:aprend[ae]|enseñ[ae]|recorda|recuerd[ae])\s+(?:que\s+|:\s*|,\s*)?(.+)',
+            text_lower
+        )
+        if m_direct:
+            content = m_direct.group(1).strip().rstrip('.')
+            # Detectar "aprende sobre X" — NO es hecho directo
+            # "aprende sobre contabilidad" no dice qué es la contabilidad
+            if re.match(r'^(?:sobre|acerca de|respecto a|de)\s+\w+', content):
+                # ─── Caso 2: "aprende sobre X" — ir a la web ───
+                topic = re.sub(r'^(?:sobre|acerca de|respecto a|de)\s+', '', content)
+                topic = re.sub(r'\s+(?:por favor|plz|please)$', '', topic).strip()
+                return self._learn_from_web_topic(topic, actions_registry)
+
+            # Hecho directo: "aprende que X" tiene contenido
+            if len(content) > 5 and not content.startswith(('sobre ', 'acerca ', 'de ')):
+                # Extraer como hecho y guardar
+                from learning.extractor import extract_facts_from_text
+                facts_found = extract_facts_from_text(content)
+                if facts_found:
+                    for f in facts_found[:3]:
+                        self.memory.learn_fact(
+                            f, category="aprendizaje",
+                            confidence=0.5, source="usuario"
+                        )
+                    return (
+                        f"¡He aprendido {len(facts_found[:3])} cosas nuevas! 📚\n"
+                        + "\n".join(f"  • {f}" for f in facts_found[:3])
+                    )
+                else:
+                    # Guardar el contenido entero como un hecho
+                    self.memory.learn_fact(
+                        content, category="aprendizaje",
+                        confidence=0.5, source="usuario"
+                    )
+                    return f"¡He aprendido esto! 📚\n  • {content}"
+
+        # ─── Caso 3: comando 'aprende' sin contenido ───
         return (
-            "Estoy listo para aprender. Puedes enseñarme hechos, patrones o conceptos. "
-            "Por ejemplo: 'Nexus, aprende que Python es un lenguaje de programación'."
+            "Estoy listo para aprender. Puedes enseñarme con:\n"
+            "  • 'aprende que Python es un lenguaje de programación'\n"
+            "  • 'aprende sobre la Revolución Francesa' (iré a buscar info)\n"
+            "  • 'recuerda que mi color favorito es azul'"
+        )
+
+    def _learn_from_web_topic(self, topic: str, actions_registry=None) -> str:
+        """Aprende sobre un tema usando web_search.
+
+        Usado cuando el usuario dice "aprende sobre X" sin dar el hecho.
+        """
+        if not actions_registry:
+            return f"Aprende sobre '{topic}' (sin acceso a web)"
+
+        # Hacer web search sobre el tema
+        try:
+            result = actions_registry.execute("web_search", query=topic)
+            if result.get("success"):
+                data = result["result"]
+                if isinstance(data, dict) and "resultados" in data:
+                    items = data["resultados"]
+                    if items:
+                        # Guardar los 3 mejores como hechos
+                        learned = 0
+                        for item in items[:3]:
+                            if isinstance(item, dict):
+                                text = item.get("snippet", "") or item.get("extract", "")
+                                title = item.get("title", "")
+                            else:
+                                text = str(item)
+                                title = ""
+
+                            # Quitar HTML y limpiar
+                            text = re.sub(r'<[^>]+>', '', text).strip()[:200]
+
+                            if not text and title:
+                                text = title
+                            if text and len(text) > 20:
+                                self.memory.learn_fact(
+                                    text, category=f"aprendido_{topic[:15]}",
+                                    confidence=0.5, source="auto_web"
+                                )
+                                learned += 1
+
+                        # Mostrar resumen al usuario
+                        preview = "\n".join(
+                            f"  • {str(item)[:120]}" for item in items[:3]
+                        )
+                        return (
+                            f"📚 Investigué sobre '{topic}' y aprendí {learned} hechos:\n"
+                            f"{preview}\n\n"
+                            f"Próxima vez que preguntes sobre esto, responderé desde mi memoria."
+                        )
+        except Exception as e:
+            logger.warning(f"Error aprendiendo sobre {topic}: {e}")
+
+        return (
+            f"No pude encontrar información sobre '{topic}'. "
+            f"Prueba: 'busca en la web {topic}' o 'aprende que {topic} es...'"
         )
 
     def _handle_phase(self, text: str, memories: list, facts: list) -> str:

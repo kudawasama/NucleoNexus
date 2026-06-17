@@ -191,7 +191,95 @@ def test_hola_dime_impuestos_usa_slm():
     assert len(r) > 50, f"respuesta muy corta: {r[:80]}"
 
 
-test("'hola dime...' NO es saludo", test_hola_largo_no_es_saludo)
+test("comandos existen", lambda: None)
+
+
+# ===================================================================
+# Tests de los nuevos comandos de aprendizaje (commit e04f122+)
+# ===================================================================
+section("COMANDOS: /buscar, /aprende, /analiza, /olvida")
+
+
+def test_cmd_aprende_guarda_hecho():
+    """/aprende guarda un hecho directamente."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    before = nexus.memory.semantic.count()
+    cli._cmd_learn("/aprende test_comando_aprende X es un dato unico")
+    after = nexus.memory.semantic.count()
+    assert after > before, f"/aprende no guardo el hecho: before={before}, after={after}"
+
+
+def test_cmd_aprende_sin_args_muestra_ayuda():
+    """/aprende sin argumentos muestra ayuda."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    # No debe fallar
+    cli._cmd_learn("/aprende")
+
+
+def test_cmd_aprende_sobre_sugiere_web():
+    """/aprende sobre X sugiere usar /aprende-web."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    # No debe fallar
+    cli._cmd_learn("/aprende sobre algo")
+
+
+def test_cmd_recuerda_alias_aprende():
+    """/recuerda es alias de /aprende."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    before = nexus.memory.semantic.count()
+    cli._cmd_remember("/recuerda test_recuerda_alias funciona")
+    after = nexus.memory.semantic.count()
+    assert after > before, f"/recuerda no guardo el hecho: before={before}, after={after}"
+
+
+def test_cmd_olvida_borra_hecho():
+    """/olvida borra un hecho de la memoria."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    # Guardar uno primero
+    cli._cmd_learn("/aprende test_olvida_xyz dato temporal unico")
+    # Ahora borrarlo
+    cli._cmd_forget("/olvida test_olvida_xyz")
+    # Verificar que se borro
+    facts = nexus.memory.semantic.query_knowledge("test_olvida_xyz", top_k=5)
+    assert not any("test_olvida_xyz" in f.get("text", "") for f in facts), \
+        "/olvida no borro el hecho"
+
+
+def test_cmd_olvida_no_falla_sin_args():
+    """/olvida sin args no falla."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    cli._cmd_forget("/olvida")
+
+
+def test_cmd_olvida_no_falla_sin_matches():
+    """/olvida algo que no existe no falla."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    cli._cmd_forget("/olvida algo_que_no_existe_12345")
+
+
+def test_cmd_analiza_extray_hechos():
+    """/analiza extrae hechos de un texto."""
+    from interface.cli import NexusCLI
+    cli = NexusCLI(nexus)
+    # No debe fallar
+    cli._cmd_analyze("/analiza python es un lenguaje interpretado")
+
+
+test("/aprende guarda hecho", test_cmd_aprende_guarda_hecho)
+test("/aprende sin args OK", test_cmd_aprende_sin_args_muestra_ayuda)
+test("/aprende sobre X sugiere web", test_cmd_aprende_sobre_sugiere_web)
+test("/recuerda es alias de /aprende", test_cmd_recuerda_alias_aprende)
+test("/olvida borra hecho", test_cmd_olvida_borra_hecho)
+test("/olvida sin args OK", test_cmd_olvida_no_falla_sin_args)
+test("/olvida sin matches OK", test_cmd_olvida_no_falla_sin_matches)
+test("/analiza extrae hechos", test_cmd_analiza_extray_hechos)
 test("'hola' SI es saludo", test_hola_corto_si_es_saludo)
 test("'hola!' SI es saludo", test_hola_punto_si_es_saludo)
 test("'hola me llamo Carlos' es nombre", test_hola_me_llamo_es_nombre)

@@ -7,6 +7,7 @@ Terminal interactiva con colores, historial y comandos.
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
@@ -258,6 +259,7 @@ class NexusCLI:
             "/fase": self._cmd_phase,
             "/memoria": self._cmd_memory,
             "/hechos": self._cmd_facts,
+            "/olvida": self._cmd_forget,
             "/skills": self._cmd_skills,
             "/skill": self._cmd_skills,
             "/hora": self._cmd_time,
@@ -269,6 +271,12 @@ class NexusCLI:
             "/version": self._cmd_version,
             "/update": self._cmd_update,
             "/verbose": self._cmd_verbose,
+            # Comandos de aprendizaje directo (sin SLM)
+            "/buscar": self._cmd_search,
+            "/aprende": self._cmd_learn,
+            "/aprende-web": self._cmd_learn_web,
+            "/recuerda": self._cmd_remember,
+            "/analiza": self._cmd_analyze,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -288,6 +296,7 @@ class NexusCLI:
 {Color.GREEN}/hora{Color.RESET}         Fecha y hora actual
 {Color.GREEN}/memoria{Color.RESET}      Últimos recuerdos
 {Color.GREEN}/hechos{Color.RESET}       Hechos aprendidos
+{Color.GREEN}/olvida{Color.RESET}       Borrar un hecho de la memoria
 {Color.GREEN}/skills{Color.RESET}       Skills cargadas
 {Color.GREEN}/personalidad{Color.RESET} Ver/ajustar personalidad
 {Color.GREEN}/backend{Color.RESET}      Cambiar backend (symbolic/slm)
@@ -298,6 +307,14 @@ class NexusCLI:
 {Color.GREEN}/clear{Color.RESET}        Limpiar pantalla
 {Color.GREEN}/reset{Color.RESET}        Resetear Nexus
 {Color.GREEN}/exit{Color.RESET}         Salir
+{Color.DIM}─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─{Color.RESET}
+{Color.CYAN}Comandos de aprendizaje (sin SLM):{Color.RESET}
+{Color.GREEN}/buscar{Color.RESET} <q>    Web search + auto-aprende
+{Color.GREEN}/aprende{Color.RESET} <h>   Guardar hecho directo
+{Color.GREEN}/aprende-web{Color.RESET} <tema>   Buscar y aprender sobre tema
+{Color.GREEN}/recuerda{Color.RESET} <h>  Alias de /aprende
+{Color.GREEN}/analiza{Color.RESET} <txt> Extraer hechos de un texto
+{Color.GREEN}/olvida{Color.RESET} <txt>  Borrar hecho de la memoria
 
 {Color.DIM}Tip: Para enseñar algo a Nexus, escribe:{Color.RESET}
   "aprende que [hecho]"
@@ -826,6 +843,171 @@ class NexusCLI:
   {Color.YELLOW}Build:{Color.RESET}    {interactions} interacciones · {skills} skills
   {Color.YELLOW}Repo:{Color.RESET}    github.com/kudawasama/NucleoNexus
         """)
+
+    # ─────────────────────────────────────────────────────────
+    # Comandos de aprendizaje (capa rápida, sin SLM)
+    # ─────────────────────────────────────────────────────────
+
+    def _cmd_search(self, cmd: str = ""):
+        """Busca en la web sin pasar por el SLM. Uso: /buscar <query>"""
+        query = cmd.replace("/buscar", "", 1).strip()
+        if not query:
+            print(f"{Color.YELLOW}Uso: /buscar <query>{Color.RESET}")
+            print(f"  Ejemplo: /buscar capital de francia")
+            return
+
+        print(f"{Color.CYAN}Buscando: '{query}'{Color.RESET}")
+        result = self.core.actions.execute("web_search", query=query)
+        if result.get("success"):
+            data = result["result"]
+            if isinstance(data, dict) and "resultados" in data:
+                items = data["resultados"]
+                fuente = data.get("fuente", "web")
+                print(f"\n{Color.GREEN}Resultados ({fuente}):{Color.RESET}")
+                for i, item in enumerate(items[:5], 1):
+                    print(f"  {i}. {str(item)[:200]}")
+                # Aprender de los resultados (auto-aprendizaje)
+                learned = self.core._learn_from_web_search(query, items)
+                if learned:
+                    print(f"\n{Color.CYAN}📚 Aprendí {learned} hechos nuevos{Color.RESET}")
+            elif isinstance(data, dict) and "mensaje" in data:
+                print(f"{Color.YELLOW}{data['mensaje']}{Color.RESET}")
+            else:
+                print(f"{Color.GRAY}Sin resultados{Color.RESET}")
+        else:
+            err = result.get("error", "Error desconocido")
+            print(f"{Color.RED}Error: {err}{Color.RESET}")
+
+    def _cmd_learn(self, cmd: str = ""):
+        """Aprende un hecho directo. Uso: /aprende <hecho>"""
+        fact = cmd.replace("/aprende", "", 1).strip()
+        if not fact:
+            print(f"{Color.YELLOW}Uso: /aprende <hecho>{Color.RESET}")
+            print(f"  Ejemplo: /aprende Python es un lenguaje de programacion")
+            return
+
+        # Si empieza con 'sobre', sugerir /aprende-web
+        if re.match(r'^(?:sobre|acerca de|respecto a|de)\s+\w+', fact, re.IGNORECASE):
+            print(f"{Color.YELLOW}Parece que quieres aprender sobre un tema.{Color.RESET}")
+            print(f"  Usa: /aprende-web {fact}")
+            return
+
+        # Guardar el hecho
+        self.core.memory.learn_fact(
+            fact, category="aprendizaje",
+            confidence=0.5, source="usuario"
+        )
+        print(f"{Color.GREEN}✓ Aprendido: {fact}{Color.RESET}")
+        print(f"  {Color.DIM}Categoría: aprendizaje | Confianza: 0.5{Color.RESET}")
+
+    def _cmd_learn_web(self, cmd: str = ""):
+        """Busca en la web y aprende los resultados. Uso: /aprende-web <tema>"""
+        topic = cmd.replace("/aprende-web", "", 1).strip()
+        if not topic:
+            print(f"{Color.YELLOW}Uso: /aprende-web <tema>{Color.RESET}")
+            print(f"  Ejemplo: /aprende-web la revolucion francesa")
+            return
+
+        print(f"{Color.CYAN}Investigando '{topic}' en la web...{Color.RESET}")
+        result = self.core.actions.execute("web_search", query=topic)
+        if result.get("success"):
+            data = result["result"]
+            if isinstance(data, dict) and "resultados" in data:
+                items = data["resultados"]
+                if not items:
+                    print(f"{Color.YELLOW}No encontré información sobre '{topic}'{Color.RESET}")
+                    return
+                # Guardar los 3 mejores
+                learned = 0
+                for item in items[:3]:
+                    if isinstance(item, dict):
+                        text = item.get("snippet", "") or item.get("extract", "")
+                        title = item.get("title", "")
+                    else:
+                        text = str(item)
+                        title = ""
+                    text = re.sub(r'<[^>]+>', '', text).strip()[:200]
+                    if not text and title:
+                        text = title
+                    if text and len(text) > 20:
+                        self.core.memory.learn_fact(
+                            text, category=f"aprendido_{topic[:15]}",
+                            confidence=0.5, source="auto_web"
+                        )
+                        learned += 1
+                print(f"\n{Color.GREEN}✓ Aprendí {learned} hechos sobre '{topic}':{Color.RESET}")
+                for i, item in enumerate(items[:3], 1):
+                    print(f"  {i}. {str(item)[:200]}")
+                print(f"\n{Color.CYAN}Próxima vez que preguntes sobre esto, "
+                      f"responderé desde mi memoria.{Color.RESET}")
+            else:
+                print(f"{Color.GRAY}Sin resultados{Color.RESET}")
+        else:
+            err = result.get("error", "Error desconocido")
+            print(f"{Color.RED}Error: {err}{Color.RESET}")
+
+    def _cmd_remember(self, cmd: str = ""):
+        """Alias de /aprende. Uso: /recuerda <hecho>"""
+        self._cmd_learn(cmd.replace("/recuerda", "/aprende", 1))
+
+    def _cmd_analyze(self, cmd: str = ""):
+        """Analiza un texto y extrae hechos. Uso: /analiza <texto>"""
+        text = cmd.replace("/analiza", "", 1).strip()
+        if not text:
+            print(f"{Color.YELLOW}Uso: /analiza <texto>{Color.RESET}")
+            print(f"  Ejemplo: /analiza el riñon filtra la sangre")
+            return
+
+        from learning.extractor import extract_facts_from_text
+        facts = extract_facts_from_text(text)
+        if not facts:
+            print(f"{Color.YELLOW}No extraje hechos del texto.{Color.RESET}")
+            return
+
+        print(f"{Color.CYAN}Hechos extraídos ({len(facts)}):{Color.RESET}")
+        for i, f in enumerate(facts, 1):
+            print(f"  {i}. {f}")
+        # Guardarlos
+        for f in facts:
+            self.core.memory.learn_fact(
+                f, category="extraccion",
+                confidence=0.4, source="auto_analisis"
+            )
+        print(f"\n{Color.GREEN}✓ {len(facts)} hechos guardados{Color.RESET}")
+
+    def _cmd_forget(self, cmd: str = ""):
+        """Borra un hecho de la memoria. Uso: /olvida <texto>"""
+        text = cmd.replace("/olvida", "", 1).strip()
+        if not text:
+            print(f"{Color.YELLOW}Uso: /olvida <texto_a_borrar>{Color.RESET}")
+            print(f"  Borrara los hechos que coincidan con el texto")
+            return
+
+        # Buscar hechos similares
+        facts = self.core.memory.semantic.query_knowledge(text, top_k=10)
+        if not facts:
+            print(f"{Color.YELLOW}No encontré hechos sobre '{text}'{Color.RESET}")
+            return
+
+        # Borrar los que coincidan bien
+        deleted = 0
+        for fact in facts:
+            fact_text = fact.get("text", "") or fact.get("fact", "")
+            fact_id = fact.get("id")
+            if not fact_id:
+                continue
+            if text.lower() in fact_text.lower() or fact_text.lower() in text.lower():
+                # Borrar de la BD directamente
+                self.core.memory.semantic.conn.execute(
+                    "DELETE FROM semantic WHERE id = ?", (fact_id,)
+                )
+                self.core.memory.semantic.conn.commit()
+                deleted += 1
+                print(f"  {Color.DIM}Borrado: {fact_text[:80]}{Color.RESET}")
+        if deleted:
+            print(f"\n{Color.GREEN}✓ {deleted} hechos borrados{Color.RESET}")
+        else:
+            print(f"{Color.YELLOW}No borré nada (los hechos no coinciden){Color.RESET}")
 
     def _cmd_verbose(self, cmd: str = ""):
         """Alterna el modo verbose (mostrar logs de INFO en pantalla).
