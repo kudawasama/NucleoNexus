@@ -244,6 +244,13 @@ Respuesta: <texto final al usuario>
                 for r in memory_records[:2]:
                     lines.append(f"  - {r.get('text', '')[:100]}")
             parts.append("\n".join(lines))
+
+        # Historial reciente de la conversacion actual
+        if self.memory:
+            history = self.summarize_recent(limit=4)
+            if history:
+                parts.append(history)
+
         parts.append(f"Usuario: {user_input}")
         return "\n\n".join(parts)
 
