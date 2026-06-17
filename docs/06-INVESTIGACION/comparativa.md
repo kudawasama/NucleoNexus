@@ -43,9 +43,11 @@
 | **✅ Hecho** | Extractor automático | Bajo | Alto |
 | **✅ Hecho** | Structured Generation (JSON mode Ollama) | Medio | Muy alto |
 | **✅ Hecho** | Tools vía intent directo (regex) | Medio | Alto |
+| **✅ Hecho** | Sinónimos + expansión queries | Bajo | Alto |
+| **✅ Hecho** | Auto-aprendizaje desde web | Bajo | Muy alto |
 | **Pendiente** | Fine-tuning LoRA para tool calling | Medio | Transformacional |
 | **Pendiente** | Memoria vectorial (embeddings) | Medio | Alto |
-| **Pendiente** | Self-consistency | Bajo | Medio |
+| **Parcial** | Self-consistency | Bajo | Medio |
 | **Pendiente** | DSPy optimization | Alto | Alto |
 
 ### Próximo Paso Inmediato: Structured Generation
