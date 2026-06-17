@@ -287,7 +287,7 @@ class NexusCore:
             # Pregunta sin intent rápido: ver si hay hechos en memoria
             # Pero preguntas de definicion ("que es X") siempre van al SLM
             import re as _qr
-            if not _qr.search(r'^(?:que\s+es|qué\s+es|que\s+significa|qué\s+significa|defineme|define|explicame)', user_input.lower().strip()):
+            if not _qr.search(r'(?:que\s+es|qué\s+es|que\s+significa|qué\s+significa|defineme|define|explicame)', user_input.lower().strip()):
                 facts = self.memory.query_knowledge(user_input, top_k=2)
                 if facts and any(f.get("score", 0) >= 0.15 for f in facts):
                     response = self.symbolic.process(user_input, actions_registry=self.actions,
