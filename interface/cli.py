@@ -922,6 +922,14 @@ class NexusCLI:
                         print(f"  {Color.DIM}{line}{Color.RESET}")
 
             print(f"\n{Color.YELLOW}Reinicia Nexus para aplicar los cambios.{Color.RESET}")
+            # Refrescar version info para que el proximo /version muestre la nueva
+            try:
+                import version as _v
+                _v.refresh_version()
+                # Actualizar el banner para el siguiente ciclo
+                self._git_info = self._load_git_info()
+            except Exception:
+                pass
         except _sp.TimeoutExpired:
             print(f"{Color.RED}Timeout. git pull tardó más de 30s.{Color.RESET}")
         except FileNotFoundError:
