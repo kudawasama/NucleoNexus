@@ -14,11 +14,26 @@ Nexus usa **JSON mode nativo de Ollama** para forzar que el SLM genere respuesta
 ```json
 {
   "respuesta": "texto de respuesta al usuario",
-  "accion": "ninguna | buscar_memoria | calcular",
+  "accion": "responder | buscar_memoria | calcular | usar_herramienta",
   "tema": "tema a buscar (si accion=buscar_memoria)",
-  "expresion": "expresión a calcular (si accion=calcular)"
+  "expresion": "expresión a calcular (si accion=calcular)",
+  "herramienta": "web_search (si accion=usar_herramienta)",
+  "parametros": {"query": "termino busqueda"}
 }
 ```
+
+## Acciones Soportadas
+
+| accion | Descripción |
+|---|---|
+| `responder` | Solo devuelve la respuesta del SLM (la más común) |
+| `buscar_memoria` | Busca un tema en la base de conocimiento y lo aprende |
+| `calcular` | Evalúa una expresión matemática |
+| `usar_herramienta` | Ejecuta una herramienta del sistema (web_search, read_file, etc.) |
+
+> **Nota**: Las herramientas también se ejecutan **directamente** desde el intent
+> detectado (ver `NexusCore._handle_tool_intent()`), no solo via JSON.
+> Esto es más confiable porque Qwen 0.5B no siempre genera el JSON correcto.
 
 ## Implementación
 
@@ -26,7 +41,8 @@ Nexus usa **JSON mode nativo de Ollama** para forzar que el SLM genere respuesta
 
 ```python
 slm.generate(prompt, system_prompt=ctx, structured=True)
-# → devuelve string JSON válido o None
+# → devuelve dict con 'response', 'model', 'tokens_prompt', 
+#   'tokens_generated', 'duration_ms'
 ```
 
 **Flujo en main.py**:
@@ -35,7 +51,8 @@ slm.generate(prompt, system_prompt=ctx, structured=True)
 3. Se extrae `respuesta` y `accion`
 4. Si `accion == "buscar_memoria"` → busca en memoria semántica y aprende
 5. Si `accion == "calcular"` → registra la operación
-6. Si `accion == "ninguna"` → solo devuelve la respuesta
+6. Si `accion == "usar_herramienta"` → ejecuta la herramienta via ActionRegistry
+7. Si `accion == "responder"` → solo devuelve la respuesta
 
 ## Ventajas
 

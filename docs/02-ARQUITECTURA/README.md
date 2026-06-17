@@ -77,6 +77,8 @@ Usuario: "¿Qué es la fotosíntesis?"
 
 **Fast intents**: saludo, despedida, agradecimiento, presentacion, hora, calcular (con números), fase, ayuda, memoria, nombre, reset, personalidad, confianza, estado, clima.
 
+**Tool intents** (se ejecutan directo sin SLM, ver `NexusCore._handle_tool_intent()`): `web_search`, `read_file`, `search_files`, `run_command`, `browse_url`. Para estos intents, Nexus extrae parámetros del texto con regex y ejecuta la herramienta via ActionRegistry. Más confiable que esperar que Qwen 0.5B genere el JSON de tool call correctamente.
+
 ## Backend SLM (Ollama)
 
 El SLM se conecta a Ollama usando el modelo `qwen2.5:0.5b`. Si no puede cargar (Ollama caído, modelo no encontrado), el sistema cae automáticamente a modo simbólico.

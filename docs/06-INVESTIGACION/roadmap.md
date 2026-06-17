@@ -36,6 +36,10 @@ Fine-tunear Qwen 0.5B con LoRA para que aprenda a generar acciones estructuradas
 ### [5] Structured generation con Guidance
 Integrar Guidance o Outlines para forzar la salida del SLM a un formato JSON/acciones válido. Elimina respuestas mal formadas.
 
+> **Estado actual**: Nexus ya usa JSON mode nativo de Ollama (`format: "json"` en la API),
+> que es una implementación parcial de structured generation. Para máxima garantía
+> usar Guidance/Outlines.
+
 **Dependencia**: `pip install outlines`
 **Esfuerzo**: Medio (~1 día)
 

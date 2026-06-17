@@ -8,8 +8,9 @@
 | **Memoria + Contexto** | ✅ Sí, mejora respuestas | Implementado y funcionando |
 | **Ruteo Híbrido** | ✅ Sí, evita alucinaciones | Implementado y funcionando |
 | **Parser de acciones** | 🟡 Ocasionalmente | Mantener como bonus |
-| **Structured Generation** | ✅ Sí, forzaría formato | Pendiente (próximo paso) |
-| **Fine-tuning LoRA** | ✅ Sí, ideal para tool use | Futuro |
+| **Structured Generation** | ✅ Sí, JSON mode Ollama | ✅ Implementado (commit `dd0bae1`) |
+| **Fine-tuning LoRA** | ✅ Sí, ideal para tool use | Pendiente |
+| **Tools vía Intent** | ✅ Sí, regex directa | ✅ Implementado (commit `0c0e601`) |
 
 ## Resultados de la Investigación
 
@@ -40,10 +41,12 @@
 | **✅ Hecho** | Ruteo híbrido | Bajo | Muy alto |
 | **✅ Hecho** | Memoria + contexto | Bajo | Muy alto |
 | **✅ Hecho** | Extractor automático | Bajo | Alto |
-| **1°** | Structured Generation (Guidance) | Medio | Muy alto |
-| **2°** | Fine-tuning LoRA | Medio | Transformacional |
-| **3°** | Memoria vectorial (embeddings) | Medio | Alto |
-| **4°** | Self-consistency | Bajo | Medio |
+| **✅ Hecho** | Structured Generation (JSON mode Ollama) | Medio | Muy alto |
+| **✅ Hecho** | Tools vía intent directo (regex) | Medio | Alto |
+| **Pendiente** | Fine-tuning LoRA para tool calling | Medio | Transformacional |
+| **Pendiente** | Memoria vectorial (embeddings) | Medio | Alto |
+| **Pendiente** | Self-consistency | Bajo | Medio |
+| **Pendiente** | DSPy optimization | Alto | Alto |
 
 ### Próximo Paso Inmediato: Structured Generation
 
