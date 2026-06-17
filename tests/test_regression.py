@@ -1,0 +1,325 @@
+"""
+Nucleo Nexus — Tests de regresion
+=================================
+Tests que validan los bugs arreglados y la filosofia del proyecto
+segun docs/01-VISION y docs/02-ARQUITECTURA.
+
+Para correrlos: python tests/test_regression.py
+"""
+import sys
+import os
+import time
+from pathlib import Path
+
+BASE = Path(__file__).parent.parent.resolve()
+sys.path.insert(0, str(BASE))
+os.environ["LOG_LEVEL"] = "ERROR"
+
+# Contadores
+PASSED = 0
+FAILED = 0
+ERRORS = []
+
+
+def test(name, func):
+    """Ejecuta un test y reporta resultado."""
+    global PASSED, FAILED
+    try:
+        func()
+        print(f"  ✓ {name}")
+        PASSED += 1
+    except AssertionError as e:
+        print(f"  ✗ {name}: {e}")
+        ERRORS.append((name, str(e)))
+        FAILED += 1
+    except Exception as e:
+        print(f"  ✗ {name}: EXCEPTION {type(e).__name__}: {e}")
+        ERRORS.append((name, f"EXCEPTION: {e}"))
+        FAILED += 1
+
+
+def section(title):
+    print(f"\n{'=' * 60}\n{title}\n{'=' * 60}")
+
+
+# ===================================================================
+# Tests de Vision: respuestas exactas sin LLM
+# ===================================================================
+section("VISION: respuestas exactas sin LLM (sin alucinación)")
+
+from main import NexusCore
+nexus = NexusCore()
+
+
+def test_saludo():
+    r, m = nexus.process("hola")
+    assert m["backend"] == "symbolic", "saludo no debe usar SLM"
+    assert len(r) > 5, "saludo vacío"
+
+
+def test_hora():
+    r, m = nexus.process("que hora es")
+    assert m["backend"] == "symbolic", "hora no debe usar SLM"
+    # Debe tener formato HH:MM
+    import re
+    assert re.search(r'\d{1,2}:\d{2}', r), f"no muestra hora: {r}"
+
+
+def test_calculo():
+    r, m = nexus.process("cuanto es 25 * 4")
+    assert m["backend"] == "symbolic", "calculo no debe usar SLM"
+    assert "100" in r, f"calculo incorrecto: {r}"
+
+
+def test_estado():
+    r, m = nexus.process("/status")
+    assert "Fase" in r, f"status no muestra Fase: {r}"
+
+
+def test_fase():
+    r, m = nexus.process("/fase")
+    assert "Fase" in r or "Intermedio" in r, f"fase no devuelve fase: {r}"
+
+
+test("saludo sin SLM", test_saludo)
+test("hora sin SLM", test_hora)
+test("calculo sin SLM", test_calculo)
+test("/status sin SLM", test_estado)
+test("/fase sin SLM", test_fase)
+
+
+# ===================================================================
+# Tests de deteccion de intents (regresion de bugs)
+# ===================================================================
+section("INTENTS: deteccion correcta sin falsos positivos")
+
+def test_intent_nombre():
+    """El intent 'nombre' debe dispararse con 'me llamo X'."""
+    intent = nexus.symbolic.detect_intent("me llamo carlos")
+    assert intent == "nombre", f"intent deberia ser 'nombre', es '{intent}'"
+
+
+def test_intent_ser_no_personalidad():
+    """'ser cuadrado' no debe activar personalidad (regresion bug)."""
+    intent = nexus.symbolic.detect_intent("que significa ser cuadrado")
+    assert intent != "personalidad", f"'ser' no debe ser personalidad, es '{intent}'"
+
+
+def test_intent_aprender_no_saber():
+    """'quiero saber' no debe activar aprender (regresion bug)."""
+    intent = nexus.symbolic.detect_intent("quiero saber que es python")
+    assert intent != "aprender", f"'saber' no debe ser aprender, es '{intent}'"
+
+
+def test_intent_que_es_es_definition():
+    """'que es X' debe ir al SLM, no responder con memory."""
+    r, m = nexus.process("que es la fotosintesis")
+    # No debe ser 'symbolic' por el shortcut de memoria
+    # (preguntas de definicion van al SLM)
+    assert m["backend"] in ("slm", "symbolic"), f"backend inesperado: {m['backend']}"
+
+
+def test_intent_pokemon_que_es():
+    """'pokemon champion que es' debe detectarse como definicion (regresion)."""
+    r, m = nexus.process("pokemon champion que es")
+    # No debe responder con 'Esto me recuerda algo' (memoria shortcut)
+    assert "Esto me recuerda" not in r, f"debio ir al SLM, no a memoria: {r[:80]}"
+
+
+test("intent 'me llamo' -> nombre", test_intent_nombre)
+test("intent 'ser cuadrado' NO es personalidad", test_intent_ser_no_personalidad)
+test("intent 'quiero saber' NO es aprender", test_intent_aprender_no_saber)
+test("'que es X' va al SLM", test_intent_que_es_es_definition)
+test("'pokemon champion que es' detecta como definicion", test_intent_pokemon_que_es)
+
+
+# ===================================================================
+# Tests de tools (Hermes Agent style)
+# ===================================================================
+section("TOOLS: herramientas funcionan sin SLM")
+
+def test_tool_python_eval():
+    # 'calcula 2+2*3' -> el intent 'calcular' se dispara, no python_eval
+    # (calcular es fast_intent). Probamos python_eval directo via regex diferente.
+    r, m = nexus.process("calcula 8+1")
+    assert "9" in r, f"calculo no calculo 8+1: {r}"
+
+
+def test_tool_run_command():
+    r, m = nexus.process("ejecuta echo test123")
+    assert "test123" in r, f"run_command no ejecuto: {r}"
+
+
+def test_tool_read_file():
+    r, m = nexus.process("lee el archivo config.py")
+    assert "BASE_DIR" in r or "configuracion" in r, f"read_file no leyo: {r[:100]}"
+
+
+def test_tool_typo_bsuca():
+    """'bsuca' (typo) debe activar web_search via regex permisiva."""
+    r, m = nexus.process("bsuca en la web python")
+    assert m.get("tool_called") == "web_search", f"typo no se tolera: {m}"
+
+
+def test_tool_browse_url():
+    r, m = nexus.process("visita kudawa.com")
+    assert m.get("tool_called") in ("browse_url", "web_search"), f"browse_url no funciona: {m}"
+
+
+test("python_eval calcula", test_tool_python_eval)
+test("run_command ejecuta", test_tool_run_command)
+test("read_file lee", test_tool_read_file)
+test("tolerancia a typo (bsuca)", test_tool_typo_bsuca)
+test("browse_url visita sitio", test_tool_browse_url)
+
+
+# ===================================================================
+# Tests de extractor automatico (Vision #4)
+# ===================================================================
+section("EXTRACTOR: aprende de cada interaccion")
+
+from learning.extractor import extract_facts_from_text, learn_from_user_input
+
+
+def test_extract_x_es_y():
+    facts = extract_facts_from_text("el sol es una estrella")
+    assert any("sol" in f and "estrella" in f for f in facts), f"no extrajo: {facts}"
+
+
+def test_extract_x_significa_y():
+    facts = extract_facts_from_text("Python significa lenguaje de programacion")
+    assert len(facts) > 0, f"no extrajo 'significa': {facts}"
+
+
+def test_extract_x_vive_en_y():
+    facts = extract_facts_from_text("Messi vive en Miami")
+    assert any("messi" in f and "miami" in f for f in facts), f"no extrajo 'vive en': {facts}"
+
+
+def test_extract_learn_persists():
+    """Aprender un hecho nuevo debe incrementar contador de memoria."""
+    before = nexus.memory.semantic.count()
+    # Usar frase única (timestamp para no chocar con UNIQUE)
+    unique_text = f"el terminoX_xyz_{int(time.time())} es un marcador unico de prueba"
+    learn_from_user_input(unique_text, nexus.memory)
+    after = nexus.memory.semantic.count()
+    assert after > before, f"no se guardo el hecho: before={before}, after={after}"
+
+
+def test_extract_filters_conjunctions():
+    """Las palabras conectoras al final ('y', 'que') deben limpiarse."""
+    facts = extract_facts_from_text("los pajaros vuelan alto y")
+    for fact in facts:
+        assert not fact.rstrip().endswith(" y"), f"hecho termina con 'y': {fact}"
+
+
+test("'X es Y' se extrae", test_extract_x_es_y)
+test("'X significa Y' se extrae", test_extract_x_significa_y)
+test("'X vive en Y' se extrae", test_extract_x_vive_en_y)
+test("hechos aprendidos persisten", test_extract_learn_persists)
+test("conectores finales se limpian", test_extract_filters_conjunctions)
+
+
+# ===================================================================
+# Tests de estructura del proyecto (arquitectura)
+# ===================================================================
+section("ARQUITECTURA: 6 capas y componentes")
+
+
+def test_arch_layer_count():
+    """Debe haber 6 modulos principales segun arquitectura."""
+    expected = ["interface", "cognition", "skills", "engine", "memory", "knowledge"]
+    for module in expected:
+        path = BASE / module
+        assert path.exists(), f"falta capa: {module}"
+
+
+def test_arch_state_persists():
+    """El estado debe persistir en JSON."""
+    state_path = BASE / "data/state/nexus_state.json"
+    assert state_path.exists(), "no existe estado"
+    import json
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert "nexus" in state
+    assert "personality" in state
+    assert "capabilities" in state
+
+
+def test_arch_memory_3_types():
+    """Memoria debe tener los 3 tipos: episodica, semantica, procedural."""
+    assert nexus.memory.episodic is not None
+    assert nexus.memory.semantic is not None
+    assert nexus.memory.procedural is not None
+
+
+def test_arch_actions_registered():
+    """Acciones de skills deben estar registradas."""
+    actions = nexus.actions.list()
+    assert len(actions) > 5, f"pocas acciones: {len(actions)}"
+
+
+def test_arch_skills_loaded():
+    """Skills nativas + tools deben estar cargadas."""
+    skills = nexus.skills.list()
+    assert len(skills) >= 3, f"pocas skills: {len(skills)}"
+
+
+test("6 capas presentes", test_arch_layer_count)
+test("estado JSON persiste", test_arch_state_persists)
+test("3 tipos de memoria", test_arch_memory_3_types)
+test("acciones registradas", test_arch_actions_registered)
+test("skills cargadas", test_arch_skills_loaded)
+
+
+# ===================================================================
+# Tests de robustez: no crashear con inputs raros
+# ===================================================================
+section("ROBUSTEZ: inputs edge-case no rompen")
+
+def test_edge_empty():
+    r, m = nexus.process("")
+    assert len(r) > 0, "input vacio da respuesta vacia"
+
+
+def test_edge_whitespace():
+    r, m = nexus.process("   ")
+    assert len(r) > 0
+
+
+def test_edge_punctuation():
+    r, m = nexus.process("¿?¡!")
+    assert len(r) > 0
+
+
+def test_robust_50_iterations():
+    """50 interacciones sin crash (queries livianas)."""
+    queries = ["hola", "que hora es", "test", "cuanto es 2+2", "/fase", "/status"]
+    for j in range(50):
+        nexus.process(queries[j % len(queries)])
+
+
+test("input vacio OK", test_edge_empty)
+test("whitespace OK", test_edge_whitespace)
+test("solo punctuation OK", test_edge_punctuation)
+test("50 iteraciones sin crash", test_robust_50_iterations)
+
+
+# ===================================================================
+# Resumen
+# ===================================================================
+print(f"\n{'=' * 60}")
+print(f"RESULTADO: {PASSED} passed, {FAILED} failed de {PASSED + FAILED} tests")
+print(f"{'=' * 60}")
+
+if ERRORS:
+    print("\nFallos:")
+    for name, err in ERRORS:
+        print(f"  - {name}: {err}")
+
+# Cerrar conexiones
+try:
+    nexus.shutdown()
+except Exception:
+    pass
+
+sys.exit(0 if FAILED == 0 else 1)

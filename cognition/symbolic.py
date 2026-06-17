@@ -455,7 +455,7 @@ class SymbolicEngine:
         )
 
     def _handle_name(self, text: str, memories: list, facts: list) -> str:
-        """Maneja preguntas sobre el nombre del usuario."""
+        """Maneja preguntas sobre el nombre del usuario Y declaraciones."""
         text_lower = text.lower()
 
         # Primero buscar en memoria semantica si sabemos el nombre
@@ -474,23 +474,27 @@ class SymbolicEngine:
                         f"Lo aprendi cuando me lo dijiste."
                     )
 
-        # Si es una declaracion de nombre ("me llamo X", "mi nombre es X")
+        # Si es una declaracion de nombre ("me llamo X", "mi nombre es X", "soy X")
+        # Solo si "soy X" es todo el texto (no "soy programador")
         name_declaration = re.search(
             r'(?:mi nombre es|me llamo|soy) ([a-záéíóúñ]+)',
             text_lower
         )
         if name_declaration:
-            user_name = name_declaration.group(1)
-            self.memory.learn_fact(
-                f"el usuario se llama {user_name}",
-                category="personal",
-                confidence=0.8,
-                source="usuario"
-            )
-            return (
-                f"¡Encantado de conocerte, {user_name.capitalize()}! 🎉\n"
-                f"He guardado tu nombre en mi memoria. No lo olvidare."
-            )
+            # Si el match es "soy X", validar que sea el texto completo
+            # (evita "soy programador" → nombre="programador")
+            if name_declaration.group(0) == text_lower.strip():
+                user_name = name_declaration.group(1)
+                self.memory.learn_fact(
+                    f"el usuario se llama {user_name}",
+                    category="personal",
+                    confidence=0.8,
+                    source="usuario"
+                )
+                return (
+                    f"¡Encantado de conocerte, {user_name.capitalize()}! 🎉 "
+                    f"He guardado tu nombre en mi memoria."
+                )
 
         # No sabemos el nombre
         return (
@@ -555,50 +559,28 @@ class SymbolicEngine:
             return f"Error en el calculo: {e}"
 
         return "No pude interpretar la expresion matematica."
-
     def _handle_conversation(self, text: str, memories: list, facts: list) -> str:
-        """Respuesta general que busca activamente en memoria."""
+        """Respuesta general que busca activamente en memoria.
+
+        Pipeline (siguiendo docs/03-MEMORIA):
+        1. Buscar hechos relevantes en memoria semantica
+        2. Si no hay, buscar recuerdos en memoria episodica
+        3. Si no hay, dar respuesta generica segun fase
+        """
         text_lower = text.lower()
 
-        # --- Auto-aprendizaje: detectar datos personales ---
-        # "mi nombre es X" o "me llamo X"
-        name_match = re.search(
-            r'(?:mi nombre es|me llamo) ([a-záéíóúñ]+)', text_lower
-        )
-        if name_match:
-            user_name = name_match.group(1)
-            self.memory.learn_fact(
-                f"el usuario se llama {user_name}",
-                category="personal",
-                confidence=0.8,
-                source="usuario"
-            )
-            return (
-                f"¡Encantado de conocerte, {user_name.capitalize()}! 🎉 "
-                f"He guardado tu nombre en mi memoria."
-            )
+        # NOTA: La deteccion de nombre ("me llamo X") ocurre en _handle_name
+        # (intent=nombre es fast_intent). Esta funcion solo maneja conversacion
+        # general donde ya no se detecto un intent especifico.
 
-        # "soy X" (nombre)
-        soy_match = re.match(r'^soy ([a-záéíóúñ]+)$', text_lower)
-        if soy_match:
-            user_name = soy_match.group(1)
-            self.memory.learn_fact(
-                f"el usuario se llama {user_name}",
-                category="personal",
-                confidence=0.8,
-                source="usuario"
-            )
-            return f"¡Hola, {user_name.capitalize()}! Un gusto."
-
-        # --- Busqueda activa en memoria ---
-        # Detectar si es una pregunta
+        # --- 1. Busqueda en memoria semantica ---
+        # Detectar si es una pregunta (heuristica simple)
         is_question = any(q in text_lower for q in [
             "sabes", "conoces", "recuerdas", "como", "qué", "que",
             "cuando", "donde", "por que", "por qué", "cual", "cuál"
         ])
 
         if is_question:
-            # Buscar en memoria semantica
             mem_facts = self.memory.query_knowledge(text, top_k=5)
             if mem_facts:
                 relevant = [f for f in mem_facts if f.get("score", 0) > 0.15]
@@ -611,22 +593,14 @@ class SymbolicEngine:
                             f"¿Quieres que profundice en algo?"
                         )
 
-            # Buscar en memoria episodica (conversacion previa)
+        # --- 2. Busqueda en memoria episodica ---
+        # La memoria episodica usa TF-IDF, no requiere filtrado manual
+        # (el motor ya lo hace). Solo pedimos un umbral de score.
+        if is_question:
             mem_recall = self.memory.recall(text, top_k=5)
             if mem_recall:
-                # Filtrar: umbral mas alto + al menos una palabra significativa en comun
-                stop_words = {'como', 'que', 'qué', 'es', 'son', 'las', 'los', 'mas',
-                             'por', 'para', 'con', 'del', 'una', 'uno', 'sus', 'le'}
-                query_words = set(re.findall(r'\b[a-z]{4,}\b', text_lower)) - stop_words
-                relevant = []
-                for m in mem_recall:
-                    score = m.get("score", 0)
-                    if score < 0.25:
-                        continue
-                    mem_words = set(re.findall(r'\b[a-z]{4,}\b',
-                                     m.get("text", "").lower())) - stop_words
-                    if query_words & mem_words:
-                        relevant.append(m)
+                # Filtrar: score >= 0.25 (umbral definido en docs)
+                relevant = [m for m in mem_recall if m.get("score", 0) >= 0.25]
                 if relevant:
                     best = relevant[0].get("text", "")[:120]
                     return (
@@ -635,7 +609,7 @@ class SymbolicEngine:
                         f"¿Quieres que retomemos ese tema?"
                     )
 
-        # --- Si hay hechos relevantes, usarlos ---
+        # --- 3. Si hay facts pre-buscados, usarlos ---
         if facts:
             fact_texts = [f.get("text", "")[:80] for f in facts[:2]]
             if fact_texts:

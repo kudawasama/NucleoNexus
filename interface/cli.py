@@ -517,23 +517,63 @@ class NexusCLI:
         import subprocess as _sp
         print(f"{Color.YELLOW}Actualizando Nexus desde GitHub...{Color.RESET}")
         try:
+            # Capturar SHA antes del pull
+            sha_before = ""
+            try:
+                with open(Path(__file__).parent.parent / ".git" / "refs" / "heads" / "master", "r") as _f:
+                    sha_before = _f.read().strip()[:7]
+            except Exception:
+                pass
+
             result = _sp.run(
                 ["git", "pull", "origin", "master"],
                 capture_output=True, text=True, timeout=30,
                 cwd=Path(__file__).parent.parent,
             )
-            if result.returncode == 0:
-                output = result.stdout.strip()
-                if "Already up to date" in output:
-                    print(f"{Color.GREEN}✓ Nexus ya está actualizado.{Color.RESET}")
-                else:
-                    print(f"{Color.GREEN}✓ Actualización completada:{Color.RESET}")
-                    for line in output.splitlines()[-5:]:
-                        print(f"  {Color.DIM}{line}{Color.RESET}")
-                    print(f"\n{Color.YELLOW}Reinicia Nexus para aplicar los cambios.{Color.RESET}")
-            else:
+            if result.returncode != 0:
                 print(f"{Color.RED}Error al actualizar:{Color.RESET}")
                 print(f"  {result.stderr.strip()}")
+                return
+
+            output = result.stdout.strip()
+            # Detectar tipo de cambio en el output de git pull
+            if "Already up to date" in output or "ya está actualizado" in output:
+                print(f"{Color.GREEN}✓ No hay cambios. Nexus ya esta en la ultima version (#{sha_before}).{Color.RESET}")
+                return
+
+            # Capturar SHA despues del pull
+            sha_after = sha_before
+            try:
+                with open(Path(__file__).parent.parent / ".git" / "refs" / "heads" / "master", "r") as _f:
+                    sha_after = _f.read().strip()[:7]
+            except Exception:
+                pass
+
+            # Parsear commits descargados
+            changes = []
+            for line in output.splitlines():
+                # Formato: " Fast-forward  | 1 file changed, 2 insertions(+), 1 deletion(-)"
+                # Formato: "abc1234 Mensaje del commit"
+                if "|" in line and "changed" not in line and "insertion" not in line and "deletion" not in line:
+                    parts = line.strip().split(None, 1)
+                    if len(parts) == 2 and len(parts[0]) >= 7:
+                        changes.append((parts[0][:7], parts[1]))
+
+            if changes:
+                print(f"{Color.GREEN}✓ Actualizado #{sha_before} -> #{sha_after}{Color.RESET}")
+                print(f"  {Color.CYAN}Cambios:{Color.RESET}")
+                for sha, msg in changes[:5]:
+                    print(f"    {Color.DIM}{sha}{Color.RESET} {msg[:80]}")
+                if len(changes) > 5:
+                    print(f"    {Color.DIM}... y {len(changes) - 5} mas{Color.RESET}")
+            else:
+                # Pull exitoso pero sin listado de commits (ej: merge)
+                print(f"{Color.GREEN}✓ Actualizado a #{sha_after}{Color.RESET}")
+                for line in output.splitlines()[-5:]:
+                    if line.strip():
+                        print(f"  {Color.DIM}{line}{Color.RESET}")
+
+            print(f"\n{Color.YELLOW}Reinicia Nexus para aplicar los cambios.{Color.RESET}")
         except _sp.TimeoutExpired:
             print(f"{Color.RED}Timeout. git pull tardó más de 30s.{Color.RESET}")
         except FileNotFoundError:
