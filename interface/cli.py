@@ -264,6 +264,7 @@ class NexusCLI:
             "/backend": self._cmd_backend,
             "/export": self._cmd_export,
             "/version": self._cmd_version,
+            "/update": self._cmd_update,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -510,6 +511,35 @@ class NexusCLI:
   {Color.YELLOW}Build:{Color.RESET}    {interactions} interacciones · {skills} skills
   {Color.YELLOW}Repo:{Color.RESET}    github.com/kudawasama/NucleoNexus
         """)
+
+    def _cmd_update(self, cmd: str = ""):
+        """Actualiza Nexus via git pull."""
+        import subprocess as _sp
+        print(f"{Color.YELLOW}Actualizando Nexus desde GitHub...{Color.RESET}")
+        try:
+            result = _sp.run(
+                ["git", "pull", "origin", "master"],
+                capture_output=True, text=True, timeout=30,
+                cwd=Path(__file__).parent.parent,
+            )
+            if result.returncode == 0:
+                output = result.stdout.strip()
+                if "Already up to date" in output:
+                    print(f"{Color.GREEN}✓ Nexus ya está actualizado.{Color.RESET}")
+                else:
+                    print(f"{Color.GREEN}✓ Actualización completada:{Color.RESET}")
+                    for line in output.splitlines()[-5:]:
+                        print(f"  {Color.DIM}{line}{Color.RESET}")
+                    print(f"\n{Color.YELLOW}Reinicia Nexus para aplicar los cambios.{Color.RESET}")
+            else:
+                print(f"{Color.RED}Error al actualizar:{Color.RESET}")
+                print(f"  {result.stderr.strip()}")
+        except _sp.TimeoutExpired:
+            print(f"{Color.RED}Timeout. git pull tardó más de 30s.{Color.RESET}")
+        except FileNotFoundError:
+            print(f"{Color.RED}git no está instalado o no está en el PATH.{Color.RESET}")
+        except Exception as e:
+            print(f"{Color.RED}Error: {e}{Color.RESET}")
 
     def _cmd_reset(self, cmd: str = ""):
         # Confirmación simple
