@@ -601,12 +601,44 @@ class NexusCLI:
             if result.facts_learned > 0:
                 print(f"  📚 Aprendi {result.facts_learned} hechos nuevos")
             print(f"  Pasos ejecutados: {len(result.steps)}")
-            print()
 
-            # Mostrar preview de cada paso con su output
-            for i, step in enumerate(result.steps, 1):
+            # ─── RESPUESTA FINAL destacada ───
+            # Buscar el paso de sintesis (siempre al final si existe)
+            synth_step = None
+            for s in reversed(result.steps):
+                if s.tool == "synthesize" and s.success:
+                    synth_step = s
+                    break
+
+            if synth_step:
+                print()
+                print(f"{Color.CYAN}{'═' * 60}{Color.RESET}")
+                print(f"{Color.CYAN}{Color.BOLD}📝 RESPUESTA:{Color.RESET}")
+                print(f"{Color.CYAN}{'═' * 60}{Color.RESET}")
+                # Mostrar la respuesta en bloques
+                response = synth_step.output.strip()
+                for line in response.split("\n"):
+                    if line.startswith("# "):
+                        print(f"\n{Color.BOLD}{line[2:]}{Color.RESET}")
+                    elif line.startswith("Fuentes:"):
+                        print(f"\n{Color.DIM}{line}{Color.RESET}")
+                    elif line.startswith("  - ") and "http" in line:
+                        print(f"{Color.DIM}{line}{Color.RESET}")
+                    elif line.startswith("- "):
+                        print(f"  {line}")
+                    else:
+                        print(line)
+                print()
+            else:
+                print()
+
+            # Mostrar preview de cada paso (excepto synthesize que ya se mostro)
+            steps_to_show = [s for s in result.steps if s.tool != "synthesize"]
+            if steps_to_show:
+                print(f"{Color.DIM}--- Pasos ejecutados ---{Color.RESET}")
+            for i, step in enumerate(steps_to_show, 1):
                 status_icon = "✓" if step.success else "✗"
-                print(f"{Color.DIM}--- Paso {i}: {step.tool} ({step.duration_ms}ms) {status_icon} ---{Color.RESET}")
+                print(f"{Color.DIM}[{i}]{Color.RESET} {step.tool} → {status_icon} ({step.duration_ms}ms)")
 
                 # Limpiar output: quitar dicts raw, mostrar solo texto
                 output = step.output
@@ -631,10 +663,10 @@ class NexusCLI:
                             print(f"  {Color.DIM}{output[:300]}{Color.RESET}")
                     else:
                         # Output de read_file, browse_website, etc
-                        preview = output[:600]
-                        if len(output) > 600:
-                            preview += f"\n  {Color.DIM}... ({len(output) - 600} chars mas){Color.RESET}"
-                        print(f"  {preview}")
+                        preview = output[:400]
+                        if len(output) > 400:
+                            preview += f" {Color.DIM}...{Color.RESET}"
+                        print(f"  {Color.DIM}{preview}{Color.RESET}")
                 print()
 
         except Exception as e:

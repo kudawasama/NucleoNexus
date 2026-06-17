@@ -146,7 +146,11 @@ class NexusAgent:
 
     # ─── Plan: Investigar (web search + learn) ──────────────
     def _plan_investigate(self, task: str, result: AgentResult):
-        """Plan: web_search el tema, aprender los resultados."""
+        """Plan: web_search + synthesize.
+
+        1. web_search el tema
+        2. synthesize una respuesta coherente con lo encontrado
+        """
         # Extraer el tema del task (quitar el verbo "investiga")
         topic = self._extract_topic(task)
         if not topic:
@@ -185,9 +189,19 @@ class NexusAgent:
         except Exception as e:
             logger.warning(f"Learn step error: {e}")
 
+        # Paso 3: SYNTHESIZE - redactar una respuesta coherente
+        synth_step = self._synthesize_answer(task, topic, result.steps)
+        if synth_step:
+            result.steps.append(synth_step)
+
     # ─── Plan: Explicar (web_search + browse_url) ──────────
     def _plan_explain(self, task: str, result: AgentResult):
-        """Plan: web_search para encontrar URLs, luego browse las mejores."""
+        """Plan: web_search + browse + synthesize.
+
+        1. web_search para encontrar URLs
+        2. browse_website para obtener el contenido textual
+        3. synthesize para redactar una respuesta coherente con todo
+        """
         topic = self._extract_topic(task)
         if not topic:
             topic = task  # fallback
@@ -220,6 +234,136 @@ class NexusAgent:
                         )
                         learned += 1
                 result.facts_learned = learned
+
+        # Paso 3: SYNTHESIZE - redactar una respuesta coherente
+        # Toma todo lo recolectado y genera una explicacion
+        synth_step = self._synthesize_answer(task, topic, result.steps)
+        if synth_step:
+            result.steps.append(synth_step)
+
+    def _synthesize_answer(self, task: str, topic: str, prior_steps: list) -> 'AgentStep | None':
+        """Sintetiza una respuesta coherente usando el SLM.
+
+        Toma los outputs de los pasos anteriores (web_search, browse_website)
+        y los pasa al SLM con un prompt que le pide redactar una explicacion.
+
+        Si el SLM no esta disponible, usa el motor simbolico como fallback.
+        """
+        import time
+        start = time.time()
+
+        # Recolectar contenido de los pasos anteriores
+        context_text = ""
+        sources = []
+        for step in prior_steps:
+            if not step.success:
+                continue
+            output = step.output
+            # Para web_search: extraer los items •
+            if "web_search" in step.tool and ("'resultados':" in output or '"resultados":' in output):
+                items = re.findall(r"['\"](•[^'\"]{20,})['\"]", output)
+                if items:
+                    for item in items[:3]:
+                        clean = item.lstrip('•').strip()
+                        # Quitar la URL entre parentesis
+                        clean = re.sub(r'\s*\([^)]+\)\s*', ' ', clean).strip()
+                        if clean:
+                            context_text += f"- {clean[:200]}\n"
+                            # Extraer fuente (URL)
+                            url_match = re.search(r'\((https?://[^\)]+)\)', item)
+                            if url_match:
+                                sources.append(url_match.group(1))
+            # Para browse_website: extraer contenido
+            elif "browse_website" in step.tool:
+                m = re.search(r"'contenido':\s*'([^']{50,2000})'", output)
+                if not m:
+                    m = re.search(r'"contenido":\s*"([^"]{50,2000})"', output)
+                if m:
+                    context_text += f"\nContenido de la web:\n{m.group(1)[:1500]}\n"
+
+        if not context_text:
+            return None
+
+        # Intentar usar el SLM
+        synthesized = ""
+        try:
+            slm = getattr(self.core, 'slm', None)
+            if slm and getattr(slm, 'loaded', False):
+                system_prompt = (
+                    "Eres Nexus, asistente inteligente. Tu tarea es redactar una "
+                    "respuesta clara y coherente en espanol basada en la informacion "
+                    "proporcionada. NO inventes datos. Si la informacion es insuficiente, "
+                    "dilo. Incluye los puntos principales, no mas de 200 palabras."
+                )
+                user_msg = (
+                    f"Pregunta del usuario: {task}\n\n"
+                    f"Informacion encontrada:\n{context_text}\n\n"
+                    f"Redacta una respuesta clara y util en espanol:"
+                )
+                slm_result = slm.generate(user_msg, system_prompt=system_prompt)
+                # El SLM puede devolver un dict {response: ...} o un string directo
+                if slm_result is None:
+                    synthesized = ""
+                elif isinstance(slm_result, str):
+                    synthesized = slm_result
+                elif isinstance(slm_result, dict):
+                    raw = slm_result.get("response", "")
+                    if isinstance(raw, str):
+                        # Si el SLM devolvio JSON, parsearlo
+                        try:
+                            import json as _json
+                            parsed = _json.loads(raw)
+                            if isinstance(parsed, dict):
+                                synthesized = parsed.get("respuesta", raw)
+                            else:
+                                synthesized = raw
+                        except Exception:
+                            synthesized = raw
+                    else:
+                        synthesized = str(raw)
+                else:
+                    synthesized = str(slm_result)
+        except Exception as e:
+            logger.warning(f"SLM synthesize fallo: {e}")
+
+        # Fallback: si el SLM no esta o fallo, generar respuesta basica
+        if not synthesized:
+            synthesized = self._synthesize_fallback(topic, context_text, sources)
+
+        duration = int((time.time() - start) * 1000)
+        return AgentStep(
+            tool="synthesize",
+            input=task,
+            output=synthesized[:2000],
+            success=bool(synthesized),
+            duration_ms=duration,
+        )
+
+    def _synthesize_fallback(self, topic: str, context_text: str, sources: list) -> str:
+        """Fallback cuando el SLM no esta disponible: arma respuesta con extractos.
+
+        Sin SLM, la respuesta es basica pero util:
+        - Titulo
+        - Extractos relevantes
+        - Fuentes
+        """
+        lines = [f"# {topic}\n"]
+        # Tomar las primeras 3 lineas de contexto
+        context_lines = [
+            line for line in context_text.split("\n")
+            if line.strip() and not line.startswith("Contenido de la web:")
+        ][:3]
+        for line in context_lines:
+            clean = line.lstrip("- ").strip()
+            if len(clean) > 30:
+                lines.append(f"- {clean[:200]}")
+
+        if sources:
+            lines.append("\nFuentes:")
+            for src in sources[:3]:
+                lines.append(f"  - {src}")
+
+        return "\n".join(lines)
 
     # ─── Plan: Documentar (web_search + search_files) ─────
     def _plan_document(self, task: str, result: AgentResult):
