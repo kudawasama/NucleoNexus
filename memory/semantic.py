@@ -182,9 +182,11 @@ class SemanticMemory:
         seen_ids = set()
 
         # Enfoque simple: cargar hechos una vez, filtrar en Python
+        # LIMIT 500 para evitar cargar TODA la BD en cada query
         cur.execute(
-            "SELECT id, fact, category, confidence, source, created_at "
-            "FROM semantic ORDER BY confidence DESC"
+            "SELECT id, fact, category, confidence, source, created_at, "
+            "access_count "
+            "FROM semantic ORDER BY confidence DESC LIMIT 500"
         )
         all_rows = cur.fetchall()
 

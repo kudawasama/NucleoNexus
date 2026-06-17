@@ -600,11 +600,14 @@ class NexusCore:
                                 }
 
                 if best_response:
+                    # Limpiar formato ReAct si el modelo lo usó
+                    cleaned = self._strip_react(best_response)
                     metadata["backend"] = "slm"
+                    metadata["model"] = self.slm.model_name if best_metadata and "model" not in best_metadata else metadata.get("model")
                     metadata["self_consistency"] = n_attempts > 1
                     if best_metadata:
                         metadata.update(best_metadata)
-                    return best_response, metadata
+                    return cleaned, metadata
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
 
@@ -884,6 +887,37 @@ class NexusCore:
         if meaningful:
             return meaningful[-1]
         return response.strip()[:300]
+
+    # ─── Limpieza de formato ReAct en respuestas del SLM ─────────
+
+    def _strip_react(self, text: str) -> str:
+        """Extrae solo la respuesta del usuario del formato ReAct.
+        
+        El SLM (deepseek) a veces responde con:
+        Pensamiento: ...
+        Acción: ...
+        Observación: ...
+        Respuesta: ...
+        
+        Esto extrae solo lo que está después de "Respuesta:".
+        Si no encuentra el formato, devuelve el texto original.
+        """
+        import re
+        markers = [
+            "Respuesta:",
+            "RESPUESTA:",
+            "respuesta:",
+            "**Respuesta:**",
+        ]
+        for marker in markers:
+            if marker in text:
+                after = text.split(marker, 1)[1].strip()
+                # Limpiar posibles marcadores residuales
+                after = re.sub(r'\n---.*$', '', after)
+                after = re.sub(r'\[\[accion:.*?\]\]', '', after)
+                return after.strip()
+        # Si no hay formato ReAct, devolver el original
+        return text.strip()
 
     def reset(self):
         """Reinicia Nexus a su estado inicial."""
