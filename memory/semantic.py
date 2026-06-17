@@ -63,10 +63,13 @@ class SemanticMemory:
 
     def query_knowledge(self, query: str, top_k: int = 3) -> list[dict]:
         """Busca hechos por relevancia semántica de términos significativos.
-        
+
         Filtra palabras vacías (stop words) para evitar matches por 'que', 'es', etc.
         Normaliza acentos para búsqueda robusta.
         El score refleja cuántos términos significativos de la query aparecen en el hecho.
+
+        ADEMAS: expande la query con sinonimos antes de buscar.
+        Si pregunta por "auto", tambien busca hechos con "coche", "carro", etc.
         """
         cur = self.conn.cursor()
         import re as _re
@@ -77,6 +80,14 @@ class SemanticMemory:
                     .replace('ó','o').replace('ú','u').replace('ü','u')
                     .replace('¿','').replace('?','').replace('!','')
                     .replace('.','').replace(',',''))
+
+        # ─── Expansion con sinonimos ───
+        # Import lazy para evitar circular imports
+        try:
+            from learning.synonyms import get_synonyms
+            use_synonyms = True
+        except ImportError:
+            use_synonyms = False
 
         if not query or not query.strip():
             cur.execute(
@@ -123,6 +134,16 @@ class SemanticMemory:
         if not terms:
             return []
 
+        # ─── Expandir con sinonimos ───
+        # Cada termino se reemplaza por TODOS sus sinonimos.
+        # Asi "auto" tambien busca "coche", "carro", "vehiculo".
+        expanded_terms = set(terms)
+        if use_synonyms:
+            for term in terms[:8]:  # Limitar para no explotar
+                for syn in get_synonyms(term):
+                    if syn != term:
+                        expanded_terms.add(syn)
+
         # Buscar facts que contengan al menos uno de los términos
         results = []
         seen_ids = set()
@@ -136,13 +157,22 @@ class SemanticMemory:
 
         for row in all_rows:
             fact_lower = _norm(row['fact'].lower())
-            # Contar cuántos términos significativos aparecen en el hecho
-            matches = sum(1 for t in terms if t in fact_lower)
-            if matches > 0:
-                relevance = matches / len(terms)
-                # Penalizar si solo matchean términos de 3 letras comunes
-                if matches == 1 and len(terms) > 2:
-                    # Un solo match entre muchos términos → muy probablemente irrelevante
+            # Match con terminos ORIGINALES (mayor peso)
+            original_matches = sum(1 for t in terms if t in fact_lower)
+            # Match con sinonimos (menor peso)
+            syn_matches = sum(
+                1 for t in expanded_terms
+                if t in fact_lower and t not in terms
+            )
+            total_matches = original_matches + (syn_matches * 0.5)
+
+            if total_matches > 0:
+                # Score base: proporcion de terminos originales matcheados
+                relevance = original_matches / len(terms) if terms else 0
+                # Bonus por sinonimos (sin sobrepasar 1.0)
+                relevance = min(1.0, relevance + (syn_matches * 0.1))
+                # Penalizar si solo matchean terminos de 3 letras comunes
+                if original_matches == 1 and syn_matches == 0 and len(terms) > 2:
                     relevance *= 0.3
                 results.append({
                     "doc_id": f"sem_{row['id']}",

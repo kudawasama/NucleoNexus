@@ -195,6 +195,99 @@ test("comandos existen", lambda: None)
 
 
 # ===================================================================
+# Tests de sinonimos y expansion de queries
+# ===================================================================
+section("SINONIMOS: busqueda expande queries con palabras equivalentes")
+
+
+def test_synonyms_auto_coche():
+    """get_synonyms('auto') debe incluir 'coche'."""
+    from learning.synonyms import get_synonyms
+    syns = get_synonyms("auto")
+    assert "coche" in syns, f"'coche' no esta en sinonimos de 'auto': {syns}"
+
+
+def test_synonyms_coche_auto():
+    """get_synonyms('coche') debe incluir 'auto' (bidireccional)."""
+    from learning.synonyms import get_synonyms
+    syns = get_synonyms("coche")
+    assert "auto" in syns, f"'auto' no esta en sinonimos de 'coche': {syns}"
+
+
+def test_synonyms_unknown_word():
+    """Palabra desconocida devuelve la misma palabra."""
+    from learning.synonyms import get_synonyms
+    syns = get_synonyms("xyzzy")
+    assert syns == ["xyzzy"], f"debio devolver ['xyzzy'], devolvio {syns}"
+
+
+def test_query_knowledge_uses_synonyms():
+    """Si busca 'auto' debe encontrar hecho con 'coche' (sinonimos)."""
+    import sqlite3
+    # Limpiar y agregar hecho de prueba
+    cur = nexus.memory.semantic.conn.cursor()
+    cur.execute("DELETE FROM semantic WHERE source = 'test_synonyms'")
+    nexus.memory.semantic.conn.commit()
+    nexus.memory.learn_fact(
+        "el coche es un vehiculo de transporte",
+        category="test_synonyms", confidence=0.5, source="test_synonyms"
+    )
+    # Buscar con sinonimo
+    facts = nexus.memory.semantic.query_knowledge("auto", top_k=3)
+    matched = any("coche" in f.get("text", "") for f in facts)
+    assert matched, f"query 'auto' no encontro hecho con 'coche': {facts}"
+
+
+def test_query_knowledge_expansion_medico():
+    """Si busca 'medico' debe encontrar hecho con 'doctor'."""
+    import sqlite3
+    cur = nexus.memory.semantic.conn.cursor()
+    cur.execute("DELETE FROM semantic WHERE source = 'test_synonyms'")
+    nexus.memory.semantic.conn.commit()
+    nexus.memory.learn_fact(
+        "mi hermana es doctora en medicina",
+        category="test_synonyms", confidence=0.5, source="test_synonyms"
+    )
+    facts = nexus.memory.semantic.query_knowledge("medico", top_k=3)
+    matched = any("doctora" in f.get("text", "") for f in facts)
+    assert matched, f"query 'medico' no encontro hecho con 'doctora': {facts}"
+
+
+def test_expand_query_basic():
+    """expand_query debe retornar la query original como minimo."""
+    from learning.synonyms import expand_query
+    expanded = expand_query("que es python")
+    assert "que es python" in expanded, f"query original no esta en expansion: {expanded}"
+
+
+def test_expand_fact_storage():
+    """expand_fact_storage genera sinonimos del hecho."""
+    from learning.synonyms import expand_fact_storage
+    expanded = expand_fact_storage("el auto es un vehiculo")
+    assert len(expanded) >= 1, f"debio devolver al menos el original: {expanded}"
+    # Verificar que incluye sinonimo
+    has_synonym = any("coche" in e or "carro" in e for e in expanded)
+    assert has_synonym, f"no hay sinonimos en: {expanded}"
+
+
+def test_synonyms_doesnt_break_existing():
+    """query_knowledge normal (sin sinonimos) sigue funcionando."""
+    facts = nexus.memory.semantic.query_knowledge("contabilidad", top_k=3)
+    # Solo verificamos que no falla, no que encuentre algo especifico
+    assert isinstance(facts, list), "query_knowledge no retorna lista"
+
+
+test("get_synonyms('auto') incluye 'coche'", test_synonyms_auto_coche)
+test("get_synonyms('coche') incluye 'auto' (bidireccional)", test_synonyms_coche_auto)
+test("get_synonyms de palabra desconocida", test_synonyms_unknown_word)
+test("query_knowledge expande 'auto' a 'coche'", test_query_knowledge_uses_synonyms)
+test("query_knowledge expande 'medico' a 'doctora'", test_query_knowledge_expansion_medico)
+test("expand_query retorna query original", test_expand_query_basic)
+test("expand_fact_storage genera sinonimos", test_expand_fact_storage)
+test("query_knowledge normal no se rompe", test_synonyms_doesnt_break_existing)
+
+
+# ===================================================================
 # Tests de los nuevos comandos de aprendizaje (commit e04f122+)
 # ===================================================================
 section("COMANDOS: /buscar, /aprende, /analiza, /olvida")
