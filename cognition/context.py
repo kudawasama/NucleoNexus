@@ -196,14 +196,32 @@ Estás en fase {phase}. Ajusta tu complejidad según esto.
 === FIN DIRECTIVAS ==="""
 
     def _build_light_directives(self) -> str:
-        """Instrucciones simples para modelos pequeños (0.5B)."""
+        """Instrucciones simples para modelos pequeños (0.5B).
+
+        Usa el patron ReAct (Reasoning + Acting) para estructurar
+        la salida del SLM:
+          Pensamiento: <que necesito hacer>
+          Accion: <que tool usar (si es necesario)>
+          Observacion: <que aprendi del tool (si use)>
+          Respuesta: <texto para el usuario>
+
+        Esto reduce alucinaciones porque el modelo 'piensa' antes
+        de responder.
+        """
         phase = self.state.get("nexus", "phase", default="Proto")
-        return f"""=== INSTRUCCIONES ===
+        return f"""=== INSTRUCCIONES (ReAct) ===
 Eres Nexus, asistente en fase {phase}.
-- Responde en español, claro y breve
-- Si tienes un hecho en el contexto, úsalo para responder
+- Responde en espanol, claro y breve
+- Si tienes un hecho en el contexto, usalo para responder
 - Si no sabes algo, dilo honestamente
 - NO inventes datos ni horarios
+
+PATRON DE RESPUESTA (sigue este formato):
+Pensamiento: <que se necesita para responder>
+Accion: <tool a usar, o "ninguna">
+Observacion: <resultado del tool, o "N/A">
+Respuesta: <texto final al usuario>
+
 === FIN INSTRUCCIONES ==="""
 
     def build_react(self, user_input: str, memory_facts: list = None,

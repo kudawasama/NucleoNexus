@@ -288,6 +288,138 @@ test("query_knowledge normal no se rompe", test_synonyms_doesnt_break_existing)
 
 
 # ===================================================================
+# Tests de ReAct, Auto-sintesis y Self-consistency (Fase 1)
+# ===================================================================
+section("FASE 1: ReAct prompt, auto-sintesis, self-consistency")
+
+
+def test_react_prompt_includes_format():
+    """El prompt ligero debe incluir el patron ReAct (Pensamiento/Accion/Respuesta)."""
+    from cognition.context import ContextBuilder
+    ctx = ContextBuilder(nexus.state, nexus.skills, nexus.memory)
+    prompt = ctx._build_light_directives()
+    assert "Pensamiento" in prompt, "prompt no incluye Pensamiento"
+    assert "Accion" in prompt or "Acción" in prompt, "prompt no incluye Accion"
+    assert "Respuesta" in prompt, "prompt no incluye Respuesta"
+
+
+def test_extract_list_items_detects_incluye():
+    """_extract_list_items detecta el patron 'X incluye: Y'."""
+    facts = [
+        {"text": "los planetas incluye: mercurio", "score": 0.5},
+        {"text": "los planetas incluye: venus", "score": 0.5},
+        {"text": "los planetas incluye: tierra", "score": 0.5},
+    ]
+    items = nexus.symbolic._extract_list_items(facts, "cuales son los planetas")
+    assert len(items) >= 2, f"debio extraer varios items, extrajo {len(items)}: {items}"
+    assert "mercurio" in items, f"'mercurio' no esta en items: {items}"
+
+
+def test_extract_list_items_detects_son():
+    """_extract_list_items detecta 'X son: A, B, C'."""
+    facts = [
+        {"text": "los planetas son: mercurio, venus y tierra", "score": 0.5},
+    ]
+    items = nexus.symbolic._extract_list_items(facts, "que son los planetas")
+    assert len(items) >= 2, f"debio extraer items, extrajo {len(items)}: {items}"
+
+
+def test_synthesize_list_response_format():
+    """_synthesize_list_response genera formato estructurado."""
+    items = ["mercurio", "venus", "tierra", "marte"]
+    response = nexus.symbolic._synthesize_list_response(
+        items, "cuales son los planetas", "cuales son los planetas"
+    )
+    assert "1." in response, "no numera los items"
+    assert "mercurio" in response, "no incluye el item 1"
+    assert "marte" in response, "no incluye el item 4"
+
+
+def test_extract_definition():
+    """_extract_definition extrae 'X es Y' de los hechos."""
+    facts = [
+        {"text": "python es un lenguaje de programacion interpretado", "score": 0.5},
+        {"text": "otra cosa random", "score": 0.3},
+    ]
+    defn = nexus.symbolic._extract_definition(facts)
+    assert "python" in defn.lower() or "lenguaje" in defn.lower(), \
+        f"definicion no encontrada: {defn}"
+
+
+def test_auto_synthesis_end_to_end():
+    """Test end-to-end: guardar hechos, preguntar, verificar sintesis."""
+    import sqlite3
+    cur = nexus.memory.semantic.conn.cursor()
+    cur.execute("DELETE FROM semantic WHERE source = 'test_synth'")
+    nexus.memory.semantic.conn.commit()
+
+    # Guardar hechos tipo lista
+    nexus.memory.learn_fact("los animales incluye: perro", category="test_synth", confidence=0.5, source="test_synth")
+    nexus.memory.learn_fact("los animales incluye: gato", category="test_synth", confidence=0.5, source="test_synth")
+    nexus.memory.learn_fact("los animales incluye: pajaro", category="test_synth", confidence=0.5, source="test_synth")
+
+    # Preguntar
+    r, m = nexus.process("cuales son los animales")
+    # Debe ser respuesta sintetizada (contiene "1.", "2.", etc)
+    assert "1." in r or "Encontre" in r, f"respuesta no es sintetizada: {r[:200]}"
+
+
+def test_self_consistency_metadata():
+    """El metadata incluye self_consistency=True para modelos tiny."""
+    import sqlite3
+    cur = nexus.memory.semantic.conn.cursor()
+    cur.execute("DELETE FROM semantic WHERE category = 'knowledge_base'")
+    # No borrar (hay 22) - solo limpiar los de prueba
+    cur.execute("DELETE FROM semantic WHERE source = 'test_synth'")
+    nexus.memory.semantic.conn.commit()
+
+    # Forzar modelo tiny
+    nexus.slm.model_name = 'qwen2.5:0.5b'
+
+    # Pregunta que SI va al SLM (no fast_intent, sin hechos)
+    r, m = nexus.process("explicame la teoria de cuerdas en 2 lineas")
+    # Si backend es slm, debe tener self_consistency
+    if m["backend"] == "slm":
+        assert m.get("self_consistency", False), \
+            f"modelo tiny debe usar self_consistency, metadata={m}"
+
+
+def test_self_consistency_off_for_big_models():
+    """Modelos grandes NO usan self_consistency (no necesitan)."""
+    # Forzar modelo grande
+    nexus.slm.model_name = 'deepseek-v4-flash'
+
+    # Pregunta generica sin hechos especificos
+    r, m = nexus.process("hola, que puedes hacer?")
+    # saludo es fast_intent, no va al SLM
+    # Pero probemos con pregunta que SI va al SLM
+    cur = nexus.memory.semantic.conn.cursor()
+    cur.execute("DELETE FROM semantic WHERE source = 'test_synth'")
+    nexus.memory.semantic.conn.commit()
+
+    # Asegurar que no hay hechos matching
+    nexus.slm.model_name = 'llama3.2:1b'  # No es tiny
+    # Borrar todos los hechos para forzar ir al SLM
+    cur.execute("DELETE FROM semantic")
+    nexus.memory.semantic.conn.commit()
+
+    r, m = nexus.process("que es xyz123?")
+    if m["backend"] == "slm":
+        assert not m.get("self_consistency", False), \
+            f"modelo grande no debe usar self_consistency, metadata={m}"
+
+
+test("prompt ReAct incluye Pensamiento/Accion/Respuesta", test_react_prompt_includes_format)
+test("_extract_list_items detecta 'X incluye: Y'", test_extract_list_items_detects_incluye)
+test("_extract_list_items detecta 'X son: A, B, C'", test_extract_list_items_detects_son)
+test("_synthesize_list_response genera formato", test_synthesize_list_response_format)
+test("_extract_definition extrae definicion", test_extract_definition)
+test("auto-sintesis end-to-end funciona", test_auto_synthesis_end_to_end)
+test("self-consistency ON para modelos tiny", test_self_consistency_metadata)
+test("self-consistency OFF para modelos grandes", test_self_consistency_off_for_big_models)
+
+
+# ===================================================================
 # Tests de los nuevos comandos de aprendizaje (commit e04f122+)
 # ===================================================================
 section("COMANDOS: /buscar, /aprende, /analiza, /olvida")

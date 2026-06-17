@@ -39,7 +39,7 @@
     "initial_facts": 22
   },
   "model_state": {
-    "backend": "ollama",
-    "model_name": "qwen2.5:0.5b"
+    "backend": "opencode",
+    "model_name": "deepseek-v4-flash"
   }
 }

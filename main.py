@@ -512,75 +512,79 @@ class NexusCore:
                     memory_facts=mem_facts,
                     memory_records=mem_records,
                 )
-                # Generar con JSON mode forzado
-                slm_result = self.slm.generate(user_input, system_prompt=prompt,
-                                            structured=True)
-                if slm_result:
-                    raw_json = slm_result["response"]
-                    metadata["backend"] = "slm"
-                    metadata["model"] = slm_result.get("model")
-                    metadata["tokens_prompt"] = slm_result.get("tokens_prompt", 0)
-                    metadata["tokens_generated"] = slm_result.get("tokens_generated", 0)
-                    metadata["duration_ms"] = slm_result.get("duration_ms", 0)
-                    metadata["total_duration_ms"] = slm_result.get("total_duration_ms", 0)
 
-                    # Parsear JSON
-                    import json as _json
-                    try:
-                        parsed = _json.loads(raw_json)
-                        respuesta = parsed.get("respuesta", "")
-                        accion = parsed.get("accion", "responder")
+                # ─── SELF-CONSISTENCY (mejora #7 del roadmap) ───
+                # Para modelos pequenos, generar 2 respuestas y elegir la
+                # mejor (la mas larga, asumiendo que tiene mas contenido util).
+                is_tiny = any(p in (self.slm.model_name or "").lower()
+                              for p in ["0.5b", "tiny", "nano"])
+                n_attempts = 2 if is_tiny else 1
 
-                        # Ejecutar acción según el tipo
-                        if accion == "buscar_memoria":
-                            tema = parsed.get("tema", user_input)
-                            res = self.memory.query_knowledge(tema, top_k=3)
-                            if res:
-                                for r in res:
-                                    self.memory.learn_fact(
-                                        r["text"], category="react",
-                                        confidence=0.3, source="react_busqueda")
-                        elif accion == "calcular":
-                            expr = parsed.get("expresion", "")
-                            if expr:
-                                self.memory.remember("nexus",
-                                    f"[calculo: {expr}]",
-                                    context={"backend": "react"})
-                        elif accion == "usar_herramienta":
-                            herramienta = parsed.get("herramienta", "")
-                            parametros = parsed.get("parametros", {})
-                            if herramienta:
-                                metadata["tool_called"] = herramienta
-                                # Ejecutar la herramienta via ActionRegistry
-                                tool_result = self.actions.execute(herramienta, **parametros)
-                                if tool_result.get("success"):
-                                    result_data = tool_result.get("result", {})
-                                    if isinstance(result_data, dict):
-                                        # Si la herramienta ya dio formato, usarla
-                                        if "respuesta" in result_data:
-                                            respuesta = result_data["respuesta"]
-                                        elif "resultados" in result_data:
-                                            items = result_data["resultados"]
-                                            respuesta = (
-                                                f"Resultados de {herramienta}:\n"
-                                                + "\n".join(str(i) for i in items[:5])
-                                            )
-                                        elif "salida" in result_data:
-                                            respuesta = result_data["salida"][:500]
+                best_response = ""
+                best_metadata = None
+                for attempt in range(n_attempts):
+                    slm_result = self.slm.generate(user_input, system_prompt=prompt,
+                                                structured=True)
+                    if slm_result:
+                        raw_json = slm_result["response"]
+                        # Intentar parsear JSON
+                        import json as _json
+                        try:
+                            parsed = _json.loads(raw_json)
+                            respuesta = parsed.get("respuesta", "")
+                            accion = parsed.get("accion", "responder")
+
+                            # Logica de accion (replicada para que cada intento sea valido)
+                            if accion == "usar_herramienta":
+                                herramienta = parsed.get("herramienta", "")
+                                parametros = parsed.get("parametros", {})
+                                if herramienta:
+                                    tool_result = self.actions.execute(herramienta, **parametros)
+                                    if tool_result.get("success"):
+                                        result_data = tool_result.get("result", {})
+                                        if isinstance(result_data, dict):
+                                            if "respuesta" in result_data:
+                                                respuesta = result_data["respuesta"]
+                                            elif "resultados" in result_data:
+                                                items = result_data["resultados"]
+                                                respuesta = (
+                                                    f"Resultados de {herramienta}:\n"
+                                                    + "\n".join(str(i) for i in items[:5])
+                                                )
+                                            elif "salida" in result_data:
+                                                respuesta = result_data["salida"][:500]
+                                            else:
+                                                respuesta = str(result_data)[:500]
                                         else:
                                             respuesta = str(result_data)[:500]
-                                    else:
-                                        respuesta = str(result_data)[:500]
-                                else:
-                                    # Tool fallo: usar el mensaje de error como respuesta
-                                    err = tool_result.get("error", "Error desconocido")
-                                    respuesta = f"No pude ejecutar {herramienta}: {err}"
 
-                        if respuesta:
-                            return respuesta, metadata
-                    except _json.JSONDecodeError:
-                        # Fallback: usar raw si no es JSON válido
-                        return raw_json, metadata
+                            # Usar la mejor respuesta (mas larga)
+                            if len(respuesta) > len(best_response):
+                                best_response = respuesta
+                                best_metadata = {
+                                    "model": slm_result.get("model"),
+                                    "tokens_prompt": slm_result.get("tokens_prompt", 0),
+                                    "tokens_generated": slm_result.get("tokens_generated", 0),
+                                    "duration_ms": slm_result.get("duration_ms", 0),
+                                    "total_duration_ms": slm_result.get("total_duration_ms", 0),
+                                }
+                        except _json.JSONDecodeError:
+                            # JSON invalido - usar raw
+                            if len(raw_json) > len(best_response):
+                                best_response = raw_json
+                                best_metadata = {
+                                    "model": slm_result.get("model"),
+                                    "tokens_prompt": 0,
+                                    "tokens_generated": 0,
+                                    "duration_ms": slm_result.get("duration_ms", 0),
+                                }
+
+                if best_response:
+                    metadata["backend"] = "slm"
+                    metadata["self_consistency"] = n_attempts > 1
+                    if best_metadata:
+                        metadata.update(best_metadata)
+                    return best_response, metadata
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
 

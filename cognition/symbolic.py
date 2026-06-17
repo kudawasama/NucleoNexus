@@ -766,26 +766,58 @@ class SymbolicEngine:
         1. Buscar hechos relevantes en memoria semantica
         2. Si no hay, buscar recuerdos en memoria episodica
         3. Si no hay, dar respuesta generica segun fase
+
+        Auto-sintesis (mejora #8 del roadmap):
+        - Si hay hechos que son parte de un mismo tema (ej: lista de planetas),
+          los agrupa y muestra como lista estructurada.
+        - Si el query es "cuales son X?", muestra los items numerados.
+        - Si el query es "que es X?", muestra la definicion relevante.
         """
-        text_lower = text.lower()
+        text_lower = text.lower().strip()
 
         # NOTA: La deteccion de nombre ("me llamo X") ocurre en _handle_name
         # (intent=nombre es fast_intent). Esta funcion solo maneja conversacion
         # general donde ya no se detecto un intent especifico.
 
-        # --- 1. Busqueda en memoria semantica ---
-        # Detectar si es una pregunta (heuristica simple)
+        # Detectar tipo de pregunta para sintesis adecuada
         is_question = any(q in text_lower for q in [
             "sabes", "conoces", "recuerdas", "como", "qué", "que",
             "cuando", "donde", "por que", "por qué", "cual", "cuál"
         ])
+        is_list_question = any(p in text_lower for p in [
+            "cuales son", "cuáles son", "que son", "qué son",
+            "lista de", "todos los", "todas las",
+        ])
+        is_definition_question = any(p in text_lower for p in [
+            "que es", "qué es", "definicion", "definición", "significa",
+        ])
 
+        # --- 1. Busqueda en memoria semantica ---
         if is_question:
-            mem_facts = self.memory.query_knowledge(text, top_k=5)
+            mem_facts = self.memory.query_knowledge(text, top_k=8)  # Mas facts para sintesis
             if mem_facts:
                 relevant = [f for f in mem_facts if f.get("score", 0) > 0.15]
                 if relevant:
-                    fact_texts = [f.get("text", "")[:100] for f in relevant[:3]]
+                    # ─── AUTO-SINTESIS ───
+                    # Detectar si los hechos son parte de un mismo tema
+                    # (por la estructura: "X incluye: Y", "X es: Y", etc.)
+                    items = self._extract_list_items(relevant, text)
+                    if items and len(items) >= 2 and is_list_question:
+                        # Sintesis de lista
+                        return self._synthesize_list_response(
+                            items, text, text_lower
+                        )
+                    elif is_definition_question:
+                        # Sintesis de definicion
+                        defn = self._extract_definition(relevant)
+                        if defn:
+                            return (
+                                f"Segun lo que he aprendido:\n"
+                                f"{defn}\n\n"
+                                f"¿Quieres saber mas sobre esto?"
+                            )
+                    # Fallback: lista de hechos
+                    fact_texts = [f.get("text", "")[:120] for f in relevant[:3]]
                     fact_texts = [f for f in fact_texts if f]
                     if fact_texts:
                         return (
@@ -794,12 +826,9 @@ class SymbolicEngine:
                         )
 
         # --- 2. Busqueda en memoria episodica ---
-        # La memoria episodica usa TF-IDF, no requiere filtrado manual
-        # (el motor ya lo hace). Solo pedimos un umbral de score.
         if is_question:
             mem_recall = self.memory.recall(text, top_k=5)
             if mem_recall:
-                # Filtrar: score >= 0.25 (umbral definido en docs)
                 relevant = [m for m in mem_recall if m.get("score", 0) >= 0.25]
                 if relevant:
                     best = relevant[0].get("text", "")[:120]
@@ -825,6 +854,125 @@ class SymbolicEngine:
                 "Dame un momento para conectar los puntos... "
                 "Cuentame más para poder darte una mejor respuesta."
             )
+
+    def _extract_list_items(self, facts: list, query: str) -> list[str]:
+        """Extrae items de lista de una coleccion de hechos.
+
+        Detecta el patron "X incluye: Y" o "X es: A, B, C" donde
+        varios hechos comparten el mismo "X" (sujeto).
+
+        Args:
+            facts: Lista de hechos relevantes de query_knowledge
+            query: El query original del usuario
+
+        Returns:
+            Lista de items individuales si los hechos son de tipo lista,
+            [] si no
+        """
+        import re as _re
+        # Buscar patron "X incluye: Y" en cada hecho
+        # Tambien "X son: A, B, C" (hecho completo con lista)
+        # O hechos con la misma raiz de tema
+        items = []
+        subjects = []
+        for f in facts[:8]:
+            text = f.get("text", "")
+            # Patron 1: "X incluye: Y"
+            m = _re.search(r'^(.{3,80}?)\s+incluye:?\s+(.+)$', text, _re.IGNORECASE)
+            if m:
+                subject = m.group(1).strip()
+                item = m.group(2).strip().rstrip('.')
+                # Filtrar items muy cortos o palabras sueltas
+                if len(item) > 3 and not item.startswith(('el ', 'la ', 'los ', 'las ')):
+                    items.append(item)
+                    if subject not in subjects:
+                        subjects.append(subject)
+                continue
+            # Patron 2: "X son: A, B, C" - extraer los items
+            m = _re.search(r'^(.{3,80}?)\s+son:?\s+(.+)$', text, _re.IGNORECASE)
+            if m:
+                subject = m.group(1).strip()
+                list_text = m.group(2).strip().rstrip('.')
+                # Separar items
+                sub_items = _re.split(r',\s*|\s+y\s+', list_text)
+                for si in sub_items:
+                    si = si.strip().strip('.,;:')
+                    if len(si) >= 2:
+                        items.append(si)
+                        if subject not in subjects:
+                            subjects.append(subject)
+                continue
+            # Patron 3: "X es: A" - un solo item
+            m = _re.search(r'^(.{3,80}?)\s+es:?\s+(.+)$', text, _re.IGNORECASE)
+            if m:
+                subject = m.group(1).strip()
+                item = m.group(2).strip().rstrip('.')
+                if len(item) > 5:
+                    items.append(item)
+                    if subject not in subjects:
+                        subjects.append(subject)
+
+        # Si tenemos items Y un sujeto comun, retornar los items
+        if len(items) >= 2 and len(subjects) >= 1:
+            # Devolver tambien el sujeto para la sintesis
+            return items
+        return []
+
+    def _synthesize_list_response(self, items: list, original_query: str, query_lower: str) -> str:
+        """Sintetiza una respuesta en formato de lista estructurada.
+
+        Args:
+            items: Lista de items extraidos
+            original_query: Query original del usuario
+            query_lower: Query en minusculas
+
+        Returns:
+            Respuesta formateada con items numerados
+        """
+        # Detectar el tema (lo que pregunta el usuario)
+        import re as _re
+        # Quitar prefijos como "cuales son los", "que son las", etc.
+        topic_match = _re.search(
+            r'(?:cuales son|cuáles son|que son|qué son|lista de|todos los|todas las)\s+(?:los |las |el |la )?(.+?)(?:\?|$)',
+            query_lower
+        )
+        topic = topic_match.group(1).strip() if topic_match else "estos temas"
+
+        # Limitar items a mostrar (max 10)
+        display_items = items[:10]
+
+        # Formatear como lista numerada
+        lines = [f"Encontre {len(items)} {'item' if len(items) == 1 else 'items'} sobre {topic}:\n"]
+        for i, item in enumerate(display_items, 1):
+            # Limpiar item
+            item_clean = item.strip().rstrip('.')
+            lines.append(f"  {i}. {item_clean}")
+        if len(items) > 10:
+            lines.append(f"  ... y {len(items) - 10} mas")
+
+        lines.append(f"\n¿Queres saber mas sobre alguno?")
+        return "\n".join(lines)
+
+    def _extract_definition(self, facts: list) -> str:
+        """Extrae la definicion mas relevante de una lista de hechos.
+
+        Args:
+            facts: Lista de hechos relevantes
+
+        Returns:
+            Texto de la definicion, o '' si no hay una clara
+        """
+        import re as _re
+        # Buscar el hecho que sea mas "definitorio" (contiene "es", "significa", "consiste")
+        for f in facts[:5]:
+            text = f.get("text", "")
+            # Patron: "X es Y" o "X significa Y"
+            m = _re.search(r'(.{3,80}?)\s+(?:es|significa|consiste en)\s+(.{10,150})', text, _re.IGNORECASE)
+            if m:
+                subject = m.group(1).strip()
+                definition = m.group(2).strip().rstrip('.')
+                return f"**{subject}** es: {definition}."
+        return ""
 
         # --- Respuesta generica segun la fase ---
         phase = self.state.get("nexus", "phase", default="Proto")
