@@ -324,7 +324,17 @@ def register() -> Skill:
     )
 
     # ─── 2. read_file ───────────────────────────────────────────────
-    def _read_file(path: str = "", max_lines: int = 50):
+    def _read_file(path: str = "", max_lines: int = 50,
+                   from_line: int = 0, search: str = ""):
+        """Lee un archivo del proyecto.
+
+        Args:
+            path: Ruta al archivo
+            max_lines: Cantidad maxima de lineas a devolver (default 50)
+            from_line: Desde que linea empezar (0-indexed, default 0)
+            search: Si se especifica, busca esta cadena y devuelve
+                    las lineas alrededor (10 antes + N despues)
+        """
         if not path:
             return {"error": "Especifica la ruta del archivo. Ej: 'README.md'"}
         try:
@@ -338,11 +348,34 @@ def register() -> Skill:
                 return {"error": f"Archivo no encontrado: {path}"}
             content = target.read_text(encoding="utf-8", errors="replace")
             lines = content.splitlines()
+
+            # Si se busca una cadena, encontrar la linea y mostrar contexto
+            search_line = None
+            if search:
+                for i, line in enumerate(lines):
+                    if search in line:
+                        search_line = i + 1  # 1-indexed para el usuario
+                        # Mostrar 5 lineas antes + 30 despues
+                        start = max(0, i - 5)
+                        end = min(len(lines), i + 30)
+                        return {
+                            "archivo": str(target.relative_to(PROJECT_ROOT)),
+                            "total_lineas": len(lines),
+                            "search_match_linea": search_line,
+                            "lineas": lines[start:end],
+                            "rango": f"lineas {start + 1}-{end}",
+                            "truncado": end < len(lines),
+                        }
+
+            # Modo normal: devolver lineas desde from_line
+            start_idx = max(0, from_line)
+            end_idx = min(len(lines), start_idx + max_lines)
             return {
                 "archivo": str(target.relative_to(PROJECT_ROOT)),
                 "total_lineas": len(lines),
-                "lineas": lines[:max_lines],
-                "truncado": len(lines) > max_lines,
+                "lineas": lines[start_idx:end_idx],
+                "rango": f"lineas {start_idx + 1}-{end_idx}",
+                "truncado": end_idx < len(lines),
             }
         except Exception as e:
             return {"error": f"Error leyendo archivo: {e}"}
@@ -527,21 +560,54 @@ def register() -> Skill:
             )
             with urllib.request.urlopen(req, timeout=15) as resp:
                 html = resp.read().decode("utf-8", errors="replace")
+
+            # Quitar scripts, styles, comments, nav, footer (no son contenido)
+            html = _re.sub(r'<script\b[^>]*>.*?</script>', ' ', html,
+                           flags=_re.IGNORECASE | _re.DOTALL)
+            html = _re.sub(r'<style\b[^>]*>.*?</style>', ' ', html,
+                           flags=_re.IGNORECASE | _re.DOTALL)
+            html = _re.sub(r'<!--.*?-->', ' ', html, flags=_re.DOTALL)
+            html = _re.sub(r'<nav\b[^>]*>.*?</nav>', ' ', html,
+                           flags=_re.IGNORECASE | _re.DOTALL)
+            html = _re.sub(r'<footer\b[^>]*>.*?</footer>', ' ', html,
+                           flags=_re.IGNORECASE | _re.DOTALL)
+            html = _re.sub(r'<header\b[^>]*>.*?</header>', ' ', html,
+                           flags=_re.IGNORECASE | _re.DOTALL)
+
+            # Title
             title_m = _re.search(r'<title[^>]*>(.*?)</title>', html, _re.IGNORECASE | _re.DOTALL)
             titulo = _re.sub(r"<[^>]+>", "", title_m.group(1)).strip() if title_m else url
-            textos = _re.findall(r'<(?:p|h[1-6]|li|div|span|article|section)[^>]*>(.*?)</(?:p|h[1-6]|li|div|span|article|section)>', html, _re.IGNORECASE | _re.DOTALL)
+
+            # Extraer textos de parrafos, headings, listas, etc
+            textos = _re.findall(
+                r'<(?:p|h[1-6]|li|article|section)\b[^>]*>(.*?)</(?:p|h[1-6]|li|article|section)>',
+                html, _re.IGNORECASE | _re.DOTALL
+            )
             contenido = []
             for t in textos:
-                clean = _re.sub(r"<[^>]+>", "", t).strip()
-                clean = _re.sub(r'\s+', ' ', clean)
-                if len(clean) > 20:
+                # Quitar HTML interno
+                clean = _re.sub(r"<[^>]+>", " ", t)
+                clean = _re.sub(r'&[a-z]+;', ' ', clean)  # &nbsp; etc
+                clean = _re.sub(r'&#\d+;', ' ', clean)   # &#1234;
+                clean = _re.sub(r'\s+', ' ', clean).strip()
+                if len(clean) > 30:  # Solo textos con substance
                     contenido.append(clean)
+
+            # Si no hay parrafos, buscar divs con mucho texto
             if not contenido:
                 body = _re.search(r'<body[^>]*>(.*?)</body>', html, _re.DOTALL)
                 if body:
                     texto = _re.sub(r"<[^>]+>", " ", body.group(1))
-                    contenido = [_re.sub(r'\s+', ' ', texto).strip()[:2000]]
-            return {"titulo": titulo, "contenido": "\n".join(contenido[:30]) if contenido else "(sin contenido visible)", "url": url, "total_lineas": len(contenido)}
+                    texto = _re.sub(r'\s+', ' ', texto).strip()
+                    if len(texto) > 30:
+                        contenido = [texto[:2000]]
+
+            return {
+                "titulo": titulo,
+                "contenido": "\n".join(contenido[:15]) if contenido else "(sin contenido visible)",
+                "url": url,
+                "total_parrafos": len(contenido),
+            }
         except urllib.error.HTTPError as e:
             return {"error": f"HTTP {e.code}: {e.reason}"}
         except urllib.error.URLError:

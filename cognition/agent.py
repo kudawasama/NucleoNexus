@@ -293,17 +293,22 @@ class NexusAgent:
         if not search_step.success:
             return
 
-        # Paso 2: leer el primer archivo .py encontrado (no .pyc, no history)
+        # Paso 2: leer el archivo .py encontrado en el contexto de la funcion
         files = self._parse_file_results(search_step.output)
         py_files = [f for f in files if f.endswith('.py')
                     and '__pycache__' not in f
                     and '.history' not in f]
         if py_files:
-            # Limitar lectura: solo las primeras lineas (no archivos gigantes)
-            # (Asume que la definicion de la funcion esta al inicio)
-            read_step = self._execute_tool(
-                "read_file", path=py_files[0], max_lines=50
-            )
+            # Si tenemos func_name, usar search= para ir directo a la definicion
+            if func_name:
+                read_step = self._execute_tool(
+                    "read_file", path=py_files[0],
+                    search=f"def {func_name}", max_lines=40,
+                )
+            else:
+                read_step = self._execute_tool(
+                    "read_file", path=py_files[0], max_lines=50
+                )
             result.steps.append(read_step)
         elif files:
             read_step = self._execute_tool(
