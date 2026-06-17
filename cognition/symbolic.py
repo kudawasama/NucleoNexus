@@ -93,6 +93,11 @@ class SymbolicEngine:
         self._patterns = []
         self._load_patterns()
 
+        # --- Contexto conversacional ---
+        self._last_topic = ""        # Ultimo tema que se estaba discutiendo
+        self._last_response = ""     # Ultima respuesta de Nexus
+        self._last_user_msg = ""     # Ultimo mensaje del usuario
+
         # --- Puente: intencion -> accion de skill ---
         # Cuando se detecta una intent, se busca una skill action que la maneje
         # Esto permite que las skills extiendan las capacidades de Nexus
@@ -137,11 +142,30 @@ class SymbolicEngine:
         if action_result:
             return action_result
 
-        # 2. Detectar intención
+        # 2. Detectar intención (primero, para saber si es continuacion)
         intent = self._detect_intent(input_lower)
 
-        # 3. Buscar en memoria experiencias similares
-        memories = self.memory.recall(input_lower, top_k=2)
+        # 2b. Detectar continuacion conversacional
+        CONTINUATION_WORDS = {'si', 'sí', 'no', 'ok', 'vale', 'claro', 'dale', 'sipi',
+                              'nop', 'sep', 'sip', 'obvio', 'cuenta', 'entonces', 'y',
+                              'ah', 'ah ok', 'ah ya', 'ya', 'ya veo', 'entiendo',
+                              'genial', 'perfecto', 'excelente', 'bien', 'sigue',
+                              'adelante', 'prosigue', 'continua', 'continúa',
+                              'explica', 'explícame', 'profundiza', 'mas', 'más'}
+        is_continuation = (input_lower in CONTINUATION_WORDS
+                          or (len(input_lower.split()) <= 2 and intent == "conversacion")
+                          or (input_lower.startswith("y ") and len(input_lower) < 20))
+
+        if is_continuation and self._last_topic:
+            enriched = f"{input_lower} (continuando el tema: {self._last_topic})"
+            enriched_lower = enriched.lower()
+            intent = self._detect_intent(enriched_lower)
+        else:
+            enriched = input_lower
+            enriched_lower = input_lower
+
+        # 3. Buscar en memoria experiencias similares (con contexto si aplica)
+        memories = self.memory.recall(enriched_lower, top_k=2)
 
         # 4. Buscar hechos relevantes
         facts = self.memory.query_knowledge(input_lower, top_k=2)
@@ -171,6 +195,22 @@ class SymbolicEngine:
         self.state.set("knowledge_stats", "semantic_facts", value=mem_stats.get("semantic", 0))
         self.state.set("knowledge_stats", "procedural_patterns", value=mem_stats.get("procedural", 0))
         self.state.set("nexus", "total_learned_facts", value=mem_stats.get("semantic", 0))
+
+        # --- Actualizar contexto conversacional ---
+        # Extraer tema de la conversacion actual
+        if intent not in ("saludo", "despedida", "agradecimiento"):
+            # Extraer palabras clave del mensaje del usuario como tema
+            words = [w for w in re.findall(r'\b[a-záéíóúñ]{4,}\b', input_lower)
+                    if w not in ('para', 'como', 'más', 'mas', 'pero', 'porque',
+                                  'por qué', 'cuando', 'donde', 'esta', 'esto',
+                                  'con', 'sin', 'entre', 'sobre')]
+            if words:
+                self._last_topic = " ".join(words[:5])
+            elif self._last_topic:
+                # Si no hay palabras clave, mantener el tema anterior
+                pass
+        self._last_response = response
+        self._last_user_msg = user_input
 
         return response
 
