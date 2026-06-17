@@ -1,13 +1,13 @@
 {
   "nexus": {
-    "version": "0.1.0+build.31",
-    "commit": "52f9e1c",
+    "version": "0.1.0+build.32",
+    "commit": "28320b9",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
-    "total_interactions": 614,
-    "total_learned_facts": 26,
+    "total_interactions": 638,
+    "total_learned_facts": 56,
     "total_skills": 3,
-    "confidence_level": 0.714,
+    "confidence_level": 0.738,
     "awake_time": 0
   },
   "personality": {
@@ -25,21 +25,21 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 30.6,
-    "responses_given": 614,
-    "successful_responses": 614,
+    "avg_response_time_ms": 29.4,
+    "responses_given": 638,
+    "successful_responses": 638,
     "failed_responses": 0,
-    "last_response_time": 1781712167.7350774
+    "last_response_time": 1781713211.861405
   },
   "knowledge_stats": {
-    "episodic_memories": 1341,
-    "semantic_facts": 26,
+    "episodic_memories": 1409,
+    "semantic_facts": 56,
     "procedural_patterns": 0,
     "skills_learned": 3,
-    "initial_facts": 22
+    "initial_facts": 48
   },
   "model_state": {
-    "backend": "opencode",
-    "model_name": "deepseek-v4-flash"
+    "backend": "ollama",
+    "model_name": "qwen2.5:0.5b"
   }
 }

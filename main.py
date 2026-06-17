@@ -355,6 +355,21 @@ class NexusCore:
                     metadata["backend"] = "symbolic"
                     return response, metadata
 
+            # ── META DEL PROYECTO: mejorar Qwen 0.5B ─────────
+            # docs/01-VISION: "Inteligencia por arquitectura, no por tamaño"
+            # NO evadimos al SLM. En su lugar, lo rodeamos de:
+            #   - Contexto rico (memoria, skills, estado)
+            #   - Structured generation (JSON forzado)
+            #   - Tools via intent (regex directa)
+            #   - Self-consistency (multi-shot)
+            #   - Memoria vectorial (embeddings)
+            # Si todo falla, el SLM responde lo mejor que puede.
+            # NO redirigimos a web_search automaticamente para no
+            # ocultar el problema real: el modelo necesita entrenamiento.
+            # Para preguntas factuales, el sistema mejora inyectando
+            # contexto: en lugar de "que es Charizard?", mejor
+            # "segun tu base de conocimiento, que es Charizard?".
+
             # Sin hechos → SLM con contexto de memoria (structured output)
             try:
                 mem_facts = self.memory.query_knowledge(user_input, top_k=3)
