@@ -184,7 +184,7 @@ class SymbolicEngine:
             "memoria": r'\b(recuerda[s]?|memoria|olvid|acuerd[ao])\b',
             "nombre": r'\b(cómo me llamo|como me llamo|sabes mi nombre|sabes quién soy|quién soy|me llamo|mi nombre es)\b',
             "reset": r'\b(reset|reiniciar|borrar|limpiar|empezar de nuevo)\b',
-            "personalidad": r'\b(personalidad|tono|voz|estilo|forma[l]?|ser)\b',
+            "personalidad": r'\b(personalidad|tono|voz|estilo|formalidad)\b',
             "confianza": r'\b(confianza|seguro|certeza|cuanto sabes|qué tanto sabes)\b',
             "web_search": r'\b(busca|buscar|investiga|investigar|consulta|consultar|encuentra|encontrar)\s+(en la web|en internet|en google|online|en linea|en línea)\b',
             "read_file": r'\b(lee|leer|abre|abrir|muestra|mostrar)\s+(el\s+)?(archivo|fichero|file)\b',
