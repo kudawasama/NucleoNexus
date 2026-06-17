@@ -259,20 +259,31 @@ class NexusAgent:
             if not step.success:
                 continue
             output = step.output
-            # Para web_search: extraer los items •
+            # Para web_search: extraer items (•, [Wikipedia], etc)
             if "web_search" in step.tool and ("'resultados':" in output or '"resultados":' in output):
-                items = re.findall(r"['\"](•[^'\"]{20,})['\"]", output)
+                # Match items de 50+ chars (incluye •, [Wikipedia], etc)
+                items = re.findall(r"['\"]([^'\"]{50,})['\"]", output)
                 if items:
-                    for item in items[:3]:
+                    # Filtrar y rankear items por relevancia al topic
+                    topic_words = set(re.findall(r'\b[a-záéíóúñ]{3,}\b', topic.lower()))
+                    ranked = []
+                    for item in items:
                         clean = item.lstrip('•').strip()
                         # Quitar la URL entre parentesis
-                        clean = re.sub(r'\s*\([^)]+\)\s*', ' ', clean).strip()
-                        if clean:
+                        url_in_item = re.search(r'\((https?://[^\)]+)\)', clean)
+                        if url_in_item:
+                            sources.append(url_in_item.group(1))
+                        clean_no_url = re.sub(r'\s*\([^)]+\)\s*', ' ', clean).strip()
+                        # Contar matches con topic
+                        item_words = set(re.findall(r'\b[a-záéíóúñ]{3,}\b', clean.lower()))
+                        relevance = len(topic_words & item_words)
+                        ranked.append((relevance, clean_no_url))
+                    # Ordenar por relevancia descendente
+                    ranked.sort(key=lambda x: x[0], reverse=True)
+                    # Tomar los top 3
+                    for relevance, clean in ranked[:3]:
+                        if clean and len(clean) > 20:
                             context_text += f"- {clean[:200]}\n"
-                            # Extraer fuente (URL)
-                            url_match = re.search(r'\((https?://[^\)]+)\)', item)
-                            if url_match:
-                                sources.append(url_match.group(1))
             # Para browse_website: extraer contenido
             elif "browse_website" in step.tool:
                 m = re.search(r"'contenido':\s*'([^']{50,2000})'", output)
@@ -499,30 +510,41 @@ class NexusAgent:
 
         'investiga sobre fotosintesis' -> 'fotosintesis'
         'explica como funciona X' -> 'X' (despues de 'como funciona')
+        'explica que son los bitcoin' -> 'bitcoin' (limpia mas)
+        'que es la fotosintesis' -> 'fotosintesis'
+        'como funciona blockchain' -> 'blockchain'
         """
-        task_lower = task.lower().strip()
+        topic = task.lower().strip()
 
-        # Quitar prefijos comunes
+        # Aplicar prefijos secuencialmente hasta que no cambie
         prefixes_to_remove = [
             r"^investiga\s+(?:sobre |acerca de )?",
             r"^busca\s+(?:informacion\s+)?(?:sobre |acerca de )?",
             r"^explica\s+",
             r"^describe\s+",
             r"^documenta\s+",
-            r"^que es\s+",
-            r"^que son\s+",
+            r"^que\s+(?:es|son)\s+",
             r"^como\s+(?:funciona\s+)?",
             r"^donde\s+esta\s+",
             r"^por\s+que\s+",
             r"^aprende\s+(?:sobre )?",
         ]
-        for p in prefixes_to_remove:
-            topic = re.sub(p, "", task_lower, flags=re.IGNORECASE)
-            if topic != task_lower:
-                return topic.strip().rstrip("?!.")
+        max_iter = 5
+        for _ in range(max_iter):
+            prev = topic
+            for p in prefixes_to_remove:
+                topic = re.sub(p, "", topic, flags=re.IGNORECASE)
+            # Limpiar stopwords iniciales en cada iteracion
+            stop_leading = re.compile(
+                r"^(?:el|la|los|las|un|una|unos|unas|de|del|al)\s+",
+                re.IGNORECASE
+            )
+            while stop_leading.match(topic):
+                topic = stop_leading.sub("", topic).strip()
+            if topic == prev:
+                break
 
-        # Default: devolver el task completo
-        return task.strip().rstrip("?!.")
+        return topic.rstrip("?!.")
 
     def _execute_tool(self, tool: str, **kwargs) -> AgentStep:
         """Ejecuta una tool via ActionRegistry."""
@@ -564,16 +586,19 @@ class NexusAgent:
         # Intentar parsear como dict (puede ser un Python dict stringificado)
         # Acepta tanto comillas simples como dobles
         try:
-            # Buscar patron de lista de strings con •
-            # Acepta ' o " para las comillas
+            # Buscar patron de lista de strings
             match = re.search(
                 r"['\"]resultados['\"]:\s*\[(.*?)\](?=\s*$|\s*[,\}])",
                 output, re.DOTALL
             )
             if match:
                 list_content = match.group(1)
-                # Extraer cada string (con • al inicio) - acepta ambas comillas
-                for item_match in re.finditer(r"['\"](•[^'\"]{20,})['\"]", list_content):
+                # Extraer cada string de la lista (con •, [Wikipedia], etc)
+                # Acepta comillas simples y dobles
+                for item_match in re.finditer(
+                    r"['\"]([^'\"]{30,})['\"]",
+                    list_content
+                ):
                     item = item_match.group(1)
                     # Limpiar el item
                     if item.startswith("•"):
@@ -593,12 +618,65 @@ class NexusAgent:
         return items[:5]
 
     def _extract_urls_from_results(self, output: str) -> list:
-        """Extrae URLs del output de busqueda."""
+        """Extrae URLs utiles del output de busqueda, filtrando las problematicas.
+
+        Filtra:
+        - duckduckgo.com (redirects, /html, etc)
+        - github.com (generalmente no tiene contenido para explicar)
+        - wikipedia.org/wiki (Wikipedia ya da snippets buenos, el browse no aporta)
+        - URLs con patrones 'login', 'redirect', 'javascript'
+        - URLs con paths /api/, /track, /share
+        """
         urls = []
-        # Buscar URLs entre parentesis
         for match in re.finditer(r"\((https?://[^\)]+)\)", output):
-            urls.append(match.group(1))
+            url = match.group(1)
+            if self._is_url_valuable(url):
+                urls.append(url)
         return urls[:3]
+
+    def _is_url_valuable(self, url: str) -> bool:
+        """Determina si una URL vale la pena visitarla (no es redirect/login/etc)."""
+        url_lower = url.lower()
+
+        # Patrones problematicos
+        bad_patterns = [
+            # DuckDuckGo: redirect, html version, changelog
+            "duckduckgo.com/html",
+            "duckduckgo.com/changelog",
+            "duckduckgo.com/?",
+            "duckduckgo.com/",
+            # Wikipedia: mejor usar el snippet de busqueda
+            "wikipedia.org/wiki/",
+            # GitHub: a veces no tiene readme accesible
+            # (mantener por si hay /blob/ explicativos)
+            # Redes sociales y login
+            "facebook.com/",
+            "twitter.com/",
+            "instagram.com/",
+            "linkedin.com/",
+            # Patrones de redirect/javascript
+            "/redirect",
+            "redirect=",
+            "javascript:",
+            "login.php",
+            "login?",
+            "signin?",
+            # API endpoints
+            "/api/",
+            ".json",
+            ".xml",
+            # Patrones de tracking
+            "utm_",
+            "/track",
+            "/share?",
+        ]
+
+        for pattern in bad_patterns:
+            if pattern in url_lower:
+                return False
+
+        # Si llega aqui, la URL es valiosa
+        return True
 
     def _parse_file_results(self, output: str) -> list:
         """Extrae paths de archivos del output de search_files.
