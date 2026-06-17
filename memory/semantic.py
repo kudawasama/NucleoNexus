@@ -223,80 +223,92 @@ class SemanticMemory:
         results.sort(key=lambda x: (x['score'], x['metadata']['confidence']), reverse=True)
 
         # ── FASE 3: Busqueda por embeddings (complementa TF-IDF) ──
-        # Si los resultados de TF-IDF son pocos o vacios, usar embeddings.
-        # Si hay resultados de TF-IDF, los embeddings se usan como BOOST
-        # para reordenar y encontrar hechos semanticamente similares.
+        # Solo usar embeddings si:
+        # 1. TF-IDF encontro pocos resultados (< 2)
+        # 2. Los resultados tienen score bajo (< 0.3)
+        # Esto evita queries lentas a Ollama en cada pregunta.
         try:
             from memory.embeddings import get_embedding, cosine_similarity, is_available
-            if is_available():
-                query_vec = get_embedding(query)
-                if query_vec:
-                    import json as _json
-                    # Cargar todos los hechos con embedding
-                    cur.execute(
-                        "SELECT id, fact, category, confidence, source, embedding "
-                        "FROM semantic WHERE embedding IS NOT NULL"
-                    )
-                    emb_rows = cur.fetchall()
 
-                    # Calcular similitud coseno para cada uno
-                    emb_results = []
-                    for row in emb_rows:
-                        try:
-                            vec = _json.loads(row['embedding'].decode("utf-8"))
-                            sim = cosine_similarity(query_vec, vec)
-                            if sim > 0.3:  # Umbral minimo de similitud
-                                emb_results.append({
-                                    "id": row['id'],
-                                    "text": row['fact'],
-                                    "sim": sim,
-                                    "category": row['category'],
-                                    "confidence": row['confidence'],
-                                    "source": row['source'],
-                                })
-                        except Exception:
-                            continue
+            # Solo usar embeddings si TF-IDF fue debil
+            tfidf_weak = (
+                not results or
+                all(r.get("score", 0) < 0.3 for r in results)
+            )
+            if not tfidf_weak:
+                return results[:top_k]
 
-                    # Ordenar por similitud
-                    emb_results.sort(key=lambda x: x['sim'], reverse=True)
+            if not is_available():
+                return results[:top_k]
 
-                    # Combinar: si TF-IDF no encontro nada, devolver embedding results
-                    if not results and emb_results:
-                        for r in emb_results[:top_k]:
-                            results.append({
-                                "doc_id": f"sem_{r['id']}",
-                                "text": r['text'],
-                                "metadata": {
-                                    "category": r['category'],
-                                    "type": "semantic",
-                                    "confidence": r['confidence'],
-                                    "source": r['source'],
-                                },
-                                "score": round(r['sim'], 4),
-                            })
-                    # Si TF-IDF encontro algo, agregar los embedding results
-                    # que no esten ya (boost semantico)
-                    elif emb_results:
-                        existing_texts = {r['text'] for r in results}
-                        for r in emb_results[:top_k * 2]:
-                            if r['text'] not in existing_texts and r['sim'] > 0.5:
-                                results.append({
-                                    "doc_id": f"sem_{r['id']}",
-                                    "text": r['text'],
-                                    "metadata": {
-                                        "category": r['category'],
-                                        "type": "semantic",
-                                        "confidence": r['confidence'],
-                                        "source": r['source'],
-                                    },
-                                    "score": round(r['sim'] * 0.8, 4),  # Factor 0.8 (menor que TF-IDF exacto)
-                                })
-                                existing_texts.add(r['text'])
-                                if len(results) >= top_k * 2:
-                                    break
+            query_vec = get_embedding(query)
+            if not query_vec:
+                return results[:top_k]
 
-                    # Re-ordenar despues de combinar
-                    results.sort(key=lambda x: x['score'], reverse=True)
+            import json as _json
+            # Cargar SOLO los hechos que tienen embedding (top N por confianza)
+            cur.execute(
+                "SELECT id, fact, category, confidence, source, embedding "
+                "FROM semantic WHERE embedding IS NOT NULL "
+                "ORDER BY confidence DESC LIMIT 100"
+            )
+            emb_rows = cur.fetchall()
+
+            # Calcular similitud coseno para cada uno
+            emb_results = []
+            for row in emb_rows:
+                try:
+                    vec = _json.loads(row['embedding'].decode("utf-8"))
+                    sim = cosine_similarity(query_vec, vec)
+                    if sim > 0.4:  # Umbral minimo de similitud
+                        emb_results.append({
+                            "id": row['id'],
+                            "text": row['fact'],
+                            "sim": sim,
+                            "category": row['category'],
+                            "confidence": row['confidence'],
+                            "source": row['source'],
+                        })
+                except Exception:
+                    continue
+
+            # Ordenar por similitud
+            emb_results.sort(key=lambda x: x['sim'], reverse=True)
+
+            # Si TF-IDF no encontro nada, devolver embedding results
+            if not results and emb_results:
+                for r in emb_results[:top_k]:
+                    results.append({
+                        "doc_id": f"sem_{r['id']}",
+                        "text": r['text'],
+                        "metadata": {
+                            "category": r['category'],
+                            "type": "semantic",
+                            "confidence": r['confidence'],
+                            "source": r['source'],
+                        },
+                        "score": round(r['sim'], 4),
+                    })
+            # Si TF-IDF encontro algo pero debil, agregar embedding results
+            elif emb_results:
+                existing_texts = {r['text'] for r in results}
+                for r in emb_results[:top_k]:
+                    if r['text'] not in existing_texts:
+                        results.append({
+                            "doc_id": f"sem_{r['id']}",
+                            "text": r['text'],
+                            "metadata": {
+                                "category": r['category'],
+                                "type": "semantic",
+                                "confidence": r['confidence'],
+                                "source": r['source'],
+                            },
+                            "score": round(r['sim'] * 0.9, 4),
+                        })
+                        existing_texts.add(r['text'])
+
+            # Re-ordenar despues de combinar
+            results.sort(key=lambda x: x['score'], reverse=True)
         except ImportError:
             pass
         except Exception as e:
