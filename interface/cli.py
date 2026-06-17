@@ -600,15 +600,42 @@ class NexusCLI:
             print(f"{Color.GREEN}Resumen:{Color.RESET}")
             if result.facts_learned > 0:
                 print(f"  📚 Aprendi {result.facts_learned} hechos nuevos")
-            if result.steps:
-                first_output = result.steps[0].output
-                if first_output and len(first_output) > 20:
-                    # Mostrar preview
-                    preview = first_output[:400]
-                    if len(first_output) > 400:
-                        preview += "..."
-                    print(f"\n{Color.DIM}Preview del primer paso:{Color.RESET}")
-                    print(f"  {preview}")
+            print(f"  Pasos ejecutados: {len(result.steps)}")
+            print()
+
+            # Mostrar preview de cada paso con su output
+            for i, step in enumerate(result.steps, 1):
+                status_icon = "✓" if step.success else "✗"
+                print(f"{Color.DIM}--- Paso {i}: {step.tool} ({step.duration_ms}ms) {status_icon} ---{Color.RESET}")
+
+                # Limpiar output: quitar dicts raw, mostrar solo texto
+                output = step.output
+                if not output or len(output) < 20:
+                    print(f"  {Color.DIM}(sin contenido){Color.RESET}")
+                else:
+                    # Detectar formato dict {'resultados': [...]}
+                    import re as _re
+                    if "'resultados':" in output or '"resultados":' in output:
+                        # Extraer items • del dict
+                        items = _re.findall(r"['\"](•[^'\"]{15,})['\"]", output)
+                        if items:
+                            for item in items[:3]:
+                                # Limpiar el item
+                                clean = item.lstrip('•').strip()
+                                if len(clean) > 200:
+                                    clean = clean[:200] + "..."
+                                print(f"  {Color.CYAN}•{Color.RESET} {clean[:200]}")
+                            if len(items) > 3:
+                                print(f"  {Color.DIM}... y {len(items) - 3} mas{Color.RESET}")
+                        else:
+                            print(f"  {Color.DIM}{output[:300]}{Color.RESET}")
+                    else:
+                        # Output de read_file, browse_website, etc
+                        preview = output[:600]
+                        if len(output) > 600:
+                            preview += f"\n  {Color.DIM}... ({len(output) - 600} chars mas){Color.RESET}"
+                        print(f"  {preview}")
+                print()
 
         except Exception as e:
             print(f"{Color.RED}Error ejecutando agente: {e}{Color.RESET}")

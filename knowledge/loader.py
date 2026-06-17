@@ -36,7 +36,13 @@ def load_knowledge_to_memory(memory, knowledge_dir: str) -> int:
                     continue
                 category = item.get("category", "general")
                 source = item.get("source", "knowledge_base")
-                memory.learn_fact(fact, category=category, confidence=0.5, source=source)
+                # with_embedding=False: la carga inicial es masiva, no
+                # queremos 50+ llamadas a Ollama en cada inicio de Nexus.
+                # Los hechos se pueden embeber despues bajo demanda.
+                memory.learn_fact(
+                    fact, category=category, confidence=0.5, source=source,
+                    with_embedding=False
+                )
                 loaded += 1
             logger.info(f"Cargados {len(facts)} hechos desde {json_file.name}")
         except Exception as e:

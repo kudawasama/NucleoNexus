@@ -256,23 +256,92 @@ class NexusAgent:
 
     # ─── Plan: Buscar en codigo (search_files + read_file) ───
     def _plan_code_search(self, task: str, result: AgentResult):
-        """Plan: buscar archivos locales que coincidan con el tema."""
-        topic = self._extract_topic(task)
+        """Plan: buscar archivos locales que coincidan con el tema.
+
+        Para 'busca en codigo la funcion X':
+        1. Detectar el nombre exacto de la funcion
+        2. Buscar el archivo .py que la define (no menciones, no .pyc)
+        3. Leer el archivo encontrado
+        """
+        # Detectar si se busca una funcion/metodo/clase especifica
+        func_name = self._extract_function_name(task)
+        if not func_name:
+            # Si no se detecta funcion, usar el topic completo
+            topic = self._extract_topic(task)
+        else:
+            topic = func_name
+
         if not topic:
             topic = task
 
-        # Paso 1: search_files
-        search_step = self._execute_tool("search_files", pattern=topic)
-        result.steps.append(search_step)
+        # Paso 1: buscar el archivo .py que define la funcion
+        # Primero intentar con el patron 'def FUNCION' para encontrar el archivo exacto
+        if func_name:
+            # Buscar la DEFINICION: 'def nombre_funcion' o 'class NombreClase'
+            search_pattern = f"def {func_name}"
+            search_step = self._execute_tool("search_files", pattern=search_pattern)
+            result.steps.append(search_step)
+            if not search_step.success or not self._parse_file_results(search_step.output):
+                # Si no se encontro la definicion, buscar por nombre de archivo
+                search_pattern = func_name
+                search_step = self._execute_tool("search_files", pattern=search_pattern)
+                result.steps.append(search_step)
+        else:
+            search_step = self._execute_tool("search_files", pattern=topic)
+            result.steps.append(search_step)
 
         if not search_step.success:
             return
 
-        # Paso 2: si encontro archivos, leer el primero
+        # Paso 2: leer el primer archivo .py encontrado (no .pyc, no history)
         files = self._parse_file_results(search_step.output)
-        if files:
-            read_step = self._execute_tool("read_file", path=files[0])
+        py_files = [f for f in files if f.endswith('.py')
+                    and '__pycache__' not in f
+                    and '.history' not in f]
+        if py_files:
+            # Limitar lectura: solo las primeras lineas (no archivos gigantes)
+            # (Asume que la definicion de la funcion esta al inicio)
+            read_step = self._execute_tool(
+                "read_file", path=py_files[0], max_lines=50
+            )
             result.steps.append(read_step)
+        elif files:
+            read_step = self._execute_tool(
+                "read_file", path=files[0], max_lines=50
+            )
+            result.steps.append(read_step)
+
+    def _extract_function_name(self, task: str) -> str:
+        """Detecta el nombre de una funcion/clase en el task.
+
+        'busca en codigo la funcion query_knowledge' -> 'query_knowledge'
+        'encuentra la clase NexusCore' -> 'NexusCore'
+        'donde esta def run' -> 'run'
+        """
+        import re as _re
+        task_lower = task.lower()
+
+        # Patron 1: 'la funcion X' / 'la funcion X()' / 'la funcion X.'
+        m = _re.search(r'(?:la\s+)?funci[oó]n\s+([a-z_][a-z0-9_]*)', task_lower)
+        if m:
+            return m.group(1)
+
+        # Patron 2: 'el metodo X' / 'el metodo X()'
+        m = _re.search(r'(?:el\s+)?m[ée]todo\s+([a-z_][a-z0-9_]*)', task_lower)
+        if m:
+            return m.group(1)
+
+        # Patron 3: 'la clase X' / 'la clase NexusCore'
+        m = _re.search(r'(?:la\s+)?clase\s+([A-Z][a-zA-Z0-9_]*)', task_lower)
+        if m:
+            return m.group(1)
+
+        # Patron 4: 'donde esta X' / 'donde esta el X'
+        m = _re.search(r'd[oó]nde\s+est[aá]\s+(?:el\s+|la\s+)?([a-zA-Z_][a-zA-Z0-9_]*)', task_lower)
+        if m:
+            return m.group(1)
+
+        return ""
 
     # ─── Helpers ──────────────────────────────────────────
 
@@ -383,17 +452,41 @@ class NexusAgent:
         return urls[:3]
 
     def _parse_file_results(self, output: str) -> list:
-        """Extrae paths de archivos del output de search_files."""
+        """Extrae paths de archivos del output de search_files.
+
+        El output puede ser:
+        - Un string con lineas "archivo.py: linea X" o "ruta/al/archivo"
+        - Un dict: "{'resultados': [{'archivo': 'memory\\\\semantic.py', ...}]}"
+        - O con comillas dobles
+        """
+        import re as _re
         files = []
+
+        # Intentar parsear como dict (formato search_files)
+        match = _re.search(
+            r"['\"]resultados['\"]:\s*\[(.*?)\](?=\s*$|\s*[,\}])",
+            output, _re.DOTALL
+        )
+        if match:
+            list_content = match.group(1)
+            # Extraer cada item {'archivo': 'path', 'linea': N, 'texto': '...'}
+            for item_match in _re.finditer(
+                r"['\"]archivo['\"]:\s*['\"]([^'\"]+)['\"]",
+                list_content
+            ):
+                files.append(item_match.group(1))
+            if files:
+                return files[:5]
+
+        # Fallback: buscar lineas con formato "archivo.py:" o "ruta/al/archivo"
         for line in output.split("\n"):
             line = line.strip()
-            # Formato comun: "archivo.py: linea X" o "ruta/al/archivo"
-            if line and not line.startswith("="):
-                # Tomar lo que esta antes de ":" o espacio
-                match = re.match(r"^([^\s:]+\.[a-z]+)", line)
+            if line and not line.startswith("=") and not line.startswith("{"):
+                match = _re.match(r"^([^\s:]+\.[a-z]+)", line)
                 if match:
                     files.append(match.group(1))
-        return files[:3]
+
+        return files[:5]
 
     def _summarize(self, task: str, steps: list) -> str:
         """Genera un resumen estructurado de los pasos ejecutados."""

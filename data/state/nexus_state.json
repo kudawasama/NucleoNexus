@@ -1,7 +1,7 @@
 {
   "nexus": {
-    "version": "0.1.0+build.50",
-    "commit": "c78e9a8",
+    "version": "0.1.0+build.52",
+    "commit": "1b06a1d",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
     "total_interactions": 685,
@@ -36,7 +36,7 @@
     "semantic_facts": 146,
     "procedural_patterns": 0,
     "skills_learned": 15,
-    "initial_facts": 22
+    "initial_facts": 0
   },
   "model_state": {
     "backend": "opencode",

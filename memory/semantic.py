@@ -47,8 +47,17 @@ class SemanticMemory:
         self.conn.commit()
 
     def learn_fact(self, fact: str, category: str = "general",
-                   confidence: float = 0.5, source: str = None) -> bool:
+                   confidence: float = 0.5, source: str = None,
+                   with_embedding: bool = True) -> bool:
         """Aprende un hecho. Si ya existe, refuerza confianza.
+
+        Args:
+            fact: Texto del hecho
+            category: Categoria (default: general)
+            confidence: Confianza 0-1
+            source: Origen del hecho
+            with_embedding: Si True, genera embedding (default True).
+                False para cargas masivas donde embeddings se generan despues.
 
         Si el modelo de embeddings esta disponible, tambien guarda
         el vector del hecho para busqueda semantica.
@@ -56,16 +65,17 @@ class SemanticMemory:
         cur = self.conn.cursor()
         now = time.time()
 
-        # Generar embedding (si esta disponible)
+        # Generar embedding (si esta disponible y se solicita)
         embedding_blob = None
-        try:
-            from memory.embeddings import get_embedding
-            vec = get_embedding(fact)
-            if vec:
-                import json as _json
-                embedding_blob = _json.dumps(vec).encode("utf-8")
-        except Exception:
-            pass
+        if with_embedding:
+            try:
+                from memory.embeddings import get_embedding
+                vec = get_embedding(fact)
+                if vec:
+                    import json as _json
+                    embedding_blob = _json.dumps(vec).encode("utf-8")
+            except Exception:
+                pass
 
         try:
             if embedding_blob:
