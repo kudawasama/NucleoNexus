@@ -260,11 +260,22 @@ class NexusCore:
         # 1. Generar respuesta según el backend activo
         response, metadata = self._get_response(user_input)
 
-        # 2. Aprender de la interacción (solo desde input del usuario, no del SLM)
+        # 2. Aprender de la interacción (Vision #4: el sistema aprende de cada interaccion)
+        # 2a. Extraer hechos del input del usuario
         learned_input = learn_from_user_input(user_input, self.memory)
+        # 2b. Si se hizo web_search, aprender de los resultados
+        facts_from_web = 0
+        if metadata.get("web_results"):
+            facts_from_web = self._learn_from_web_search(
+                user_input, metadata["web_results"]
+            )
+        # 2c. Reforzar hechos si el usuario dio feedback positivo
         reinforced = reinforce_from_feedback(user_input, self.memory)
 
-        # 3. Registrar en memoria episódica
+        metadata["facts_learned"] = facts_from_web
+        metadata["facts_extracted"] = learned_input
+
+        # 3. Registrar en memoria episodica
         self.memory.remember("user", user_input, context={"backend": "main"})
         self.memory.remember("nexus", response, context={"backend": "main"})
 
@@ -280,6 +291,63 @@ class NexusCore:
         metadata["mode"] = self.state.get("capabilities", "backend", default="symbolic")
 
         return response, metadata
+
+    def _learn_from_web_search(self, query: str, results: list) -> int:
+        """Aprende automaticamente de los resultados de web_search.
+
+        Cuando Nexus hace una busqueda web, los resultados son
+        informacion util. En vez de descartarlos, los guarda
+        en la memoria semantica para futuras consultas.
+
+        Args:
+            query: La pregunta original
+            results: Lista de resultados de la busqueda
+
+        Returns:
+            Cantidad de hechos aprendidos
+        """
+        if not results:
+            return 0
+
+        learned = 0
+        for result in results[:3]:  # Solo los top 3
+            # Extraer el titulo y un resumen del snippet
+            if isinstance(result, dict):
+                title = result.get("title", "")
+                snippet = result.get("snippet", "") or result.get("extract", "")
+            else:
+                # Si es string, usar como snippet
+                title = ""
+                snippet = str(result)
+
+            if not snippet and not title:
+                continue
+
+            # Construir el hecho: "Según la web: <title> - <snippet>"
+            fact_text = ""
+            if title and snippet:
+                fact_text = f"{title}: {snippet}"
+            elif snippet:
+                fact_text = snippet
+            else:
+                fact_text = title
+
+            # Limpiar (quitar HTML, cortar a longitud razonable)
+            fact_text = re.sub(r'<[^>]+>', '', fact_text)  # quitar tags HTML
+            fact_text = fact_text.strip()[:200]
+
+            if len(fact_text) > 20:
+                self.memory.learn_fact(
+                    fact_text,
+                    category="aprendido_web",
+                    confidence=0.4,  # moderada — viene de la web, no verificada
+                    source="auto_web",
+                )
+                learned += 1
+
+        if learned:
+            logger.info(f"Aprendidos {learned} hechos de la web (query: {query[:50]})")
+        return learned
 
     def _get_response(self, user_input: str) -> tuple:
         """Selecciona y ejecuta el backend adecuado según el modo actual.
@@ -325,6 +393,10 @@ class NexusCore:
             if result:
                 metadata["backend"] = "symbolic"
                 metadata["tool_called"] = tool_intent
+                # Aprender de los resultados de web_search
+                if tool_intent == "web_search" and metadata.get("web_results"):
+                    learned = self._learn_from_web_search(user_input, metadata["web_results"])
+                    metadata["facts_learned"] = learned
                 return result, metadata
 
         # --- HYBRID: intent -> simbolico, resto -> SLM (ReAct) ---
@@ -451,19 +523,29 @@ class NexusCore:
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
 
-        # --- SLM mode: todo via SLM ---
+        # --- SLM mode: todo via SLM (con self-consistency) ---
         if backend_mode == "slm" and self.slm and self.slm.loaded:
             try:
                 system_prompt = self.context.build(user_input)
-                slm_result = self.slm.generate(user_input, system_prompt=system_prompt)
-                if slm_result:
+                # Self-consistency: si el modelo es pequeno (<=1B),
+                # generar 2 respuestas y elegir la mejor
+                is_tiny = any(p in (self.slm.model_name or "").lower()
+                              for p in ["0.5b", "tiny", "nano"])
+                n_attempts = 2 if is_tiny else 1
+                best_response = ""
+                best_len = 0
+                for attempt in range(n_attempts):
+                    slm_result = self.slm.generate(user_input, system_prompt=system_prompt)
+                    if slm_result:
+                        response = slm_result["response"]
+                        if len(response) > best_len:
+                            best_response = response
+                            best_len = len(response)
+                if best_response:
                     metadata["backend"] = "slm"
-                    metadata["model"] = slm_result.get("model")
-                    metadata["tokens_prompt"] = slm_result.get("tokens_prompt", 0)
-                    metadata["tokens_generated"] = slm_result.get("tokens_generated", 0)
-                    metadata["duration_ms"] = slm_result.get("duration_ms", 0)
-                    metadata["total_duration_ms"] = slm_result.get("total_duration_ms", 0)
-                    return slm_result["response"], metadata
+                    metadata["model"] = self.slm.model_name
+                    metadata["self_consistency"] = n_attempts > 1
+                    return best_response, metadata
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
 
@@ -535,6 +617,9 @@ class NexusCore:
                                 lines = [f"🔍 Resultados ({fuente}):"]
                                 for i, item in enumerate(items[:5], 1):
                                     lines.append(f"  {i}. {str(item)[:150]}")
+                                # Guardar resultados en metadata para auto-aprendizaje
+                                if metadata is not None:
+                                    metadata["web_results"] = items
                                 return "\n".join(lines)
                             elif "mensaje" in data:
                                 return f"🔍 {data['mensaje']}"
