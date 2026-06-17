@@ -437,8 +437,16 @@ class SymbolicEngine:
                 data = result["result"]
                 if isinstance(data, dict) and "resultados" in data:
                     items = data["resultados"]
+
+                    # Detectar si los resultados son de GitHub
+                    is_github = any(
+                        "github.com" in str(r).lower() or
+                        (isinstance(r, str) and " ⭐" in r and " — " in r)
+                        for r in items[:3]
+                    )
+
                     if items:
-                        # Guardar los 3 mejores como hechos
+                        # Guardar los 3 mejores como hechos (filtrando GitHub)
                         learned = 0
                         for item in items[:3]:
                             if isinstance(item, dict):
@@ -451,9 +459,14 @@ class SymbolicEngine:
                             # Quitar HTML y limpiar
                             text = re.sub(r'<[^>]+>', '', text).strip()[:200]
 
+                            # Filtro GitHub: no guardar nombres de repos
+                            is_repo = " ⭐" in text and " — " in text and "http" in text
+                            if is_github or is_repo:
+                                continue
+
                             if not text and title:
                                 text = title
-                            if text and len(text) > 20:
+                            if text and len(text) > 30 and "http" not in text[:50]:
                                 self.memory.learn_fact(
                                     text, category=f"aprendido_{topic[:15]}",
                                     confidence=0.5, source="auto_web"

@@ -277,6 +277,7 @@ class NexusCLI:
             "/aprende-web": self._cmd_learn_web,
             "/recuerda": self._cmd_remember,
             "/analiza": self._cmd_analyze,
+            "/limpiar-web": self._cmd_clean_web,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -315,6 +316,7 @@ class NexusCLI:
 {Color.GREEN}/recuerda{Color.RESET} <h>  Alias de /aprende
 {Color.GREEN}/analiza{Color.RESET} <txt> Extraer hechos de un texto
 {Color.GREEN}/olvida{Color.RESET} <txt>  Borrar hecho de la memoria
+{Color.GREEN}/limpiar-web{Color.RESET}    Borrar hechos de web/GitHub contaminados
 
 {Color.DIM}Tip: Para enseñar algo a Nexus, escribe:{Color.RESET}
   "aprende que [hecho]"
@@ -403,6 +405,50 @@ class NexusCLI:
             content = r['content'][:70]
             print(f"  {role_icon} {content}")
         print()
+
+    def _cmd_clean_web(self, cmd: str = ""):
+        """Borra los hechos aprendidos de la web que son nombres de repos/URLs.
+
+        A veces las busquedas web (especialmente GitHub) devuelven resultados
+        que NO son definiciones. Este comando limpia la memoria de esos
+        falsos positivos para evitar que contaminen futuras respuestas.
+        """
+        # Acceder directamente a la BD para tener acceso a todos los hechos
+        cur = self.core.memory.semantic.conn.cursor()
+        cur.execute(
+            "SELECT id, fact, category, confidence, source FROM semantic"
+        )
+        rows = cur.fetchall()
+
+        deleted = 0
+        for row in rows:
+            fact_id = row[0]
+            text = row[1] or ""
+            category = row[2] or ""
+            source = row[4] or ""
+            # Criterios para borrar
+            is_repo_format = " ⭐" in text and " — " in text
+            is_url_only = text.startswith("http")
+            is_github = "github.com" in text.lower() and len(text) < 200
+            is_auto_web_github = source == "auto_web" and ("github.com" in text.lower() or " ⭐" in text)
+            is_short_asiento = len(text) < 40 and "asiento" in text.lower()
+            # Hechos inutiles que el SLM alucina como "que son X"
+            is_query_echo = text.lower().startswith("que son ") or text.lower().startswith("qué son ")
+            # Tambien borrar si el texto es solo un "que" + pregunta corta
+            is_question_echo = text.endswith("?") and len(text) < 60
+            if (is_repo_format or is_url_only or is_github or
+                is_auto_web_github or is_short_asiento or
+                is_query_echo or is_question_echo):
+                self.core.memory.semantic.conn.execute(
+                    "DELETE FROM semantic WHERE id = ?", (fact_id,)
+                )
+                self.core.memory.semantic.conn.commit()
+                deleted += 1
+                print(f"  {Color.DIM}Borrado: {text[:80]}{Color.RESET}")
+        if deleted:
+            print(f"\n{Color.GREEN}✓ {deleted} hechos borrados (contaminados de web/GitHub){Color.RESET}")
+        else:
+            print(f"{Color.YELLOW}No se encontraron hechos para limpiar{Color.RESET}")
 
     def _cmd_facts(self, cmd: str = ""):
         # Extraer categoría del comando si se especifica
@@ -917,7 +963,15 @@ class NexusCLI:
                 if not items:
                     print(f"{Color.YELLOW}No encontré información sobre '{topic}'{Color.RESET}")
                     return
-                # Guardar los 3 mejores
+
+                # Detectar si los resultados son de GitHub
+                is_github = any(
+                    "github.com" in str(r).lower() or
+                    (isinstance(r, str) and " ⭐" in r and " — " in r)
+                    for r in items[:3]
+                )
+
+                # Guardar los 3 mejores (filtrando GitHub)
                 learned = 0
                 for item in items[:3]:
                     if isinstance(item, dict):
@@ -929,12 +983,18 @@ class NexusCLI:
                     text = re.sub(r'<[^>]+>', '', text).strip()[:200]
                     if not text and title:
                         text = title
-                    if text and len(text) > 20:
+                    # Filtro GitHub: no guardar nombres de repos
+                    is_repo = " ⭐" in text and " — " in text and "http" in text
+                    if is_github or is_repo:
+                        continue
+                    if text and len(text) > 30 and "http" not in text[:50]:
                         self.core.memory.learn_fact(
                             text, category=f"aprendido_{topic[:15]}",
                             confidence=0.5, source="auto_web"
                         )
                         learned += 1
+                if is_github:
+                    print(f"\n{Color.YELLOW}Nota: Los resultados son de GitHub, no se guardaron{Color.RESET}")
                 print(f"\n{Color.GREEN}✓ Aprendí {learned} hechos sobre '{topic}':{Color.RESET}")
                 for i, item in enumerate(items[:3], 1):
                     print(f"  {i}. {str(item)[:200]}")

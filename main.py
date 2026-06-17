@@ -309,6 +309,18 @@ class NexusCore:
         if not results:
             return 0
 
+        # Detectar si los resultados son de GitHub (tienen formato repo)
+        # Los resultados de GitHub son listas de repos: "owner/repo ⭐0 — desc"
+        # NO son definiciones, no se deben guardar
+        is_github_results = any(
+            "github.com" in str(r).lower() or
+            (isinstance(r, str) and " ⭐" in r and " — " in r)
+            for r in results[:3]
+        )
+        if is_github_results:
+            logger.info("Resultados de GitHub: no se guardan como hechos (no son definiciones)")
+            return 0
+
         learned = 0
         for result in results[:3]:  # Solo los top 3
             # Extraer el titulo y un resumen del snippet
@@ -321,6 +333,13 @@ class NexusCore:
                 snippet = str(result)
 
             if not snippet and not title:
+                continue
+
+            # Filtro de calidad: rechazar resultados que parecen ser solo
+            # nombres de archivos/repos (tienen formato "X — Y (URL)")
+            if " — " in snippet and "http" in snippet and len(snippet) < 100:
+                # Tipo: "repositorio/repo ⭐0 — descripcion (https://github.com/...)"
+                # No guardar como hecho
                 continue
 
             # Construir el hecho: "Según la web: <title> - <snippet>"
@@ -336,7 +355,9 @@ class NexusCore:
             fact_text = re.sub(r'<[^>]+>', '', fact_text)  # quitar tags HTML
             fact_text = fact_text.strip()[:200]
 
-            if len(fact_text) > 20:
+            # Filtro: solo guardar si el texto parece ser una definicion
+            # (suficiente longitud, no es solo una URL, no es solo un nombre)
+            if len(fact_text) > 30 and "http" not in fact_text[:50]:
                 self.memory.learn_fact(
                     fact_text,
                     category="aprendido_web",
