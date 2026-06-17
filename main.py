@@ -354,8 +354,8 @@ class NexusCore:
                                         elif "resultados" in result_data:
                                             items = result_data["resultados"]
                                             respuesta = (
-                                                f"Resultados de {herramienta}:\\n"
-                                                + "\\n".join(str(i) for i in items[:5])
+                                                f"Resultados de {herramienta}:\n"
+                                                + "\n".join(str(i) for i in items[:5])
                                             )
                                         elif "salida" in result_data:
                                             respuesta = result_data["salida"][:500]
@@ -363,6 +363,10 @@ class NexusCore:
                                             respuesta = str(result_data)[:500]
                                     else:
                                         respuesta = str(result_data)[:500]
+                                else:
+                                    # Tool fallo: usar el mensaje de error como respuesta
+                                    err = tool_result.get("error", "Error desconocido")
+                                    respuesta = f"No pude ejecutar {herramienta}: {err}"
 
                         if respuesta:
                             return respuesta, metadata

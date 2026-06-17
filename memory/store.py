@@ -79,6 +79,13 @@ class NexusMemory:
         }
 
     def close(self):
+        """Cierra la conexion SQLite compartida."""
         self.episodic.close()
+        # Cerrar la conexion una sola vez (la creo EpisodicMemory)
+        if self.episodic.conn is not None:
+            try:
+                self.episodic.conn.close()
+            except Exception:
+                pass
         self.semantic.close()
         self.procedural.close()

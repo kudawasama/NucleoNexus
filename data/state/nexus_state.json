@@ -1,13 +1,13 @@
 {
   "nexus": {
-    "version": "0.1.0+build.24",
-    "commit": "bb8675d",
+    "version": "0.1.0+build.25",
+    "commit": "c99acb5",
     "phase": "Avanzado",
     "active_since": 1781626531.0590978,
-    "total_interactions": 229,
+    "total_interactions": 319,
     "total_learned_facts": 22,
     "total_skills": 3,
-    "confidence_level": 0.329,
+    "confidence_level": 0.419,
     "awake_time": 0
   },
   "personality": {
@@ -25,14 +25,14 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 81.94,
-    "responses_given": 229,
-    "successful_responses": 229,
+    "avg_response_time_ms": 58.82,
+    "responses_given": 319,
+    "successful_responses": 319,
     "failed_responses": 0,
-    "last_response_time": 1781702181.986287
+    "last_response_time": 1781703411.0359976
   },
   "knowledge_stats": {
-    "episodic_memories": 461,
+    "episodic_memories": 765,
     "semantic_facts": 22,
     "procedural_patterns": 0,
     "skills_learned": 3,

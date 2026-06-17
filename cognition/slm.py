@@ -44,18 +44,21 @@ class SLMBackend:
         # Fallback: leer de variables de entorno
         if not self._api_key:
             self._api_key = os.environ.get("OPENCODE_GO_API_KEY")
-        # Fallback 2: leer del archivo master env
+        # Fallback 2: leer del archivo master env (configurable via env var)
         if not self._api_key:
-            master_path = "H:/Mi unidad/kudawa-master.env"
+            master_path = os.environ.get(
+                "NEXUS_MASTER_ENV",
+                "H:/Mi unidad/kudawa-master.env"
+            )
             if os.path.exists(master_path):
                 try:
-                    with open(master_path, 'r') as f:
+                    with open(master_path, "r", encoding="utf-8") as f:
                         for line in f:
-                            if line.startswith('OPENCODE_GO_API_KEY=') and '***' not in line:
-                                self._api_key = line.split('=', 1)[1].strip().strip('"').strip("'")
+                            if line.startswith("OPENCODE_GO_API_KEY=") and "***" not in line:
+                                self._api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
                                 break
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"No se pudo leer master env: {e}")
         logger.info(f"SLMBackend creado (modo: {self.mode})")
 
     def load(self) -> bool:

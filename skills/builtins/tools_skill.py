@@ -382,14 +382,33 @@ def register() -> Skill:
         if not command:
             return {"error": "Especifica el comando a ejecutar"}
         try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
+            # Usar encoding latin-1 para evitar UnicodeDecodeError con
+            # salida de comandos Windows (ej: 'dir' en cp850/cp1252)
+            result = subprocess.run(
+                command, shell=True, capture_output=True,
+                text=False,  # bytes para evitar problemas de encoding
+                timeout=timeout,
+            )
+            # Decodificar manualmente con fallback
+            def _decode(b):
+                if not b:
+                    return ""
+                for enc in ("utf-8", "cp1252", "latin-1"):
+                    try:
+                        return b.decode(enc)
+                    except UnicodeDecodeError:
+                        continue
+                return b.decode("utf-8", errors="replace")
+
+            stdout = _decode(result.stdout).strip()
+            stderr = _decode(result.stderr).strip()
             out = []
-            if result.stdout:
+            if stdout:
                 out.append("STDOUT:")
-                out.extend(result.stdout.strip().splitlines()[:30])
-            if result.stderr:
+                out.extend(stdout.splitlines()[:30])
+            if stderr:
                 out.append("STDERR:")
-                out.extend(result.stderr.strip().splitlines()[:10])
+                out.extend(stderr.splitlines()[:10])
             return {"comando": command, "salida": "\n".join(out) if out else "(sin salida)", "codigo_retorno": result.returncode}
         except subprocess.TimeoutExpired:
             return {"error": f"Timeout de {timeout}s", "comando": command}

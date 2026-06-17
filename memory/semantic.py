@@ -175,4 +175,5 @@ class SemanticMemory:
         return cur.fetchone()[0]
 
     def close(self):
+        # conn compartida con NexusMemory — cerrar alli
         pass
