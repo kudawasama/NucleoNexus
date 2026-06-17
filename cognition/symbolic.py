@@ -168,34 +168,77 @@ class SymbolicEngine:
         return "...¿Hola? No te escuché. Puedes escribirme lo que sea."
 
     def _detect_intent(self, text: str) -> str:
-        """Detecta la intención del usuario por palabras clave."""
+        """Detecta la intención del usuario por palabras clave.
+
+        Reglas anti-falsos-positivos (regresion):
+        - "hola" + mas texto = conversacion, no saludo
+        - "buenas" solo si el texto es corto (<30 chars) o solo contiene palabras de saludo
+        - Los intents de herramienta (web_search, read_file) tienen prioridad
+          sobre intents de conversacion
+        """
+        text_clean = text.strip().lower()
+        word_count = len(text_clean.split())
+
+        # ─── 1. Calcular scores por intent ───
+        # En vez de "primer match gana", cada intent tiene un score
+        # y elegimos el de mayor prioridad cuando hay empate.
         patterns = {
-            "saludo": r'\b(hola|buenas|hey|saludos|que tal|qué tal|buen[oa]s)\b',
-            "despedida": r'\b(adiós|adios|chao|bye|nos vemos|hasta luego|saludos)\b',
-            "agradecimiento": r'\b(gracias|thank|thanks|graciass)\b',
-            "presentacion": r'\b(quién eres|quien eres|que eres|qué eres|presentate|presentate|capacidades|que puedes hacer|qué puedes hacer|que sabes hacer)\b',
-            "estado": r'\b(estado|status|cómo estás|como estas|que tal|qué tal)\b',
-            "aprender": r'\b(aprend[a-z]+|enseñ[ae]|nuev[ao]|conocimiento|recuerd[ae])\b',
-            "fase": r'\b(fase|evolución|evolucion|nivel|progreso|level|phase)\b',
-            "calcular": r'\b(cuanto es|cuánto es|calcula|calcular|suma|resta|multiplica|divide|\d+\s*[+\-*/]\s*\d+)\b',
-            "ayuda": r'\b(ayud[a-z]+|help|comando|command|qué puedes|que puedes|skills)\b',
-            "clima": r'\b(clima|temperatura|lluvia|pronóstico|pronostico|tiempo atmosferico|huechuraba|santiago)\b',
-            "hora": r'\b(hora|que hora es|qué hora es|reloj|tiempo actual|fecha actual|get_time)\b',
-            "memoria": r'\b(recuerda[s]?|memoria|olvid|acuerd[ao])\b',
-            "nombre": r'\b(cómo me llamo|como me llamo|sabes mi nombre|sabes quién soy|quién soy|me llamo|mi nombre es)\b',
-            "reset": r'\b(reset|reiniciar|borrar|limpiar|empezar de nuevo)\b',
-            "personalidad": r'\b(personalidad|tono|voz|estilo|formalidad)\b',
-            "confianza": r'\b(confianza|seguro|certeza|cuanto sabes|qué tanto sabes)\b',
-            "web_search": r'\b(busca|buscar|investiga|investigar|consulta|consultar|encuentra|encontrar)\s+(en la web|en internet|en google|online|en linea|en línea)\b',
+            # Herramientas: alta prioridad (el usuario quiere ejecutar algo)
+            "web_search": r'\b(busca|buscar|investiga|investigar|consulta|consultar|encuentra|encontrar|bsuca|buca)\s+(en la web|en internet|en google|online|en linea|en línea)\b',
+            "browse_url": r'\b(visita|visitar|navega|navegar|entra|entrar|ir a|abre|abrir)\s+\S+\.(com|org|net|io|es|cl)\b',
             "read_file": r'\b(lee|leer|abre|abrir|muestra|mostrar)\s+(el\s+)?(archivo|fichero|file)\b',
             "search_files": r'\b(busca|buscar|encuentra|encontrar)\s+(en|dentro\s+de)\s+(los\s+)?(archivos|ficheros|codigo|código)\b',
-            "run_command": r'\b(ejecuta|ejecutar|corre|correr|run|terminal|comando)\b',
+            "run_command": r'\b(ejecuta|ejecutar|corre|correr)\b|terminal|consola',
+            "calcular": r'\b(cuanto es|cuánto es|calcula|calcular|suma|resta|multiplica|divide)\b|\d+\s*[+\-*/]\s*\d+',
+            "ayuda": r'\b(ayud[a-z]+|help|comando[s]?)\s*$|^\/(help|ayuda)',
+            "clima": r'\b(clima|temperatura|pronóstico|pronostico)\b',
+            "hora": r'\b(que hora|qué hora|hora actual|fecha actual|get_time)\b',
+            "memoria": r'\b(recuerda[s]?|memoria|olvid|acuerd[ao])\s+',
+            "nombre": r'\b(cómo me llamo|como me llamo|sabes mi nombre|sabes quién soy|quién soy|me llamo|mi nombre es)\b',
+            "reset": r'\b(reset|reiniciar|empezar de nuevo)\b\s*$',
+            "personalidad": r'\b(personalidad|tono|voz|estilo|formalidad)\b',
+            "confianza": r'\b(confianza|seguro|certeza|cuanto sabes|qué tanto sabes)\b',
+            "fase": r'\b(fase|evolución|evolucion|nivel|progreso|level|phase)\b',
+            "presentacion": r'\b(quién eres|quien eres|que eres|qué eres|presentate|capacidades|que puedes hacer|qué puedes hacer|que sabes hacer)\b',
+            "estado": r'\b(estado|status|cómo estás|como estas)\b',
+            "aprender": r'\b(aprend[a-z]+|enseñ[ae])\b',
+            "agradecimiento": r'\b(gracias|thank|thanks|graciass)\b',
+            # Saludo: SOLO si el texto es muy corto (un saludo)
+            "saludo": r'^\s*(hola|buenas|hey|saludos|qué tal|que tal|buen[oa]s)\s*[!.?]*\s*$',
+            "despedida": r'^\s*(adiós|adios|chao|bye|nos vemos|hasta luego)\s*[!.?]*\s*$',
         }
 
+        # ─── 2. Calcular scores ───
+        scores = {}
         for intent, pattern in patterns.items():
-            if re.search(pattern, text, re.IGNORECASE):
-                return intent
-        return "conversacion"
+            m = re.search(pattern, text_clean, re.IGNORECASE)
+            if m:
+                # Score: prioridad base + longitud del match
+                # Herramientas y calculos tienen mayor prioridad
+                priority_boost = 0
+                if intent in ("web_search", "browse_url", "read_file",
+                              "search_files", "run_command", "calcular"):
+                    priority_boost = 100
+                elif intent in ("nombre", "memoria", "ayuda", "clima",
+                                "hora", "reset", "personalidad", "confianza",
+                                "fase", "aprender", "estado", "presentacion",
+                                "agradecimiento"):
+                    priority_boost = 50
+                else:
+                    # saludo / despedida: baja prioridad (40)
+                    priority_boost = 40
+
+                # Si es "hola" o "buenas" en un texto largo, penalizarlo
+                if intent in ("saludo", "despedida") and word_count > 4:
+                    continue  # no es saludo si tiene mas de 4 palabras
+
+                scores[intent] = priority_boost + len(m.group(0))
+
+        if not scores:
+            return "conversacion"
+
+        # ─── 3. Empate: preferir el de mayor prioridad ───
+        return max(scores, key=scores.get)
 
     def detect_intent(self, text: str) -> str:
         """Metodo publico para detectar intencion (usado por NexusCore)."""

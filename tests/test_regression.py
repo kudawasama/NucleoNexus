@@ -134,6 +134,74 @@ test("'pokemon champion que es' detecta como definicion", test_intent_pokemon_qu
 
 
 # ===================================================================
+# Tests de regresion bug saludo largo (commit 52f9e1c+)
+# ===================================================================
+section("REGRESION: 'hola, dime X' va a conversacion, no saludo")
+
+
+def test_hola_largo_no_es_saludo():
+    """'Hola, dime como puedo...' NO es saludo, es conversacion."""
+    intent = nexus.symbolic.detect_intent("hola dime como puedo pagar impuestos".lower())
+    assert intent != "saludo", f"'hola dime...' no debe ser saludo, es {intent}"
+
+
+def test_hola_corto_si_es_saludo():
+    """Pero 'hola' solo SI es saludo."""
+    intent = nexus.symbolic.detect_intent("hola")
+    assert intent == "saludo", f"'hola' debe ser saludo, es {intent}"
+
+
+def test_hola_punto_si_es_saludo():
+    """'hola.' tambien es saludo."""
+    intent = nexus.symbolic.detect_intent("hola!")
+    assert intent == "saludo", f"'hola!' debe ser saludo, es {intent}"
+
+
+def test_hola_me_llamo_es_nombre():
+    """'hola me llamo Carlos' es nombre (declaracion)."""
+    intent = nexus.symbolic.detect_intent("hola me llamo carlos")
+    assert intent == "nombre", f"'hola me llamo carlos' debe ser nombre, es {intent}"
+
+
+def test_hola_que_es_es_conversacion():
+    """'hola que es python' va a conversacion, no saludo."""
+    intent = nexus.symbolic.detect_intent("hola que es python")
+    assert intent == "conversacion", f"'hola que es python' debe ser conversacion, es {intent}"
+
+
+def test_buenas_corto_si_es_saludo():
+    """'buenas' solo es saludo."""
+    intent = nexus.symbolic.detect_intent("buenas")
+    assert intent == "saludo", f"'buenas' debe ser saludo, es {intent}"
+
+
+def test_buenas_largo_no_es_saludo():
+    """'buenas tardes, necesito ayuda con X' no es saludo."""
+    intent = nexus.symbolic.detect_intent("buenas tardes, necesito ayuda con mi proyecto")
+    assert intent != "saludo", f"'buenas tardes, necesito...' no debe ser saludo, es {intent}"
+
+
+def test_hola_dime_impuestos_usa_slm():
+    """'Hola, dime como puedo realizar ajuste de impuestos' -> SLM (no saludo)."""
+    r, m = nexus.process("Hola, dime como puedo realizar un ajuste de impuestos en un monto bruto de 100000")
+    assert m["backend"] == "slm", f"debio ir al SLM, backend={m['backend']}"
+    # No debe ser el saludo generico
+    assert "Hola. Soy Nexus" not in r, f"respuesta generica, no personalizada: {r[:80]}"
+    # Debe ser una respuesta util
+    assert len(r) > 50, f"respuesta muy corta: {r[:80]}"
+
+
+test("'hola dime...' NO es saludo", test_hola_largo_no_es_saludo)
+test("'hola' SI es saludo", test_hola_corto_si_es_saludo)
+test("'hola!' SI es saludo", test_hola_punto_si_es_saludo)
+test("'hola me llamo Carlos' es nombre", test_hola_me_llamo_es_nombre)
+test("'hola que es python' es conversacion", test_hola_que_es_es_conversacion)
+test("'buenas' SI es saludo", test_buenas_corto_si_es_saludo)
+test("'buenas tardes, necesito...' NO es saludo", test_buenas_largo_no_es_saludo)
+test("'hola, dime impuestos' usa SLM", test_hola_dime_impuestos_usa_slm)
+
+
+# ===================================================================
 # Tests de tools (Hermes Agent style)
 # ===================================================================
 section("TOOLS: herramientas funcionan sin SLM")
