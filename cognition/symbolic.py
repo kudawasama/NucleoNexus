@@ -97,9 +97,17 @@ class SymbolicEngine:
         # Cuando se detecta una intent, se busca una skill action que la maneje
         # Esto permite que las skills extiendan las capacidades de Nexus
         self.INTENT_TO_ACTION = {
-            # Solo mapear intents que NO tienen handler hardcodeado
-            # Los intents con handler (hora, estado, etc.) usan su propio formato
+            # Skills sin handler hardcodeado → se resuelven via skill action
             "clima": "get_weather",
+            "nota": "guardar_nota",
+            "buscar": "buscar_web",
+            "archivo": "leer_archivo",
+            "moneda": "indicador",
+            "recordatorio": "crear_recordatorio",
+            "ip": "mi_ip",
+            "luna": "fase_actual",
+            "tareas": "listar_tareas",
+            "csv": "leer_csv",
         }
 
     def _load_patterns(self):
@@ -190,6 +198,15 @@ class SymbolicEngine:
             "search_files": r'\b(busca|buscar|encuentra|encontrar)\s+(en|dentro\s+de)\s+(los\s+)?(archivos|ficheros|codigo|código)\b',
             "run_command": r'\b(ejecuta|ejecutar|corre|correr)\b|terminal|consola',
             "calcular": r'\b(cuanto es|cuánto es|calcula|calcular|suma|resta|multiplica|divide)\b|\d+\s*[+\-*/]\s*\d+',
+            "nota": r'\b(nota|notas|apunte|apuntes|recordatorio postal)\b',
+            "buscar": r'\b(busca|buscar|investiga|consulta)\s+(?!en la web|en internet|en google)',
+            "archivo": r'\b(archivo|fichero|file|listar archivos|leer archivo|escribir archivo)\b',
+            "moneda": r'\b(dolar|dólar|uf|utm|euro|moneda|cambio|convertir)\b',
+            "recordatorio": r'\b(recuérdame|recuerdame|recordatorio|alarma|avísame|avisame)\b',
+            "ip": r'\b(ip publica|mi ip|resolver dominio|mi ubicación|mi ubicacion)\b',
+            "luna": r'\b(luna|fase lunar|luna llena|luna nueva|cuarto creciente|menguante)\b',
+            "tareas": r'\b(tareas|pendientes|todo list|que tengo que hacer|qué tengo que hacer)\b',
+            "csv": r'\b(csv|archivo csv|leer csv|tabla csv)\b',
             "ayuda": r'\b(ayud[a-z]+|help|comando[s]?)\s*$|^\/(help|ayuda)',
             "clima": r'\b(clima|temperatura|pronóstico|pronostico)\b',
             "hora": r'\b(que hora|qué hora|hora actual|fecha actual|get_time)\b',
