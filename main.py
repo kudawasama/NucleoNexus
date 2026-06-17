@@ -321,6 +321,19 @@ class NexusCore:
             logger.info("Resultados de GitHub: no se guardan como hechos (no son definiciones)")
             return 0
 
+        # Extraer terminos significativos de la query (>=4 chars, no stop words)
+        # Normalizar acentos para matching con textos sin acentos
+        def _norm_text_local(t):
+            return (t.replace('á','a').replace('é','e').replace('í','i')
+                    .replace('ó','o').replace('ú','u').replace('ü','u').lower())
+        stop_words = {'que', 'qué', 'es', 'son', 'las', 'los', 'una', 'uno',
+                      'por', 'para', 'con', 'del', 'los', 'las', 'este', 'esta',
+                      'como', 'cómo', 'sobre', 'cual', 'cuál', 'cuando', 'donde'}
+        query_terms = set()
+        for word in re.findall(r'\b[a-záéíóúñü]{4,}\b', query.lower()):
+            if word not in stop_words:
+                query_terms.add(_norm_text_local(word))
+
         learned = 0
         for result in results[:3]:  # Solo los top 3
             # Extraer el titulo y un resumen del snippet
@@ -338,8 +351,6 @@ class NexusCore:
             # Filtro de calidad: rechazar resultados que parecen ser solo
             # nombres de archivos/repos (tienen formato "X — Y (URL)")
             if " — " in snippet and "http" in snippet and len(snippet) < 100:
-                # Tipo: "repositorio/repo ⭐0 — descripcion (https://github.com/...)"
-                # No guardar como hecho
                 continue
 
             # Construir el hecho: "Según la web: <title> - <snippet>"
@@ -355,13 +366,19 @@ class NexusCore:
             fact_text = re.sub(r'<[^>]+>', '', fact_text)  # quitar tags HTML
             fact_text = fact_text.strip()[:200]
 
-            # Filtro: solo guardar si el texto parece ser una definicion
-            # (suficiente longitud, no es solo una URL, no es solo un nombre)
-            if len(fact_text) > 30 and "http" not in fact_text[:50]:
+            # Filtro de relevancia: el texto DEBE contener al menos un termino
+            # de la query. Si no, es ruido (la busqueda no era para esto).
+            # Tambien debe tener tamano minimo y no ser solo URL.
+            fact_text_norm = fact_text.lower()
+            for src, dst in [('á','a'),('é','e'),('í','i'),('ó','o'),('ú','u'),('ü','u')]:
+                fact_text_norm = fact_text_norm.replace(src, dst)
+            if (len(fact_text) > 30
+                and "http" not in fact_text[:50]
+                and (not query_terms or any(term in fact_text_norm for term in query_terms))):
                 self.memory.learn_fact(
                     fact_text,
                     category="aprendido_web",
-                    confidence=0.4,  # moderada — viene de la web, no verificada
+                    confidence=0.4,
                     source="auto_web",
                 )
                 learned += 1

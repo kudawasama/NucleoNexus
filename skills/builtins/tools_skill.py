@@ -150,57 +150,103 @@ def _web_search_html(clean_query: str, original_query: str = "", max_results: in
                 except Exception:
                     continue
 
-        # GitHub fallback
-        if not results:
-            try:
-                gh_q = original_query or clean_query
-                gh_url = f"https://api.github.com/search/repositories?q={urllib.parse.quote(gh_q)}&per_page=5&sort=updated"
-                gh_req = urllib.request.Request(
-                    gh_url, headers={"User-Agent": "NexusAI/1.0", "Accept": "application/vnd.github.v3+json"}
-                )
-                with urllib.request.urlopen(gh_req, timeout=10) as resp:
-                    gh_data = json.loads(resp.read().decode())
-                items = gh_data.get("items", [])
+        # ─── FASE 2: DuckDuckGo HTML (busqueda web general) ───
+        # Esto SI indexa la web general, no solo Wikipedia.
+        # Wikipedia API a veces devuelve resultados irrelevantes
+        # (ej: 'fotosintesis' devuelve peliculas mexicanas)
+        # por eso siempre intentamos DDG ademas
+        ddg_results = []
+        try:
+            import re as _ddg_re
+            import html as _ddg_html
+            from urllib.parse import unquote
 
-                if not items:
-                    import re as _gr
-                    um = _gr.match(r'^([\w-]+)$', gh_q.strip())
+            ddg_html_url = "https://html.duckduckgo.com/html/"
+            data_obj = urllib.parse.urlencode({"q": clean_query or original_query}).encode()
+            req = urllib.request.Request(
+                ddg_html_url, data=data_obj,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                html_content = resp.read().decode("utf-8", errors="ignore")
+
+            # Regex simple: cada resultado es un <a class="result__a" href="...">title</a>
+            # seguido de un <td class="result__snippet">snippet</td>
+            # Capturamos con re.DOTALL para que el snippet incluya saltos de linea
+            pattern = _ddg_re.compile(
+                r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>.*?'
+                r'class="result__snippet"[^>]*>(.*?)</(?:td|div|a)',
+                _ddg_re.DOTALL
+            )
+            for match in pattern.finditer(html_content):
+                url = match.group(1)
+                # Limpiar URL de DuckDuckGo
+                if "/l/?uddg=" in url:
+                    um = _ddg_re.search(r"uddg=([^&]+)", url)
                     if um:
-                        try:
-                            uurl = f"https://api.github.com/users/{um.group(1)}/repos?per_page=5&sort=updated"
-                            ureq = urllib.request.Request(
-                                uurl, headers={"User-Agent": "NexusAI/1.0", "Accept": "application/vnd.github.v3+json"}
-                            )
-                            with urllib.request.urlopen(ureq, timeout=10) as uresp:
-                                urepos = json.loads(uresp.read().decode())
-                            if isinstance(urepos, list):
-                                items = urepos
-                        except Exception:
-                            pass
+                        url = unquote(um.group(1))
+                # Limpiar title y snippet (quitar tags HTML)
+                title = _ddg_re.sub(r"<[^>]+>", "", match.group(2)).strip()
+                snippet = _ddg_re.sub(r"<[^>]+>", "", match.group(3)).strip()
+                title = _ddg_html.unescape(title)
+                snippet = _ddg_html.unescape(snippet)
+                # Quitar espacios multiples
+                title = _ddg_re.sub(r"\s+", " ", title).strip()
+                snippet = _ddg_re.sub(r"\s+", " ", snippet).strip()
+                if title and url:
+                    ddg_results.append({
+                        "title": title,
+                        "snippet": snippet,
+                        "url": url,
+                    })
+        except Exception as e:
+            pass
 
-                if items:
-                    out = []
-                    for r in items[:max_results]:
-                        name = r.get("full_name", "") or r.get("name", "")
-                        desc = r.get("description", "") or "(sin descripcion)"
-                        stars = r.get("stargazers_count", 0)
-                        url_r = r.get("html_url", "") or f"https://github.com/{name}"
-                        out.append(f"• {name} ⭐{stars} — {desc[:120]} ({url_r})")
-                    return {"resultados": out[:max_results], "total": len(out), "consulta": clean_query or original_query, "fuente": "GitHub"}
-            except Exception:
-                pass
+        # Combinar: Wikipedia primero (es mas confiable) + DDG (web general)
+        combined = []
+        seen_urls = set()
+        # Wikipedia primero
+        for r in results[:max_results]:
+            url = r.get("url", "")
+            if url and url not in seen_urls:
+                combined.append({
+                    "title": r.get("title", ""),
+                    "snippet": re.sub(r"<[^>]+>", "", r.get("snippet", "")).strip(),
+                    "url": url,
+                    "fuente": "Wikipedia",
+                })
+                seen_urls.add(url)
+        # DDG para llenar el resto
+        for r in ddg_results[:max_results]:
+            url = r.get("url", "")
+            if url and url not in seen_urls and len(combined) < max_results:
+                combined.append({
+                    "title": r.get("title", ""),
+                    "snippet": r.get("snippet", ""),
+                    "url": url,
+                    "fuente": "DuckDuckGo",
+                })
+                seen_urls.add(url)
 
-            result = {"resultados": [], "mensaje": f"No encontre resultados para '{original_query or clean_query}'"}
+        if combined:
+            out = []
+            for r in combined[:max_results]:
+                title = r["title"][:120]
+                snippet = r["snippet"][:200]
+                url = r["url"]
+                fuente = r["fuente"]
+                out.append(f"• {title} — {snippet} ({url}) [{fuente}]")
+            result = {
+                "resultados": out[:max_results],
+                "total": len(out),
+                "consulta": clean_query or original_query,
+                "fuente": "Wikipedia+DuckDuckGo" if any(r["fuente"] == "DuckDuckGo" for r in combined) else "Wikipedia",
+            }
             _SEARCH_CACHE[cache_key] = result
             return result
 
-        out = []
-        for r in results[:max_results]:
-            title = r.get("title", "")
-            snippet = _re.sub(r"<[^>]+>", "", r.get("snippet", ""))
-            url_r = f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
-            out.append(f"• {title} — {snippet[:150]} ({url_r})")
-        result = {"resultados": out[:max_results], "total": len(out), "consulta": wiki_query, "fuente": "Wikipedia"}
+        # Si llegamos aqui, no se encontro nada
+        result = {"resultados": [], "mensaje": f"No encontre resultados para '{original_query or clean_query}'"}
         _SEARCH_CACHE[cache_key] = result
         return result
     except Exception as e:
@@ -269,7 +315,7 @@ def register() -> Skill:
 
     skill.register_action(
         name="web_search",
-        description="Busca informacion en la web. Usa DuckDuckGo + Wikipedia + GitHub.",
+        description="Busca informacion en la web. Usa Wikipedia + DuckDuckGo HTML (web general). GitHub NO se usa (no es relevante para aprendizaje).",
         handler=_web_search,
         parameters={
             "query": {"type": "string", "description": "Termino de busqueda"},

@@ -436,9 +436,28 @@ class NexusCLI:
             is_query_echo = text.lower().startswith("que son ") or text.lower().startswith("qué son ")
             # Tambien borrar si el texto es solo un "que" + pregunta corta
             is_question_echo = text.endswith("?") and len(text) < 60
+            # Hechos auto_web que NO parecen definiciones (sin verbos clave)
+            has_definition_verb = any(v in text.lower() for v in [
+                " es ", " son ", " fue ", " es un ", " es una ",
+                " significa ", " consiste ", " permite ", " realiza ",
+                " proceso ", " forma ", " tipo ", " clase ", " metodo ",
+            ])
+            # Hechos auto_web que NO parecen definiciones (sin verbos clave)
+            has_definition_verb = any(v in text.lower() for v in [
+                " es ", " son ", " fue ", " es un ", " es una ",
+                " significa ", " consiste ", " permite ", " realiza ",
+                " proceso ", " forma ", " tipo ", " clase ", " metodo ",
+            ])
+            # Hechos auto_web sin verbos de definicion Y cortos = ruido
+            is_auto_web_noise = (
+                source == "auto_web"
+                and len(text) < 100
+                and not has_definition_verb
+            )
             if (is_repo_format or is_url_only or is_github or
                 is_auto_web_github or is_short_asiento or
-                is_query_echo or is_question_echo):
+                is_query_echo or is_question_echo or
+                is_auto_web_noise):
                 self.core.memory.semantic.conn.execute(
                     "DELETE FROM semantic WHERE id = ?", (fact_id,)
                 )
@@ -971,6 +990,20 @@ class NexusCLI:
                     for r in items[:3]
                 )
 
+                # Extraer terminos de la query (normalizar acentos)
+                stop_words = {'que', 'qué', 'es', 'son', 'las', 'los', 'una', 'uno',
+                              'por', 'para', 'con', 'del', 'los', 'las', 'este', 'esta',
+                              'como', 'cómo', 'sobre', 'cual', 'cuál', 'cuando', 'donde'}
+                def _norm_text_cli(t):
+                    out = t.lower()
+                    for src, dst in [('á','a'),('é','e'),('í','i'),('ó','o'),('ú','u'),('ü','u')]:
+                        out = out.replace(src, dst)
+                    return out
+                query_terms = set()
+                for word in re.findall(r'\b[a-záéíóúñü]{4,}\b', topic.lower()):
+                    if word not in stop_words:
+                        query_terms.add(_norm_text_cli(word))
+
                 # Guardar los 3 mejores (filtrando GitHub)
                 learned = 0
                 for item in items[:3]:
@@ -987,7 +1020,12 @@ class NexusCLI:
                     is_repo = " ⭐" in text and " — " in text and "http" in text
                     if is_github or is_repo:
                         continue
-                    if text and len(text) > 30 and "http" not in text[:50]:
+                    # Filtro de relevancia: debe contener al menos un termino de la query
+                    text_norm = _norm_text_cli(text)
+                    if (text
+                        and len(text) > 30
+                        and "http" not in text[:50]
+                        and (not query_terms or any(term in text_norm for term in query_terms))):
                         self.core.memory.learn_fact(
                             text, category=f"aprendido_{topic[:15]}",
                             confidence=0.5, source="auto_web"

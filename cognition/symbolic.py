@@ -445,6 +445,18 @@ class SymbolicEngine:
                         for r in items[:3]
                     )
 
+                    # Extraer terminos de la query (normalizar acentos)
+                    stop_words = {'que', 'qué', 'es', 'son', 'las', 'los', 'una', 'uno',
+                                  'por', 'para', 'con', 'del', 'los', 'las', 'este', 'esta',
+                                  'como', 'cómo', 'sobre', 'cual', 'cuál', 'cuando', 'donde'}
+                    def _norm_text(t):
+                        return (t.replace('á','a').replace('é','e').replace('í','i')
+                                .replace('ó','o').replace('ú','u').replace('ü','u').lower())
+                    query_terms = set()
+                    for word in re.findall(r'\b[a-záéíóúñü]{4,}\b', topic.lower()):
+                        if word not in stop_words:
+                            query_terms.add(_norm_text(word))
+
                     if items:
                         # Guardar los 3 mejores como hechos (filtrando GitHub)
                         learned = 0
@@ -466,7 +478,13 @@ class SymbolicEngine:
 
                             if not text and title:
                                 text = title
-                            if text and len(text) > 30 and "http" not in text[:50]:
+                            # Filtro de relevancia: el texto DEBE contener
+                            # al menos un termino de la query (normalizado)
+                            text_norm = _norm_text(text)
+                            if (text
+                                and len(text) > 30
+                                and "http" not in text[:50]
+                                and (not query_terms or any(term in text_norm for term in query_terms))):
                                 self.memory.learn_fact(
                                     text, category=f"aprendido_{topic[:15]}",
                                     confidence=0.5, source="auto_web"
