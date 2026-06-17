@@ -246,7 +246,7 @@ class NexusCore:
             self.actions.register(action)
             logger.debug(f"Accion de skill registrada: {action.name}")
 
-    def process(self, user_input: str) -> tuple:
+    def process(self, user_input: str, on_status: callable = None) -> tuple:
         """Procesa la entrada del usuario y genera respuesta.
 
         Modos de operacion:
@@ -254,14 +254,22 @@ class NexusCore:
         - slm:        solo SLM local (modelo responde todo)
         - hybrid:     intents rapidas en simbolico, general en SLM
 
+        Args:
+            user_input: Texto del usuario
+            on_status: Callable(status_msg) para notificaciones en vivo
+
         Returns:
             Tuple (response_str, metadata_dict)
         """
-        # 1. Generar respuesta según el backend activo
-        response, metadata = self._get_response(user_input)
+        if on_status:
+            on_status("🔍 Analizando mensaje...")
 
-        # 2. Aprender de la interacción (Vision #4: el sistema aprende de cada interaccion)
-        # 2a. Extraer hechos del input del usuario
+        # 1. Generar respuesta según el backend activo
+        response, metadata = self._get_response(user_input, on_status=on_status)
+
+        # 2. Aprender de la interacción
+        if on_status:
+            on_status("📚 Aprendiendo de la interacción...")
         learned_input = learn_from_user_input(user_input, self.memory)
         # 2b. Si se hizo web_search, aprender de los resultados
         facts_from_web = 0
@@ -407,9 +415,13 @@ class NexusCore:
             logger.info(f"Aprendidos {learned} hechos de la web (query: {query[:50]})")
         return learned
 
-    def _get_response(self, user_input: str) -> tuple:
+    def _get_response(self, user_input: str, on_status: callable = None) -> tuple:
         """Selecciona y ejecuta el backend adecuado según el modo actual.
         
+        Args:
+            user_input: Texto del usuario
+            on_status: Callable(status_msg) para notificaciones en vivo
+
         Returns:
             Tuple (response_str, metadata_dict)
         """
@@ -447,6 +459,8 @@ class NexusCore:
                 break
         
         if tool_intent:
+            if on_status:
+                on_status(f"🔧 Ejecutando herramienta: {tool_intent}")
             result = self._handle_tool_intent(tool_intent, user_input, metadata)
             if result:
                 metadata["backend"] = "symbolic"
@@ -459,6 +473,8 @@ class NexusCore:
 
         # --- HYBRID: intent -> simbolico, resto -> SLM (ReAct) ---
         if backend_mode == "hybrid" and self.slm and self.slm.loaded:
+            if on_status:
+                on_status("🎯 Detectando intención...")
             intent = self.symbolic.detect_intent(user_input.lower().strip())
             fast_intents = {"saludo", "despedida", "agradecimiento", "presentacion",
                             "hora", "calcular", "fase", "ayuda", "memoria",
@@ -482,6 +498,8 @@ class NexusCore:
             import re as _qr
             if not _qr.search(r'(?:que\s+es|qué\s+es|que\s+significa|qué\s+significa|defineme|define|explicame)', user_input.lower().strip()):
                 facts = self.memory.query_knowledge(user_input, top_k=2)
+                if on_status:
+                    on_status("🔎 Buscando en memoria...")
                 if facts and any(f.get("score", 0) >= 0.15 for f in facts):
                     response = self.symbolic.process(user_input, actions_registry=self.actions,
                                                 skip_bookkeeping=True)
@@ -504,6 +522,8 @@ class NexusCore:
             # "segun tu base de conocimiento, que es Charizard?".
 
             # Sin hechos → SLM con contexto de memoria (structured output)
+            if on_status:
+                on_status("🤖 Generando respuesta con SLM...")
             try:
                 mem_facts = self.memory.query_knowledge(user_input, top_k=3)
                 mem_records = self.memory.recall(user_input, top_k=2)

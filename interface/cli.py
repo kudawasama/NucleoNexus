@@ -154,7 +154,20 @@ class NexusCLI:
                 continue
 
             # Procesar input con Nexus
-            response, metadata = self.core.process(user_input)
+            # Callback de estado en vivo
+            last_status = ""
+            def on_status(msg):
+                nonlocal last_status
+                if msg != last_status:
+                    last_status = msg
+                    # Mostrar en la misma linea con \r
+                    print(f"  {Color.DIM}{msg}{Color.RESET}\r", end="", flush=True)
+            
+            response, metadata = self.core.process(user_input, on_status=on_status)
+            
+            # Limpiar linea de status
+            if last_status:
+                print(" " * 60 + "\r", end="", flush=True)
 
             # Mostrar respuesta con estilo
             self._show_response(response, metadata)
