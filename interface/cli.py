@@ -13,6 +13,13 @@ import sys
 import time
 from pathlib import Path
 
+# ─── Herramientas externas ─────────────────────────────────────
+try:
+    from tools.pdf_renamer import procesar as pdf_renombrar
+    HAS_PDF_RENAMER = True
+except ImportError:
+    HAS_PDF_RENAMER = False
+
 # ─── Colores ANSI ─────────────────────────────────────────────
 class Color:
     RESET = "\033[0m"
@@ -421,6 +428,9 @@ class NexusCLI:
             "/ingiere": self._cmd_ingest,
             "/guia": self._cmd_guide,
             "/faq": self._cmd_faq,
+            # Herramientas externas
+            "/renombrar": self._cmd_renombrar,
+            "/renombrar-pdf": self._cmd_renombrar,
         }
 
         handler = commands.get(cmd.split()[0])
@@ -451,6 +461,7 @@ class NexusCLI:
 {Color.GREEN}/clear{Color.RESET}        Limpiar pantalla
 {Color.GREEN}/reset{Color.RESET}        Resetear Nexus
 {Color.GREEN}/exit{Color.RESET}         Salir
+{Color.GREEN}/renombrar{Color.RESET}    Renombrar PDFs según proveedor+fecha
 {Color.DIM}─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─{Color.RESET}
 {Color.CYAN}Comandos de aprendizaje (sin SLM):{Color.RESET}
 {Color.GREEN}/buscar{Color.RESET} <q>    Web search + auto-aprende
@@ -1174,6 +1185,33 @@ class NexusCLI:
   {Color.YELLOW}Build:{Color.RESET}    {interactions} interacciones · {skills} skills
   {Color.YELLOW}Repo:{Color.RESET}    github.com/kudawasama/NucleoNexus
         """)
+
+    # ─────────────────────────────────────────────────────────
+    # Comando: /renombrar
+    # ─────────────────────────────────────────────────────────
+    def _cmd_renombrar(self, cmd: str = ""):
+        """Renombra PDFs según proveedor y fecha. Uso: /renombrar <ruta>"""
+        if not HAS_PDF_RENAMER:
+            print(f"{Color.RED}Herramienta no disponible.{Color.RESET}")
+            print(f"  Ejecuta: python tools/pdf_renamer.py \"ruta\"")
+            return
+
+        args = cmd.strip().split(maxsplit=1)
+        if len(args) < 2:
+            print(f"{Color.YELLOW}Uso: /renombrar <ruta>{Color.RESET}")
+            print(f"  Ruta puede ser carpeta con PDFs o archivo .zip")
+            print(f"  Agrega --dry-run para simular")
+            print(f"  {Color.DIM}Ej: /renombrar C:/Users/joce/Downloads/Facturas.zip{Color.RESET}")
+            print(f"  {Color.DIM}Ej: /renombrar C:/ruta/carpeta --dry-run{Color.RESET}")
+            return
+
+        ruta = args[1]
+        dry_run = " --dry-run" in cmd or "--dry-run" in ruta
+        ruta_clean = ruta.replace(" --dry-run", "").strip()
+
+        print(f"{Color.CYAN}📄 Renombrando PDFs en: {ruta_clean}{Color.RESET}")
+        time.sleep(0.3)
+        pdf_renombrar(ruta_clean, dry_run=dry_run)
 
     # ─────────────────────────────────────────────────────────
     # Comandos de aprendizaje (capa rápida, sin SLM)

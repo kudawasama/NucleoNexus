@@ -13,6 +13,7 @@ TOOLS_DESCRIPTION = """HERRAMIENTAS DISPONIBLES:
 - calcular(expresion): Resuelve operaciones matematicas
 - buscar_memoria(tema): Busca hechos en mi base de conocimiento
 - hora_actual(): Devuelve la fecha y hora actual
+- pdf_rename(path): Renombra facturas PDF con formato NUMERO - PROVEEDOR - MES AÑO
 """
 
 FEW_SHOT_EXAMPLES = [
@@ -64,6 +65,17 @@ FEW_SHOT_EXAMPLES = [
             "respuesta": ""
         }
     },
+    # ─── RENOMBRAR PDFS ───
+    {
+        "input": "renombra los PDFs de la carpeta C:/facturas",
+        "output": {
+            "razonamiento": "El usuario quiere renombrar facturas PDF. Debo usar la herramienta pdf_rename.",
+            "accion": "pdf_rename",
+            "path": "C:/facturas",
+            "dry_run": True,
+            "respuesta": ""
+        }
+    },
     # ─── NO SABE (honesto) ───
     {
         "input": "cual es la capital de mongolia",
@@ -90,10 +102,11 @@ def build_tools_prompt() -> str:
     lines.append("2. Si te piden un calculo → usa calcular")
     lines.append("3. Si te preguntan de un tema que estudiamos → usa buscar_memoria")
     lines.append("4. Si te preguntan la hora → usa hora_actual")
-    lines.append("5. Si sabes la respuesta → usa accion: responder")
+    lines.append("5. Si te piden renombrar facturas PDF → usa pdf_rename")
+    lines.append("6. Si sabes la respuesta → usa accion: responder")
     lines.append("")
     lines.append("RESPONDE SIEMPRE EN ESTE FORMATO JSON:")
-    lines.append('{"razonamiento": "...", "accion": "responder|web_search|calcular|buscar_memoria|hora_actual", "respuesta": "...", "query": "..."}')
+    lines.append('{"razonamiento": "...", "accion": "responder|web_search|calcular|buscar_memoria|hora_actual|pdf_rename", "respuesta": "...", "query": "...", "path": "..."}')
     lines.append("")
     lines.append("=== EJEMPLOS ===")
     
@@ -106,6 +119,10 @@ def build_tools_prompt() -> str:
             extra += f', "query": "{out["query"]}"'
         if "expresion" in out and out["expresion"]:
             extra += f', "expresion": "{out["expresion"]}"'
+        if "path" in out and out["path"]:
+            extra += f', "path": "{out["path"]}"'
+        if "dry_run" in out:
+            extra += f', "dry_run": {str(out["dry_run"]).lower()}'
         r = out.get("respuesta", "")
         lines.append(f'JSON: {{"razonamiento": "{out["razonamiento"]}", "accion": "{out["accion"]}", "respuesta": "{r}"{extra}}}')
         lines.append("")
@@ -127,6 +144,10 @@ def build_few_shot_prompt() -> str:
             extra += f', "query": "{out["query"]}"'
         if "expresion" in out and out["expresion"]:
             extra += f', "expresion": "{out["expresion"]}"'
+        if "path" in out and out["path"]:
+            extra += f', "path": "{out["path"]}"'
+        if "dry_run" in out:
+            extra += f', "dry_run": {str(out["dry_run"]).lower()}'
         r = out.get("respuesta", "")
         lines.append(f'JSON: {{"razonamiento": "{out["razonamiento"]}", "accion": "{out["accion"]}", "respuesta": "{r}"{extra}}}')
         lines.append("")

@@ -186,6 +186,11 @@ def _encontrar_pdfs(origen: str) -> tuple[list[tuple[str, str]], Path | None]:
 
 
 def procesar(origen: str, dry_run: bool = False):
+    """Renombra PDFs y retorna resultado estructurado.
+    
+    Returns:
+        dict con 'origen', 'destino', 'resultados' y 'errores'
+    """
     pdfs, temp_dir = _encontrar_pdfs(origen)
     using_temp = temp_dir is not None
 
@@ -205,49 +210,66 @@ def procesar(origen: str, dry_run: bool = False):
 
     resultados = []
     errores = []
+    output_lines = []
 
     for fullpath, fname in pdfs:
         data = _extraer_de_pdf(fullpath)
         if data is None:
-            errores.append((fname, "No se pudo leer el PDF"))
+            errores.append({"archivo": fname, "error": "No se pudo leer el PDF"})
+            output_lines.append(f"  ✗ {fname:50s} → No se pudo leer")
             continue
 
         new_name = f"{data['numero']} - {data['corto']} - {data['mes']} {data['anio']}.pdf"
-        resultados.append((fullpath, new_name))
+        resultados.append({
+            "origen": fname,
+            "destino": new_name,
+            "numero": data['numero'],
+            "proveedor": data['corto'],
+            "mes": data['mes'],
+            "anio": data['anio'],
+            "razon_social": data['razon_social'],
+        })
+        output_lines.append(f"  {fname:50s} → {new_name}")
 
         if dry_run:
-            print(f"  {fname:50s} → {new_name}")
-            print(f"    Razón social: {data['razon_social']}")
-        else:
-            print(f"  {fname:50s} → {new_name}")
-
-    for fname, err in errores:
-        print(f"  ✗ {fname:50s} → {err}")
+            output_lines.append(f"    Razón social: {data['razon_social']}")
 
     if not dry_run and resultados:
         ok = 0
-        for old_path_str, new_name in resultados:
-            old_path = Path(old_path_str)
+        for item in resultados:
+            old_path = Path(pdfs[[p[1] for p in pdfs].index(item['origen'])][0])
+            new_name = item['destino']
             if using_temp:
                 dest = destino_base / new_name
                 if dest.exists():
-                    print(f"  ✗ YA EXISTE: {new_name}")
+                    item['estado'] = 'ya_existe'
                     continue
-                shutil.copy2(old_path_str, str(dest))
+                shutil.copy2(str(old_path), str(dest))
                 ok += 1
+                item['estado'] = 'copiado'
             else:
                 new_path = old_path.parent / new_name
                 if new_path.exists():
-                    print(f"  ✗ YA EXISTE: {new_name}")
+                    item['estado'] = 'ya_existe'
                     continue
                 old_path.rename(new_path)
                 ok += 1
-        print(f"\n  ✅ {ok} archivos renombrados.")
+                item['estado'] = 'renombrado'
+        output_lines.append(f"\n  ✅ {ok} archivos renombrados.")
     elif dry_run and resultados:
-        print(f"\n  📋 Simulación — no se modificó ningún archivo.")
+        output_lines.append(f"\n  📋 Simulación — no se modificó ningún archivo.")
 
     if using_temp and temp_dir:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+    return {
+        "origen": str(origen),
+        "destino": str(destino_base),
+        "dry_run": dry_run,
+        "resultados": resultados,
+        "errores": errores,
+        "respuesta": "\n".join(output_lines),
+    }
 
 
 def main():

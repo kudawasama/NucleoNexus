@@ -218,6 +218,21 @@ class NexusCore:
             },
         )
 
+        # Accion: renombrar PDFs de facturas
+        def _pdf_rename(path: str, dry_run: bool = False):
+            from tools.pdf_renamer import procesar
+            return procesar(path, dry_run=dry_run)
+
+        self.actions.register_fn(
+            name="pdf_rename",
+            description="Renombra facturas PDF con formato: NUMERO - PROVEEDOR - MES AÑO",
+            handler=_pdf_rename,
+            parameters={
+                "path": {"type": "string", "description": "Ruta de carpeta, ZIP o PDF a renombrar"},
+                "dry_run": {"type": "boolean", "description": "Si es True, solo simula sin cambiar archivos", "required": False},
+            },
+        )
+
         # Accion: recordar algo
         def _recall(query: str):
             results = self.memory.recall(query, top_k=3)
@@ -636,6 +651,25 @@ class NexusCore:
                                 import time as _ht
                                 now = _ht.localtime()
                                 respuesta = f"Son las {now.tm_hour:02d}:{now.tm_min:02d} del {now.tm_mday}/{now.tm_mon}/{now.tm_year}."
+                            elif accion == "pdf_rename":
+                                path = parsed.get("path", parsed.get("respuesta", ""))
+                                dry_run = parsed.get("dry_run", True)
+                                if path:
+                                    metadata["tool_called"] = "pdf_rename"
+                                    tool_result = self.actions.execute(
+                                        "pdf_rename", path=path, dry_run=dry_run)
+                                    if tool_result.get("success"):
+                                        result_data = tool_result.get("result", {})
+                                        if isinstance(result_data, dict):
+                                            if "resultados" in result_data:
+                                                items = result_data["resultados"]
+                                                respuesta = "\n".join(str(i) for i in items[:5])
+                                            elif "respuesta" in result_data:
+                                                respuesta = result_data["respuesta"][:500]
+                                            else:
+                                                respuesta = str(result_data)[:500]
+                                        else:
+                                            respuesta = str(result_data)[:500]
                             # accion == "responder" o desconocida: usar respuesta directa
 
                             # Usar la mejor respuesta (mas larga)
