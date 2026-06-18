@@ -95,6 +95,13 @@ class NexusCore:
     def __init__(self):
         logger.info(f"{SYSTEM['name']} v{SYSTEM['version']} inicializando...")
 
+        # 0. Git pull inicial: sincronizar con remoto
+        from utils.git_auto import auto_pull
+        try:
+            auto_pull()
+        except Exception:
+            pass
+
         # 1. Motor de Estado
         self.state = StateEngine(str(DATA_DIR / "state"))
         logger.info("OK Motor de Estado")
@@ -301,6 +308,13 @@ class NexusCore:
         # 4. Actualizar estado
         self.state.record_interaction(success=True)
         self.state.evolve_phase()
+
+        # 5. Git automático: commit + push en background
+        from utils.git_auto import auto_commit_push
+        try:
+            auto_commit_push(message=f"auto: interacción #{metadata.get('interactions', '?')}")
+        except Exception:
+            pass  # Git no debe bloquear nunca
 
         # Enriquece metadata con info del sistema
         metadata["version"] = self.state.get("nexus", "version", default="?")
