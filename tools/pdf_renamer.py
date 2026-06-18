@@ -46,7 +46,11 @@ _GIRO = {
     "amoblados", "equipos", "maquinarias", "distribucion",
     "distribución", "logistico", "logístico", "centro",
     "comercial", "industrial", "profesional",
+    "sociedad", "empresa", "nacional", "general",
 }
+
+# Palabras geograficas/sufijos que no identidad
+_GEO = {"chile", "santiago", "region", "regional", "metropolitana"}
 
 
 def _abreviar_proveedor(razon_social: str) -> str:
@@ -80,6 +84,7 @@ def _abreviar_proveedor(razon_social: str) -> str:
     tokens = nombre_clean.split()
     tokens = [t for t in tokens if t.lower() not in _STOP]
     tokens = [t for t in tokens if t.lower() not in _GIRO]
+    tokens = [t for t in tokens if t.lower() not in _GEO]
 
     if not tokens:
         tokens = [t for t in nombre_clean.split() if t.lower() not in _STOP]
@@ -99,15 +104,9 @@ def _abreviar_proveedor(razon_social: str) -> str:
             clave = clave[:6]
         return f"MEGA{clave}"
 
-    # ── 5. Otros proveedores: usar la palabra mas significativa ──
-    if len(tokens) == 1:
-        return tokens[0].upper()[:12]
-
-    # Multipalabra: tomar ultima (suele ser la especifica) o primera si es larga
-    ultima = tokens[-1].upper()
-    if len(ultima) >= 5:
-        return ultima[:12]
-    return (tokens[0].upper()[:6] + tokens[-1].upper()[:6])[:12]
+    # ── 5. Otros proveedores: primer token = marca ──
+    # Casi siempre la primera palabra es el nombre de marca
+    return tokens[0].upper()[:12]
 
 
 def _extraer_de_pdf(path: str) -> dict | None:
@@ -171,8 +170,11 @@ def _encontrar_pdfs(origen: str) -> tuple[list[tuple[str, str]], Path | None]:
         return pdfs, temp_dir
 
     if path.is_dir():
-        pdfs = [(str(f), f.name) for f in sorted(path.iterdir())
-                if f.suffix.lower() == ".pdf" and f.is_file()]
+        pdfs = []
+        for f in sorted(path.rglob("*.pdf")):
+            if f.is_file():
+                rel = str(f.relative_to(path))
+                pdfs.append((str(f), rel))
         if not pdfs:
             print(f"ERROR: No hay PDFs en: {origen}")
             sys.exit(1)
