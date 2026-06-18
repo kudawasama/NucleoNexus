@@ -267,11 +267,22 @@ class NexusCore:
         # 1. Generar respuesta según el backend activo
         response, metadata = self._get_response(user_input, on_status=on_status)
 
-        # 2. Aprender de la interacción
+        # 2. Aprender de la interacción — v2: de TODO
         if on_status:
             on_status("📚 Aprendiendo de la interacción...")
-        learned_input = learn_from_user_input(user_input, self.memory)
-        # 2b. Si se hizo web_search, aprender de los resultados
+        
+        # Aprender del input del usuario
+        from learning.extractor import learn_from_all, handle_feedback
+        learned_input = learn_from_all(user_input, self.memory, source="usuario")
+        
+        # Aprender también de la respuesta del SLM (confianza baja)
+        # Cada respuesta de Qwen es semilla para futuro conocimiento
+        learned_response = learn_from_all(response, self.memory, source="respuesta")
+        
+        # Detectar feedback (correcciones, refuerzos)
+        feedback_handled = handle_feedback(user_input, self.memory)
+        
+        # Si se hizo web_search, aprender de los resultados
         facts_from_web = 0
         if metadata.get("web_results"):
             facts_from_web = self._learn_from_web_search(
