@@ -224,16 +224,33 @@ Respuesta: <texto final al usuario>
 
 === FIN INSTRUCCIONES ==="""
 
+    def _build_few_shot(self) -> str:
+        """Ejemplos few-shot para modelos pequeños (Qwen 0.5B)."""
+        from learning.few_shot import build_few_shot_prompt
+        return build_few_shot_prompt()
+
     def build_react(self, user_input: str, memory_facts: list = None,
-                    memory_records: list = None) -> str:
-        """Construye un prompt con herramientas y contexto de memoria."""
-        parts = []
-        parts.append(self._build_light_directives())
+                    memory_records: list = None, small_model: bool = False) -> str:
+        """Construye un prompt con herramientas y contexto de memoria.
         
-        # Herramientas disponibles (compacto para el SLM)
-        tools_block = self._build_tools_block()
-        if tools_block:
-            parts.append(tools_block)
+        Args:
+            user_input: Texto del usuario
+            memory_facts: Hechos relevantes de memoria semántica
+            memory_records: Recuerdos episódicos similares
+            small_model: True si es Qwen 0.5B (tiny). Usa JSON + few-shot.
+        """
+        parts = []
+        
+        if small_model:
+            # Para Qwen 0.5B: JSON mode + few-shot examples
+            parts.append(self._build_light_directives())
+            parts.append(self._build_few_shot())
+        else:
+            # Para modelos capaces (deepseek): ReAct + herramientas
+            parts.append(self._build_light_directives())
+            tools_block = self._build_tools_block()
+            if tools_block:
+                parts.append(tools_block)
         
         if memory_facts or memory_records:
             lines = ["=== CONTEXTO DE MEMORIA ==="]

@@ -531,6 +531,8 @@ class NexusCore:
                     user_input,
                     memory_facts=mem_facts,
                     memory_records=mem_records,
+                    # Modelos tiny (<1B) usan JSON + few-shot en vez de ReAct
+                    small_model=("0.5b" in (self.slm.model_name or "").lower()),
                 )
 
                 # ─── SELF-CONSISTENCY (mejora #7 del roadmap) ───
