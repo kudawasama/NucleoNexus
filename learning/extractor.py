@@ -181,3 +181,22 @@ def handle_feedback(text: str, memory) -> bool:
         return True
     
     return False
+
+
+# ─── COMPATIBILIDAD CON VIEJAS IMPORTACIONES ─────────────────────
+# Algunos modulos todavia importan las funciones viejas. Las mantenemos
+# como wrappers del nuevo extractor.
+
+def learn_from_user_input(text: str, memory) -> int:
+    """Wrapper v1. Extrae hechos del input del usuario."""
+    return learn_from_all(text, memory, source="usuario")
+
+
+def learn_from_response(text: str, memory) -> int:
+    """Wrapper v1. Extrae hechos de la respuesta del SLM."""
+    return learn_from_all(text, memory, source="respuesta")
+
+
+def reinforce_from_feedback(text: str, memory) -> int:
+    """Wrapper v1. Refuerza hechos ante feedback positivo."""
+    return 1 if handle_feedback(text, memory) else 0
