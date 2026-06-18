@@ -567,29 +567,62 @@ class NexusCore:
                             respuesta = parsed.get("respuesta", "")
                             accion = parsed.get("accion", "responder")
 
-                            # Logica de accion (replicada para que cada intento sea valido)
-                            if accion == "usar_herramienta":
-                                herramienta = parsed.get("herramienta", "")
-                                parametros = parsed.get("parametros", {})
-                                if herramienta:
-                                    tool_result = self.actions.execute(herramienta, **parametros)
+                            # Logica de accion segun el tipo
+                            if accion == "web_search":
+                                query = parsed.get("query", parsed.get("respuesta", ""))
+                                if query:
+                                    metadata["tool_called"] = "web_search"
+                                    tool_result = self.actions.execute(
+                                        "web_search", query=query)
                                     if tool_result.get("success"):
                                         result_data = tool_result.get("result", {})
                                         if isinstance(result_data, dict):
-                                            if "respuesta" in result_data:
-                                                respuesta = result_data["respuesta"]
-                                            elif "resultados" in result_data:
+                                            if "resultados" in result_data:
                                                 items = result_data["resultados"]
-                                                respuesta = (
-                                                    f"Resultados de {herramienta}:\n"
-                                                    + "\n".join(str(i) for i in items[:5])
-                                                )
-                                            elif "salida" in result_data:
-                                                respuesta = result_data["salida"][:500]
+                                                respuesta = "\n".join(str(i) for i in items[:3])
+                                            elif "respuesta" in result_data:
+                                                respuesta = result_data["respuesta"][:500]
                                             else:
                                                 respuesta = str(result_data)[:500]
                                         else:
                                             respuesta = str(result_data)[:500]
+                            elif accion == "calcular":
+                                expr = parsed.get("expresion", parsed.get("respuesta", ""))
+                                if expr:
+                                    metadata["tool_called"] = "calcular"
+                                    import re as _cr
+                                    # Evaluar expresion simple
+                                    ops = {'+': lambda a,b: a+b, '-': lambda a,b: a-b,
+                                           '*': lambda a,b: a*b, '/': lambda a,b: a/b}
+                                    for op_char in ['+', '-', '*', '/']:
+                                        if op_char in expr:
+                                            parts = expr.split(op_char)
+                                            if len(parts) == 2:
+                                                try:
+                                                    a, b = float(parts[0].strip()), float(parts[1].strip())
+                                                    result = ops[op_char](a, b)
+                                                    if result == int(result):
+                                                        result_str = str(int(result))
+                                                    else:
+                                                        result_str = f"{result:.2f}"
+                                                    respuesta = f"{expr} = {result_str}"
+                                                except:
+                                                    pass
+                                            break
+                            elif accion == "buscar_memoria":
+                                query = parsed.get("query", parsed.get("respuesta", ""))
+                                if query:
+                                    mem_results = self.memory.query_knowledge(query, top_k=3)
+                                    if mem_results:
+                                        respuesta = "Segun mi memoria: " + "; ".join(
+                                            r.get("text", "")[:100] for r in mem_results[:2])
+                                    else:
+                                        respuesta = f"No encontre informacion sobre '{query}' en mi memoria."
+                            elif accion == "hora_actual":
+                                import time as _ht
+                                now = _ht.localtime()
+                                respuesta = f"Son las {now.tm_hour:02d}:{now.tm_min:02d} del {now.tm_mday}/{now.tm_mon}/{now.tm_year}."
+                            # accion == "responder" o desconocida: usar respuesta directa
 
                             # Usar la mejor respuesta (mas larga)
                             if len(respuesta) > len(best_response):

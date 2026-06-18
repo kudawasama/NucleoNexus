@@ -225,9 +225,9 @@ Respuesta: <texto final al usuario>
 === FIN INSTRUCCIONES ==="""
 
     def _build_few_shot(self) -> str:
-        """Ejemplos few-shot para modelos pequeños (Qwen 0.5B)."""
-        from learning.few_shot import build_few_shot_prompt
-        return build_few_shot_prompt()
+        """Ejemplos few-shot + herramientas para modelos pequeños (Qwen 0.5B)."""
+        from learning.few_shot import build_tools_prompt
+        return build_tools_prompt()
 
     def build_react(self, user_input: str, memory_facts: list = None,
                     memory_records: list = None, small_model: bool = False) -> str:
