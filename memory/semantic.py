@@ -272,7 +272,7 @@ class SemanticMemory:
                 try:
                     vec = _json.loads(row['embedding'].decode("utf-8"))
                     sim = cosine_similarity(query_vec, vec)
-                    if sim > 0.4:  # Umbral minimo de similitud
+                    if sim > 0.55:  # Umbral de similitud semantica
                         emb_results.append({
                             "id": row['id'],
                             "text": row['fact'],

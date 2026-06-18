@@ -1,144 +1,143 @@
 """
-Núcleo Nexus — Embeddings (Búsqueda Semántica Real)
-=====================================================
-Usa nomic-embed-text (via Ollama) para convertir texto en vectores
-y buscar por SIGNIFICADO, no solo por palabras exactas.
+Núcleo Nexus — Módulo de Embeddings Vectoriales
+================================================
+Genera embeddings usando nomic-embed-text (Ollama) y
+realiza búsqueda semántica por similitud de coseno.
 
-Diferencia con TF-IDF:
-- TF-IDF: "auto" NO encuentra "coche" (palabras distintas)
-- Embeddings: "auto" SI encuentra "coche" (significado similar)
-
-Vision: 'Inteligencia por arquitectura, no por tamaño'
-- Sin embeddings: busqueda por keywords
-- Con embeddings: busqueda semantica real (como un LLM grande)
+Reemplaza la búsqueda TF-IDF con búsqueda por significado.
 """
-
-import os
 import json
-import math
-import hashlib
+import sqlite3
 import logging
-import urllib.request
-import urllib.error
-from typing import Optional
+import time
+import math
+from typing import List, Optional
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 logger = logging.getLogger("nexus.memory.embeddings")
 
-# ─── Configuracion ─────────────────────────────────────────
-# Endpoint de Ollama para embeddings
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-EMBED_MODEL = os.environ.get("NEXUS_EMBED_MODEL", "nomic-embed-text")
-EMBED_TIMEOUT = 10  # segundos
-
-# Cache de embeddings en memoria (evita recomputar)
-_EMBED_CACHE = {}
-_CACHE_MAX = 1000
+OLLAMA_URL = "http://localhost:11434/api/embed"
+EMBED_MODEL = "nomic-embed-text"
+EMBED_DIM = 768  # nomic-embed-text output dimension
 
 
-def get_embedding(text: str, model: str = EMBED_MODEL) -> Optional[list]:
-    """Obtiene el embedding de un texto via Ollama.
-
+def get_embedding(text: str) -> Optional[List[float]]:
+    """Genera embedding para un texto usando nomic-embed-text.
+    
     Args:
-        text: Texto a embedir
-        model: Modelo de Ollama (default: nomic-embed-text)
-
+        text: Texto a vectorizar
+        
     Returns:
-        Lista de floats (vector), o None si falla
+        Lista de floats (768 dimensiones) o None si falla
     """
     if not text or not text.strip():
         return None
-
-    # Cache: si ya calculamos este embedding, devolverlo
-    cache_key = hashlib.md5(text.encode()).hexdigest()
-    if cache_key in _EMBED_CACHE:
-        return _EMBED_CACHE[cache_key]
-
-    # Si cache esta lleno, limpiar
-    if len(_EMBED_CACHE) > _CACHE_MAX:
-        _EMBED_CACHE.clear()
-
+    
+    payload = json.dumps({
+        "model": EMBED_MODEL,
+        "input": text[:2048],  # Limitar a 2048 chars
+    }).encode()
+    
     try:
-        # Ollama embeddings API
-        data = json.dumps({
-            "model": model,
-            "prompt": text[:2000],  # nomic-embed-text tiene limite
-        }).encode("utf-8")
-
-        req = urllib.request.Request(
-            f"{OLLAMA_URL}/api/embeddings",
-            data=data,
-            headers={"Content-Type": "application/json"},
-        )
-
-        with urllib.request.urlopen(req, timeout=EMBED_TIMEOUT) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-
-        embedding = result.get("embedding")
-        if embedding and isinstance(embedding, list):
-            _EMBED_CACHE[cache_key] = embedding
-            return embedding
-    except (urllib.error.URLError, urllib.error.HTTPError) as e:
-        logger.warning(f"Ollama embeddings no disponible: {e}")
+        req = Request(OLLAMA_URL, data=payload,
+                     headers={"Content-Type": "application/json"})
+        resp = urlopen(req, timeout=10)
+        data = json.loads(resp.read())
+        return data["embeddings"][0]
     except Exception as e:
         logger.warning(f"Error generando embedding: {e}")
-
-    return None
-
-
-def cosine_similarity(vec1: list, vec2: list) -> float:
-    """Calcula la similitud coseno entre dos vectores.
-
-    Returns:
-        Valor entre -1 y 1 (1 = identicos, 0 = sin relacion, -1 = opuestos)
-    """
-    if not vec1 or not vec2 or len(vec1) != len(vec2):
-        return 0.0
-
-    # Producto punto
-    dot = sum(a * b for a, b in zip(vec1, vec2))
-
-    # Normas
-    norm1 = math.sqrt(sum(a * a for a in vec1))
-    norm2 = math.sqrt(sum(b * b for b in vec2))
-
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
-
-    return dot / (norm1 * norm2)
+        return None
 
 
 def is_available() -> bool:
-    """Verifica si Ollama + modelo de embeddings esta disponible."""
+    """Verifica si el modelo de embeddings esta disponible en Ollama."""
     try:
-        req = urllib.request.Request(f"{OLLAMA_URL}/api/tags")
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            models = [m.get("name", "") for m in data.get("models", [])]
-            return any(EMBED_MODEL in m for m in models)
+        payload = json.dumps({"model": EMBED_MODEL, "input": "test"}).encode()
+        req = Request(OLLAMA_URL, data=payload,
+                     headers={"Content-Type": "application/json"})
+        resp = urlopen(req, timeout=5)
+        return True
     except Exception:
         return False
 
 
-def clear_cache():
-    """Limpia el cache de embeddings (util para tests)."""
-    _EMBED_CACHE.clear()
+def cosine_similarity(a: List[float], b: List[float]) -> float:
+    """Calcula similitud coseno entre dos vectores."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
 
 
-# ─── Tests ─────────────────────────────────────────────────
-if __name__ == "__main__":
-    print("Test: get_embedding")
-    if is_available():
-        e1 = get_embedding("auto")
-        e2 = get_embedding("coche")
-        e3 = get_embedding("python programming")
-        if e1 and e2 and e3:
-            sim1 = cosine_similarity(e1, e2)  # auto vs coche
-            sim2 = cosine_similarity(e1, e3)  # auto vs python
-            print(f"  'auto' vs 'coche' (relacionados):  {sim1:.4f}")
-            print(f"  'auto' vs 'python' (no relacionados): {sim2:.4f}")
-            assert sim1 > sim2, "auto deberia ser mas similar a coche que a python"
-            print("  [OK] embeddings funcionan")
-        else:
-            print("  [FAIL] no se pudieron generar embeddings")
-    else:
-        print(f"  [SKIP] Ollama o {EMBED_MODEL} no disponible")
+def embed_to_blob(embedding: List[float]) -> bytes:
+    """Convierte embedding a BLOB para SQLite."""
+    return json.dumps(embedding).encode()
+
+
+def blob_to_embed(blob: bytes) -> List[float]:
+    """Convierte BLOB de SQLite a embedding."""
+    return json.loads(blob.decode())
+
+
+class EmbeddingIndex:
+    """Índice de embeddings en memoria para búsqueda rápida.
+    
+    Mantiene todos los embeddings cargados para calcular
+    similitud coseno sin consultas SQL complejas.
+    """
+    
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+        self._vectors: List[tuple] = []  # [(id, embedding, text)]
+        self._loaded = False
+    
+    def load(self):
+        """Carga todos los embeddings desde la DB."""
+        if self._loaded:
+            return
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT id, fact, embedding FROM semantic WHERE embedding IS NOT NULL")
+            count = 0
+            for row in cur.fetchall():
+                doc_id, text, blob = row
+                if blob:
+                    emb = blob_to_embed(blob)
+                    self._vectors.append((doc_id, emb, text))
+                    count += 1
+            conn.close()
+            self._loaded = True
+            logger.info(f"Cargados {count} embeddings en índice")
+        except Exception as e:
+            logger.warning(f"Error cargando embeddings: {e}")
+    
+    def add(self, doc_id: int, embedding: List[float], text: str):
+        """Agrega un embedding al índice en memoria."""
+        self._vectors.append((doc_id, embedding, text))
+    
+    def search(self, query_embedding: List[float], top_k: int = 5) -> List[dict]:
+        """Busca los top_k vectores más similares por coseno."""
+        if not self._vectors:
+            return []
+        
+        scores = []
+        for doc_id, vec, text in self._vectors:
+            sim = cosine_similarity(query_embedding, vec)
+            scores.append((sim, doc_id, text))
+        
+        scores.sort(reverse=True)
+        results = []
+        for sim, doc_id, text in scores[:top_k]:
+            results.append({
+                "doc_id": doc_id,
+                "text": text[:200],
+                "score": round(sim, 4),
+            })
+        return results
+    
+    def count(self) -> int:
+        return len(self._vectors)
