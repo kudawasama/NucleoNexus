@@ -112,29 +112,67 @@ def _extract_city(text: str) -> str:
     Si no encuentra ciudad, usa la ultima consultada (contexto)."""
     global _last_city
     
-    # Palabras que NO son ciudades pero el regex podria capturar
+    # Palabras que NUNCA son parte de una ciudad
     not_cities = {'minima', 'maxima', 'actual', 'hoy', 'manana', 'ahora', 
                   'por', 'favor', 'plz', 'gracias', 'temperatura', 'clima',
                   'pronostico', 'ambiente', 'cual', 'que', 'como', 'esta',
-                  'sensacion', 'termica', 'humedad', 'viento', 'presion'}
+                  'sensacion', 'termica', 'humedad', 'viento', 'presion',
+                  'hay', 'la', 'el', 'los', 'las', 'un', 'una', 'del',
+                  'hace', 'minimo', 'maximo'}
     
-    # Patrones: "en [ciudad]", "clima [ciudad]", "pronostico [ciudad]"
-    patterns = [
-        r'(?:en|para|de)\s+([a-záéíóúñ\s]+?)(?:$|[?.,!]|por favor|plz)',
-        r'(?:clima|temperatura|pronostico)\s+(?:de\s+|en\s+|para\s+)?([a-záéíóúñ\s]+?)(?:$|[?.,!]|por favor|plz)',
-    ]
-    for pat in patterns:
-        m = re.search(pat, text.lower())
-        if m:
-            city = m.group(1).strip()
-            # Limpiar palabras sobrantes
-            city = re.sub(r'\b(por favor|plz|gracias|ahora|hoy|manana)\b', '', city).strip()
+    t = text.lower().strip()
+    
+    # Estrategia 1: "en <ciudad>" (la mas confiable)
+    m = re.search(r'\ben\s+([a-záéíóúñ\s]+?)(?:\s*(?:hoy|ahora|manana|por favor|plz|gracias)|\s*\?|$)', t)
+    if m:
+        city = m.group(1).strip()
+        city = re.sub(r'\b(por favor|plz|gracias|hoy|ahora|manana)\b', '', city).strip()
+        city = ' '.join(w for w in city.split() if w not in not_cities)
+        if city and len(city) > 2:
+            _last_city = city
+            return city
+    
+    # Estrategia 2: buscar despues de la keyword (clima/temperatura/pronostico)
+    # Capturamos todo, luego buscamos "en X" o "de X" dentro
+    m = re.search(r'(?:clima|temperatura|pronostico)\s+(?:de\s+|en\s+|para\s+)?(.+)', t)
+    if m:
+        rest = m.group(1).strip()
+        # Quitar signos y palabras finales
+        rest = re.sub(r'[?.,!]+$', '', rest)
+        rest = re.sub(r'\s+(?:hoy|ahora|manana|por favor|plz|gracias)$', '', rest)
+        # Buscar "en <ciudad>" dentro de lo que quedo
+        inner = re.search(r'en\s+([a-záéíóúñ\s]+)$', rest)
+        if inner:
+            city = inner.group(1).strip()
             city = ' '.join(w for w in city.split() if w not in not_cities)
-            if city and len(city) > 1:
+            if city and len(city) > 2:
                 _last_city = city
                 return city
+        # Buscar "de <ciudad>"
+        inner = re.search(r'de\s+([a-záéíóúñ\s]+)$', rest)
+        if inner:
+            city = inner.group(1).strip()
+            city = ' '.join(w for w in city.split() if w not in not_cities)
+            if city and len(city) > 2:
+                _last_city = city
+                return city
+        # Sin preposicion: filtrar todo
+        words = [w for w in rest.split() if w not in not_cities]
+        city = ' '.join(words).strip()
+        if city and len(city) > 2:
+            _last_city = city
+            return city
     
-    # Si no encontro ciudad en este texto, usar la ultima
+    # Estrategia 3: "de <ciudad>" 
+    m = re.search(r'\bde\s+([a-záéíóúñ\s]+?)(?:\s*(?:hoy|ahora|manana|por favor|plz|gracias)|\s*\?|$)', t)
+    if m:
+        city = m.group(1).strip()
+        city = ' '.join(w for w in city.split() if w not in not_cities)
+        if city and len(city) > 2:
+            _last_city = city
+            return city
+    
+    # Fallback: cache
     if _last_city:
         return _last_city
     return ""
