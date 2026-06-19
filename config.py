@@ -37,12 +37,12 @@ ENGINE = {
         "learning_rate": 0.1,    # Que tan rapido aprende (0-1)
     },
     "llm": {
-        "backend": "openai",     # "ollama" | "llamacpp" | "openai" | None
+        "backend": "ollama",     # "ollama" | "llamacpp" | "openai" | None
         "model_path": None,      # Ruta al modelo GGUF
-        "model_name": "deepseek-v4-flash",  # Modelo OpenCode Go
-        "api_base": "https://opencode.ai/zen/go/v1",  # OpenCode Go endpoint
-        "api_key": None,         # Se lee de OPENCODE_GO_API_KEY
-        "max_tokens": 2048,
+        "model_name": "hermes3:3b",  # 🏆 Mejor modelo local (131K ctx, agent-optimized)
+        "api_base": "http://localhost:11434/v1",  # Ollama local
+        "api_key": "not-needed", # Ollama no requiere API key
+        "max_tokens": 4096,
         "temperature": 0.7,
     }
 }
