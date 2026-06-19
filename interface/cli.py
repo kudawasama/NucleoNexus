@@ -939,7 +939,42 @@ class NexusCLI:
             return
 
         if subcommand == "show":
-            self._show_current_model()
+            # Si no hay subcomando, mostrar menu principal de modelos
+            print(f"""
+{Color.CYAN}╔══ /model — Gestion de Modelos ══╗{Color.RESET}
+
+  {Color.YELLOW}1{Color.RESET}  {Color.GREEN}/model{Color.RESET}           Ver modelo actual
+  {Color.YELLOW}2{Color.RESET}  {Color.GREEN}/model list{Color.RESET}      Lista modelos instalados
+  {Color.YELLOW}3{Color.RESET}  {Color.GREEN}/model use{Color.RESET}       Menu interactivo (cambiar)
+  {Color.YELLOW}4{Color.RESET}  {Color.GREEN}/model use <m>{Color.RESET}   Cambio rapido directo
+  {Color.YELLOW}5{Color.RESET}  {Color.GREEN}/model test{Color.RESET}      Comparar backends
+
+  {Color.DIM}Escribe el numero, el comando completo, o 'q' para salir{Color.RESET}
+""")
+            try:
+                choice = input(f"  {Color.YELLOW}Elige →{Color.RESET} ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return
+            if choice.lower() in ('q', '', '0'):
+                return
+            if choice == '1':
+                self._show_current_model()
+            elif choice == '2':
+                self._print_model_list()
+            elif choice == '3':
+                self._model_interactive_menu()
+            elif choice == '4':
+                print(f"{Color.YELLOW}Uso: /model use <backend> [modelo]{Color.RESET}")
+                print(f"  Ej: /model use ollama hermes3:3b")
+            elif choice == '5':
+                query = input(f"  {Color.DIM}Pregunta de prueba (Enter = default):{Color.RESET} ").strip()
+                if not query:
+                    query = "explicame brevemente que es la fotosintesis"
+                self._run_model_comparison(query)
+            elif choice.startswith('/'):
+                self._handle_command(choice)
+            else:
+                print(f"{Color.RED}Opcion no valida: {choice}{Color.RESET}")
             return
 
         print(f"{Color.RED}Subcomando desconocido: {subcommand}{Color.RESET}")
