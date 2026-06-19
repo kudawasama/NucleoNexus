@@ -104,8 +104,20 @@ def register() -> Skill:
     return skill
 
 
+# Cache de ultima ciudad consultada
+_last_city = None
+
 def _extract_city(text: str) -> str:
-    """Extrae el nombre de una ciudad del texto del usuario."""
+    """Extrae el nombre de una ciudad del texto del usuario.
+    Si no encuentra ciudad, usa la ultima consultada (contexto)."""
+    global _last_city
+    
+    # Palabras que NO son ciudades pero el regex podria capturar
+    not_cities = {'minima', 'maxima', 'actual', 'hoy', 'manana', 'ahora', 
+                  'por', 'favor', 'plz', 'gracias', 'temperatura', 'clima',
+                  'pronostico', 'ambiente', 'cual', 'que', 'como', 'esta',
+                  'sensacion', 'termica', 'humedad', 'viento', 'presion'}
+    
     # Patrones: "en [ciudad]", "clima [ciudad]", "pronostico [ciudad]"
     patterns = [
         r'(?:en|para|de)\s+([a-záéíóúñ\s]+?)(?:$|[?.,!]|por favor|plz)',
@@ -117,6 +129,12 @@ def _extract_city(text: str) -> str:
             city = m.group(1).strip()
             # Limpiar palabras sobrantes
             city = re.sub(r'\b(por favor|plz|gracias|ahora|hoy|manana)\b', '', city).strip()
+            city = ' '.join(w for w in city.split() if w not in not_cities)
             if city and len(city) > 1:
+                _last_city = city
                 return city
+    
+    # Si no encontro ciudad en este texto, usar la ultima
+    if _last_city:
+        return _last_city
     return ""

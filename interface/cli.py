@@ -13,6 +13,13 @@ import sys
 import time
 from pathlib import Path
 
+# ─── Menu interactivo con teclado ──────────────────────────────
+try:
+    from interface.menu import interactive_menu, C as MC
+    HAS_INTERACTIVE_MENU = True
+except ImportError:
+    HAS_INTERACTIVE_MENU = False
+
 # ─── Autocompletado con readline ───────────────────────────────
 try:
     import readline
@@ -226,77 +233,60 @@ class NexusCLI:
             return []
 
     def _show_command_menu(self):
-        """Muestra un menu interactivo de comandos disponibles.
-
-        El usuario puede:
-        - Escribir el numero: ejecutar el comando
-        - Escribir el nombre (/help): ejecutar ese comando
-        - Escribir texto libre: usar eso como query de Nexus
-        - Enter vacio o 'q': salir del menu
-        """
-        import sys as _sys
-
+        """Menu interactivo de comandos con navegacion por teclado."""
         commands_list = [
-            ("1",  "/help",       "Ver ayuda de todos los comandos"),
-            ("2",  "/status",     "Estado del sistema (fase, memoria, etc)"),
-            ("3",  "/stats",      "Estadisticas de memoria"),
-            ("4",  "/fase",       "Fase actual de Nexus"),
-            ("5",  "/hechos",     "Ver hechos aprendidos"),
-            ("6",  "/memoria",    "Ver ultimos recuerdos"),
-            ("7",  "/skills",     "Ver skills cargadas"),
-            ("8",  "/hora",       "Fecha y hora actual"),
-            ("9",  "/buscar X",   "Buscar en la web y aprender"),
-            ("10", "/aprende X",  "Guardar un hecho directo"),
-            ("11", "/aprende-web X", "Buscar y aprender sobre un tema"),
-            ("12", "/recuerda X", "Alias de /aprende"),
-            ("13", "/analiza X",  "Extraer hechos de un texto"),
-            ("14", "/olvida X",   "Borrar un hecho de la memoria"),
-            ("15", "/limpiar-web", "Borrar hechos contaminados de GitHub/web"),
-            ("16", "/model",      "Gestionar modelos (menu interactivo)"),
-            ("17", "/model test X", "Comparar todos los backends"),
-            ("18", "/backend",    "Cambiar backend (symbolic/slm/hybrid)"),
-            ("19", "/personalidad", "Ver/ajustar personalidad"),
-            ("20", "/export",     "Exportar estado como JSON"),
-            ("21", "/version",    "Version, commit y build"),
-            ("22", "/update",     "git pull desde GitHub"),
-            ("23", "/clear",      "Limpiar pantalla"),
-            ("24", "/reset",      "Resetear Nexus"),
-            ("25", "/exit",       "Salir"),
-            ("26", "/agent X",    "Encadenar tools (investigar, explicar)"),
+            ("/help",       "Ver ayuda de todos los comandos"),
+            ("/status",     "Estado del sistema (fase, memoria)"),
+            ("/stats",      "Estadisticas de memoria"),
+            ("/fase",       "Fase actual de Nexus"),
+            ("/hechos",     "Ver hechos aprendidos"),
+            ("/memoria",    "Ver ultimos recuerdos"),
+            ("/skills",     "Ver skills cargadas"),
+            ("/hora",       "Fecha y hora actual"),
+            ("/buscar X",   "Buscar en la web y aprender"),
+            ("/aprende X",  "Guardar un hecho directo"),
+            ("/aprende-web X", "Buscar y aprender sobre un tema"),
+            ("/analiza X",  "Extraer hechos de un texto"),
+            ("/olvida X",   "Borrar un hecho de la memoria"),
+            ("/model",      "Gestionar modelos (menu interactivo)"),
+            ("/model test X","Comparar todos los backends"),
+            ("/backend",    "Cambiar backend (symbolic/slm/hybrid)"),
+            ("/personalidad","Ver/ajustar personalidad"),
+            ("/export",     "Exportar estado como JSON"),
+            ("/version",    "Version, commit y build"),
+            ("/update",     "git pull desde GitHub"),
+            ("/clear",      "Limpiar pantalla"),
+            ("/reset",      "Resetear Nexus"),
+            ("/exit",       "Salir"),
+            ("/agent X",    "Encadenar tools (investigar, explicar)"),
         ]
 
-        print(f"\n{Color.CYAN}╔══════════════════════════════════════════════════════════╗{Color.RESET}")
-        print(f"{Color.CYAN}║{Color.RESET}  {Color.BOLD}Comandos disponibles{Color.RESET}                                            {Color.CYAN}║{Color.RESET}")
-        print(f"{Color.CYAN}╠══════════════════════════════════════════════════════════╣{Color.RESET}")
+        if HAS_INTERACTIVE_MENU:
+            opts = [f"{cmd:<18} {desc}" for cmd, desc in commands_list]
+            choice = interactive_menu("Comandos Nexus", opts)
+            if choice is not None and 0 <= choice < len(commands_list):
+                cmd = commands_list[choice][0]
+                # Si tiene 'X', pedir argumento
+                if ' X' in cmd or 'X' in cmd:
+                    base_cmd = cmd.replace(' X', '').replace('X', '')
+                    arg = input(f"{Color.DIM}Argumento para {Color.GREEN}{base_cmd}{Color.DIM}:{Color.RESET} ").strip()
+                    if arg:
+                        self._handle_command(f"{base_cmd} {arg}")
+                    else:
+                        print(f"{Color.YELLOW}Comando '{base_cmd}' requiere argumento{Color.RESET}")
+                else:
+                    self._handle_command(cmd)
+            return
 
-        # Agrupar en columnas de 3
-        per_col = 9
-        num_cols = 3
-        for i in range(0, len(commands_list), per_col):
-            row_items = commands_list[i:i+per_col]
-            line = f"{Color.CYAN}║{Color.RESET}  "
-            for item in row_items:
-                num, cmd, desc = item
-                cmd_str = f"{Color.YELLOW}{num:>2}{Color.RESET} {Color.GREEN}{cmd:<18}{Color.RESET}"
-                line += f"{cmd_str}"
-            # Rellenar si la fila esta incompleta
-            if len(row_items) < num_cols:
-                padding = (num_cols - len(row_items)) * 32
-                line += " " * padding
-            line += f"  {Color.CYAN}║{Color.RESET}"
-            print(line)
-        print(f"{Color.CYAN}╠══════════════════════════════════════════════════════════╣{Color.RESET}")
-        print(f"{Color.CYAN}║{Color.RESET}  {Color.DIM}Escribe el numero, el nombre (/help), texto libre, o 'q' para salir{Color.RESET}  {Color.CYAN}║{Color.RESET}")
-        print(f"{Color.CYAN}╚══════════════════════════════════════════════════════════╝{Color.RESET}")
+        # Fallback sin interactive_menu
+        print(f"\n{Color.CYAN}╔══ Comandos Nexus ══╗{Color.RESET}")
+        for i, (cmd, desc) in enumerate(commands_list, 1):
+            print(f"  {Color.YELLOW}{i:>2}{Color.RESET} {Color.GREEN}{cmd:<18}{Color.RESET} {Color.DIM}{desc}{Color.RESET}")
+        print(f"{Color.CYAN}╚{'═'*22}╝{Color.RESET}")
+        print(f"{Color.DIM}Escribe numero, comando (/help), o 'q'{Color.RESET}")
 
-        # Diccionario de numeros a nombres de comando
-        num_to_cmd = {item[0]: item[1] for item in commands_list}
-        # Para comandos con argumentos
-        arg_commands = {
-            "9": "/buscar", "10": "/aprende", "11": "/aprende-web",
-            "12": "/recuerda", "13": "/analiza", "14": "/olvida",
-            "17": "/model test",
-        }
+        # Numero → indice en commands_list
+        arg_commands_idx = {i for i, (cmd, _) in enumerate(commands_list) if 'X' in cmd}
 
         while True:
             try:
@@ -310,35 +300,36 @@ class NexusCLI:
                 return
 
             # Si es un numero
-            if sel in num_to_cmd:
-                cmd_name = num_to_cmd[sel]
-                # Si el comando necesita argumentos
-                if sel in arg_commands:
-                    # Limpiar cmd_name: quitar la "X" de "/buscar X" -> "/buscar"
-                    base_cmd = cmd_name.replace(" X", "").strip()
-                    arg = input(f"  {Color.DIM}Argumento para {base_cmd}:{Color.RESET} ").strip()
-                    if arg:
-                        cmd_name = f"{base_cmd} {arg}"
-                    else:
-                        cmd_name = base_cmd
-                print(f"  {Color.GREEN}→ Ejecutando: {cmd_name}{Color.RESET}")
-                self._handle_command(cmd_name)
-                return
+            if sel.isdigit():
+                idx = int(sel) - 1
+                if 0 <= idx < len(commands_list):
+                    cmd, _ = commands_list[idx]
+                    if idx in arg_commands_idx:
+                        base_cmd = cmd.replace(" X", "").strip()
+                        arg = input(f"  {Color.DIM}Argumento para {base_cmd}:{Color.RESET} ").strip()
+                        if arg:
+                            cmd = f"{base_cmd} {arg}"
+                        else:
+                            cmd = base_cmd
+                    print(f"  {Color.GREEN}-> Ejecutando: {cmd}{Color.RESET}")
+                    self._handle_command(cmd)
+                    return
 
             # Si empieza con / es un comando directo
             if sel.startswith("/"):
-                # Si necesita argumento
-                if sel in ("/buscar", "/aprende", "/aprende-web",
-                           "/recuerda", "/analiza", "/olvida"):
+                base = sel.split()[0]
+                needs_arg = base in ("/buscar", "/aprende", "/aprende-web",
+                                     "/recuerda", "/analiza", "/olvida", "/model")
+                if needs_arg and len(sel.split()) == 1:
                     arg = input(f"  {Color.DIM}Argumento para {sel}:{Color.RESET} ").strip()
                     if arg:
                         sel = f"{sel} {arg}"
-                print(f"  {Color.GREEN}→ Ejecutando: {sel}{Color.RESET}")
+                print(f"  {Color.GREEN}-> Ejecutando: {sel}{Color.RESET}")
                 self._handle_command(sel)
                 return
 
             # Si no es ni numero ni comando, tratarlo como query
-            print(f"  {Color.GREEN}→ Procesando como query:{Color.RESET} {sel}")
+            print(f"  {Color.GREEN}-> Procesando como query:{Color.RESET} {sel}")
             response, metadata = self.core.process(sel)
             self._show_response(response, metadata)
             return
@@ -939,42 +930,34 @@ class NexusCLI:
             return
 
         if subcommand == "show":
-            # Si no hay subcomando, mostrar menu principal de modelos
-            print(f"""
-{Color.CYAN}╔══ /model — Gestion de Modelos ══╗{Color.RESET}
-
-  {Color.YELLOW}1{Color.RESET}  {Color.GREEN}/model{Color.RESET}           Ver modelo actual
-  {Color.YELLOW}2{Color.RESET}  {Color.GREEN}/model list{Color.RESET}      Lista modelos instalados
-  {Color.YELLOW}3{Color.RESET}  {Color.GREEN}/model use{Color.RESET}       Menu interactivo (cambiar)
-  {Color.YELLOW}4{Color.RESET}  {Color.GREEN}/model use <m>{Color.RESET}   Cambio rapido directo
-  {Color.YELLOW}5{Color.RESET}  {Color.GREEN}/model test{Color.RESET}      Comparar backends
-
-  {Color.DIM}Escribe el numero, el comando completo, o 'q' para salir{Color.RESET}
-""")
-            try:
-                choice = input(f"  {Color.YELLOW}Elige →{Color.RESET} ").strip()
-            except (EOFError, KeyboardInterrupt):
+            if HAS_INTERACTIVE_MENU:
+                opts = [
+                    "Ver modelo actual",
+                    "Lista modelos instalados",
+                    "Cambiar modelo (interactivo)",
+                    "Cambio rapido directo",
+                    "Comparar backends",
+                ]
+                choice = interactive_menu("Gestion de Modelos", opts)
+                if choice == 0:
+                    self._show_current_model()
+                elif choice == 1:
+                    self._print_model_list()
+                elif choice == 2:
+                    self._model_interactive_menu()
+                elif choice == 3:
+                    print(f"{Color.YELLOW}Uso: /model use <backend> [modelo]{Color.RESET}")
+                    print(f"  Ej: /model use ollama hermes3:3b")
+                elif choice == 4:
+                    query = input(f"  {Color.DIM}Pregunta de prueba (Enter = default):{Color.RESET} ").strip()
+                    if not query:
+                        query = "explicame brevemente que es la fotosintesis"
+                    self._run_model_comparison(query)
                 return
-            if choice.lower() in ('q', '', '0'):
-                return
-            if choice == '1':
-                self._show_current_model()
-            elif choice == '2':
-                self._print_model_list()
-            elif choice == '3':
-                self._model_interactive_menu()
-            elif choice == '4':
-                print(f"{Color.YELLOW}Uso: /model use <backend> [modelo]{Color.RESET}")
-                print(f"  Ej: /model use ollama hermes3:3b")
-            elif choice == '5':
-                query = input(f"  {Color.DIM}Pregunta de prueba (Enter = default):{Color.RESET} ").strip()
-                if not query:
-                    query = "explicame brevemente que es la fotosintesis"
-                self._run_model_comparison(query)
-            elif choice.startswith('/'):
-                self._handle_command(choice)
             else:
-                print(f"{Color.RED}Opcion no valida: {choice}{Color.RESET}")
+                # Fallback sin interactive_menu
+                self._show_current_model()
+                print(f"{Color.DIM}/model list | /model use | /model test{Color.RESET}")
             return
 
         print(f"{Color.RED}Subcomando desconocido: {subcommand}{Color.RESET}")
@@ -1051,58 +1034,46 @@ class NexusCLI:
         print()
 
     def _model_interactive_menu(self):
-        """Menu interactivo para seleccionar backend y modelo con numeros."""
-        print(f"""
-{Color.CYAN}╔══ Seleccion de Modelo ══╗{Color.RESET}
-
-  {Color.YELLOW}Backends disponibles:{Color.RESET}
-
-    1) {Color.GREEN}opencode{Color.RESET}  → OpenCode Go (cloud, rapido)
-              Modelo: deepseek-v4-flash
-    2) {Color.GREEN}ollama{Color.RESET}    → Ollama local (offline, ilimitado)
-              Modelos:""")
-        # Listar modelos Ollama reales
+        """Menu interactivo con teclado para seleccionar modelo."""
         installed = self._get_installed_ollama_models()
-        if installed:
-            for i, (name, size_bytes, params) in enumerate(installed, 3):
-                size_gb = size_bytes / (1024**3)
-                param_str = f"{params}" if params and params != "?" else ""
-                icon = "🧠" if "embed" not in name.lower() else "📊"
-                print(f"    {i}) {icon} {Color.GREEN}{name}{Color.RESET} ({size_gb:.1f} GB{f', {param_str}' if param_str else ''})")
-            ollama_end = i + 1
-        else:
-            print(f"    {Color.DIM}(Ollama no detectado){Color.RESET}")
-            ollama_end = 3
+        chat_models = [(n, s, p) for n, s, p in installed if "embed" not in n.lower()]
         
-        print(f"""
-    {ollama_end}) {Color.GREEN}symbolic{Color.RESET}  → Solo motor simbolico (sin modelo)
-
-  {Color.DIM}Escribe el numero o 'q' para cancelar{Color.RESET}
-""")
-        try:
-            choice = input(f"  {Color.YELLOW}Elige →{Color.RESET} ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return
-
-        if choice.lower() in ('q', '0', ''):
-            return
-
-        if choice == '1':
-            self._switch_model("opencode", "deepseek-v4-flash")
-        elif choice == '2':
-            self._switch_model("ollama", None)  # usa default
-        elif choice == str(ollama_end):
-            self._switch_model("symbolic")
-        elif choice.isdigit() and installed:
-            idx = int(choice) - 3
-            if 0 <= idx < len(installed):
-                name = installed[idx][0]
-                if "embed" not in name.lower():
-                    self._switch_model("ollama", name)
-                else:
-                    print(f"{Color.YELLOW}{name} es un modelo de embeddings, no de chat{Color.RESET}")
+        opts = ["OpenCode Go (cloud) — deepseek-v4-flash"]
+        for name, size_bytes, params in chat_models:
+            size_gb = size_bytes / (1024**3)
+            param_str = f"{params}" if params and params != "?" else "?"
+            opts.append(f"{name} ({size_gb:.1f}GB, {param_str})")
+        opts.append("Solo motor simbolico (sin modelo)")
+        
+        if HAS_INTERACTIVE_MENU:
+            choice = interactive_menu("Seleccion de Modelo", opts)
+            if choice is None:
+                return
+            if choice == 0:
+                self._switch_model("opencode", "deepseek-v4-flash")
+            elif choice == len(opts) - 1:
+                self._switch_model("symbolic")
+            elif 1 <= choice < len(opts) - 1:
+                model_name = chat_models[choice - 1][0]
+                self._switch_model("ollama", model_name)
         else:
-            print(f"{Color.RED}Opcion no valida: {choice}{Color.RESET}")
+            # Fallback: menu numerado simple
+            print(f"""
+{Color.CYAN}╔══ Seleccion de Modelo ══╗{Color.RESET}
+  1) OpenCode Go (cloud) — deepseek-v4-flash""")
+            for i, (name, size_bytes, params) in enumerate(chat_models, 2):
+                size_gb = size_bytes / (1024**3)
+                print(f"  {i}) {Color.GREEN}{name}{Color.RESET} ({size_gb:.1f}GB)")
+            print(f"  {len(chat_models)+2}) Solo motor simbolico")
+            try:
+                c = input(f"  {Color.YELLOW}Elige →{Color.RESET} ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return
+            if c.isdigit():
+                idx = int(c)
+                if idx == 1: self._switch_model("opencode", "deepseek-v4-flash")
+                elif idx == len(chat_models)+2: self._switch_model("symbolic")
+                elif 2 <= idx <= len(chat_models)+1: self._switch_model("ollama", chat_models[idx-2][0])
 
     def _switch_model(self, backend: str, model_name: str | None):
         """Cambia el backend SLM y persiste en el estado."""

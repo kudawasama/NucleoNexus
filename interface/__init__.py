@@ -1,3 +1,1 @@
-"""
-Núcleo Nexus — Interfaces de Usuario
-"""
+# Interface package
