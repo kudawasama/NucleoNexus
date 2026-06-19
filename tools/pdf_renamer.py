@@ -44,12 +44,13 @@ _SUFIJOS = [
     " E.I.R.L.", " EIRL",
 ]
 
-# Palabras de giro (se filtran solo si NO hay conflictos)
+# Palabras de giro generico (no aportan identidad)
+# NOTA: 'distribucion', 'generacion', 'transmision' NO estan aqui
+# porque diferencian empresas como ENEL Distribucion vs ENEL Generacion
 _GIRO = {
     "arriendo", "compra", "venta", "bienes", "inmuebles",
-    "amoblados", "equipos", "maquinarias", "distribucion",
-    "distribución", "generacion", "generación", "transmision",
-    "transmisión", "logistico", "logístico", "centro",
+    "amoblados", "equipos", "maquinarias",
+    "logistico", "logístico", "centro",
     "comercial", "industrial", "profesional",
     "sociedad", "empresa", "nacional", "general",
 }
@@ -58,11 +59,11 @@ _GIRO = {
 _GEO = {"chile", "santiago", "region", "regional", "metropolitana"}
 
 
-def _abreviar_proveedor(razon_social: str, disambiguate: bool = False) -> str:
+def _abreviar_proveedor(razon_social: str) -> str:
     """Deriva nombre corto (~10-12 chars) desde la razon social.
 
-    Con disambiguate=True NO se filtran palabras de giro, asi que
-    'ENEL Distribucion Chile' → 'ENELDISTRIB' en vez de solo 'ENEL'.
+    Para no-Megacentro usa siempre los primeros 2 tokens significativos
+    (marca + giro), asi 'ENEL Distribucion' → ENELDISTRI (no solo ENEL).
     """
     nombre = razon_social.strip()
 
@@ -79,62 +80,34 @@ def _abreviar_proveedor(razon_social: str, disambiguate: bool = False) -> str:
         if len(partes) >= 2:
             nombre = partes[-1].strip()
 
-    # ── 3. Tokenizar ──
+    # ── 3. Tokenizar y limpiar ──
     nombre_clean = re.sub(r'[^\w\s]', ' ', nombre)
     tokens = nombre_clean.split()
-
-    # Siempre filtrar STOP y GEO
     tokens = [t for t in tokens if t.lower() not in _STOP]
     tokens = [t for t in tokens if t.lower() not in _GEO]
+    tokens = [t for t in tokens if t.lower() not in _GIRO]
 
     if not tokens:
         tokens = [t for t in nombre_clean.split() if t.lower() not in _STOP]
+        tokens = [t for t in tokens if t.lower() not in _GEO]
     if not tokens:
         return "DESCONOCIDO"
 
-    # ── 4. Detectar grupo Megacentro ──
+    # ── 4. Grupo Megacentro: prefijo MEGA + ultima palabra clave ──
     full_upper = razon_social.upper()
-    es_grupo_mega = "MEGACENTRO" in full_upper
-    es_rentas = full_upper.startswith("RENTAS")
-    if es_grupo_mega or es_rentas:
+    if "MEGACENTRO" in full_upper or full_upper.startswith("RENTAS"):
         clave = tokens[-1].upper()
         if len(clave) > 8:
             clave = clave[:6]
         return f"MEGA{clave}"
 
-    # ── 5. Proveedor generico ──
-    if not disambiguate:
-        # Modo normal: filtrar GIRO, usar primer token como marca
-        tokens = [t for t in tokens if t.lower() not in _GIRO]
-        if not tokens:
-            tokens = [t for t in nombre_clean.split() if t.lower() not in _STOP]
-            tokens = [t for t in tokens if t.lower() not in _GEO]
-        if not tokens:
-            return "DESCONOCIDO"
-        return tokens[0].upper()[:12]
-
-    # ── Modo desambiguacion: incluir GIRO para diferenciar ──
-    # Tomar primeros 2 tokens significativos
-    # Si hay 3+ tokens, tomar primero + tercero (el segundo suele ser generico)
-    # O primero + segundo directamente
-    keep = []
-    for t in tokens:
-        if t.lower() not in _STOP and t.lower() not in _GEO:
-            keep.append(t.upper())
-        if len(keep) == 2:
-            break
-
-    if len(keep) == 0:
-        return "DESCONOCIDO"
-    if len(keep) == 1:
-        return keep[0][:12]
-
-    # Combinar: primer token completo + segundo abreviado (max 12 chars)
-    p1, p2 = keep[0], keep[1]
-    if len(p1) >= 6:
-        return f"{p1[:6]}{p2[:4]}"
-    else:
-        return f"{p1}{p2[:6]}"
+    # ── 5. Otros proveedores: primeros 2 tokens = marca + tipo ──
+    # Tomar hasta 2 tokens y abreviar: primero + segundo[:6]
+    p1 = tokens[0].upper()[:6]
+    if len(tokens) >= 2:
+        p2 = tokens[1].upper()[:6]
+        return f"{p1}{p2}"
+    return p1
 
 
 def _extraer_de_pdf(path: str) -> dict | None:
@@ -215,19 +188,6 @@ def _encontrar_pdfs(origen: str) -> tuple[list[tuple[str, str]], Path | None]:
     sys.exit(1)
 
 
-def _detectar_conflictos(resultados: list) -> set:
-    """Detecta si dos proveedores distintos comparten el mismo nombre corto."""
-    grupos = {}
-    for item in resultados:
-        corto = item["proveedor"]
-        rs = item["razon_social"]
-        if corto not in grupos:
-            grupos[corto] = set()
-        grupos[corto].add(rs)
-
-    return {corto for corto, rses in grupos.items() if len(rses) > 1}
-
-
 def procesar(origen: str, dry_run: bool = False) -> dict:
     """Renombra PDFs. Retorna dict con resultados estructurados."""
     pdfs, temp_dir = _encontrar_pdfs(origen)
@@ -247,7 +207,6 @@ def procesar(origen: str, dry_run: bool = False) -> dict:
         print(f"  Destino: {destino_base}")
     print(f"{'='*65}\n")
 
-    # ── Primera pasada: extraer datos con nombres candidatos ──
     resultados = []
     errores = []
     output_lines = []
@@ -259,9 +218,13 @@ def procesar(origen: str, dry_run: bool = False) -> dict:
             output_lines.append(f"  ✗ {fname:50s} → No se pudo leer")
             continue
 
+        destino = (
+            f"{data['numero']} - {data['corto']} - "
+            f"{data['mes']} {data['anio']}.pdf"
+        )
         resultados.append({
             "origen": fname,
-            "destino": None,
+            "destino": destino,
             "fullpath": fullpath,
             "numero": data["numero"],
             "proveedor": data["corto"],
@@ -269,30 +232,9 @@ def procesar(origen: str, dry_run: bool = False) -> dict:
             "anio": data["anio"],
             "razon_social": data["razon_social"],
         })
-
-    # ── Detectar conflictos (mismo nombre corto, distinta razon social) ──
-    conflictos = _detectar_conflictos(resultados)
-    if conflictos:
-        output_lines.append(f"\n  ⚠ Conflicto detectado: {', '.join(sorted(conflictos))}")
-        output_lines.append(f"    (dos proveedores comparten el mismo nombre)")
-        output_lines.append(f"    Regenerando con desambiguación...\n")
-
-        for item in resultados:
-            if item["proveedor"] in conflictos:
-                item["proveedor"] = _abreviar_proveedor(
-                    item["razon_social"], disambiguate=True
-                )
-
-    # ── Generar nombre destino final ──
-    for item in resultados:
-        item["destino"] = (
-            f"{item['numero']} - {item['proveedor']} - "
-            f"{item['mes']} {item['anio']}.pdf"
-        )
-        output_lines.append(f"  {item['origen']:50s} → {item['destino']}")
-
+        output_lines.append(f"  {fname:50s} → {destino}")
         if dry_run:
-            output_lines.append(f"    Razón social: {item['razon_social']}")
+            output_lines.append(f"    Razón social: {data['razon_social']}")
 
     # ── Ejecutar renombre ──
     if not dry_run and resultados:
