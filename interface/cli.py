@@ -13,6 +13,13 @@ import sys
 import time
 from pathlib import Path
 
+# ─── Autocompletado con readline ───────────────────────────────
+try:
+    import readline
+    HAS_READLINE = True
+except ImportError:
+    HAS_READLINE = False
+
 # ─── Herramientas externas ─────────────────────────────────────
 try:
     from tools.pdf_renamer import procesar as pdf_renombrar
@@ -133,6 +140,7 @@ class NexusCLI:
 
     def run(self):
         """Bucle principal de la CLI."""
+        self._setup_autocomplete()
         self.show_banner()
 
         while self.running:
@@ -179,6 +187,44 @@ class NexusCLI:
             # Mostrar respuesta con estilo
             self._show_response(response, metadata)
 
+    def _setup_autocomplete(self):
+        """Configura autocompletado con Tab para comandos /."""
+        if not HAS_READLINE:
+            return
+        try:
+            # Lista de comandos para autocompletar
+            self._all_commands = [
+                "/help", "/status", "/stats", "/fase", "/hechos", "/memoria",
+                "/skills", "/hora", "/buscar", "/aprende", "/aprende-web",
+                "/recuerda", "/analiza", "/olvida", "/limpiar-web",
+                "/model", "/model list", "/model use", "/model test",
+                "/backend", "/personalidad", "/export", "/version",
+                "/update", "/clear", "/reset", "/exit", "/agent",
+                "/renombrar", "/verbose"
+            ]
+            def completer(text, state):
+                options = [cmd for cmd in self._all_commands if cmd.startswith(text)]
+                if state < len(options):
+                    return options[state]
+                return None
+            readline.set_completer(completer)
+            readline.parse_and_bind("tab: complete")
+        except Exception:
+            pass
+
+    def _get_installed_ollama_models(self):
+        """Consulta Ollama API y retorna lista de modelos instalados."""
+        try:
+            import urllib.request
+            req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                data = json.loads(resp.read())
+                models = data.get("models", [])
+                return [(m["name"], m.get("size", 0), m.get("details", {}).get("parameter_size", "?"))
+                        for m in models]
+        except Exception:
+            return []
+
     def _show_command_menu(self):
         """Muestra un menu interactivo de comandos disponibles.
 
@@ -206,7 +252,7 @@ class NexusCLI:
             ("13", "/analiza X",  "Extraer hechos de un texto"),
             ("14", "/olvida X",   "Borrar un hecho de la memoria"),
             ("15", "/limpiar-web", "Borrar hechos contaminados de GitHub/web"),
-            ("16", "/model",      "Cambiar backend + modelo"),
+            ("16", "/model",      "Gestionar modelos (menu interactivo)"),
             ("17", "/model test X", "Comparar todos los backends"),
             ("18", "/backend",    "Cambiar backend (symbolic/slm/hybrid)"),
             ("19", "/personalidad", "Ver/ajustar personalidad"),
@@ -884,8 +930,8 @@ class NexusCLI:
 
         if subcommand == "use":
             if len(parts) < 3:
-                print(f"{Color.RED}Uso: /model use <backend> [modelo]{Color.RESET}")
-                print(f"  Backends: opencode, ollama, symbolic, llamacpp")
+                # Sin argumentos: menu interactivo
+                self._model_interactive_menu()
                 return
             backend = parts[2].lower()
             model_name = parts[3] if len(parts) > 3 else None
@@ -904,12 +950,9 @@ class NexusCLI:
 {Color.CYAN}╔══ /model — Gestión de Modelos ══╗{Color.RESET}
 
   {Color.YELLOW}/model{Color.RESET}                          Muestra modelo actual
-  {Color.YELLOW}/model list{Color.RESET}                     Lista backends disponibles
-  {Color.YELLOW}/model use opencode{Color.RESET}             OpenCode Go (rapido, cloud)
-  {Color.YELLOW}/model use ollama qwen2.5:0.5b{Color.RESET} Ollama local (gratis, offline)
-  {Color.YELLOW}/model use ollama qwen2.5:1.5b{Color.RESET} Ollama local (mejor)
-  {Color.YELLOW}/model use ollama llama3.2:1b{Color.RESET}  Otro modelo
-  {Color.YELLOW}/model use llamacpp{Color.RESET}              llama.cpp (avanzado)
+  {Color.YELLOW}/model list{Color.RESET}                     Lista modelos instalados (dinamico)
+  {Color.YELLOW}/model use{Color.RESET}                      Menu interactivo para elegir modelo
+  {Color.YELLOW}/model use <backend> [modelo]{Color.RESET}   Cambiar directo
   {Color.YELLOW}/model test [pregunta]{Color.RESET}          Compara todos los backends
 
 {Color.DIM}Persiste en data/state/nexus_state.json (sobrevive entre sesiones).{Color.RESET}
@@ -922,15 +965,22 @@ class NexusCLI:
   {Color.YELLOW}opencode{Color.RESET}    OpenCode Go (Nous Research)
            Endpoint: https://opencode.ai/zen/go/v1
            API key: $OPENCODE_GO_API_KEY
-           Modelos: deepseek-v4-flash (default), otros
+           Modelo: deepseek-v4-flash (default)
            Rapido, cloud, gratis con API key
 
-  {Color.YELLOW}ollama{Color.RESET}      Ollama local (offline)
+  {Color.YELLOW}ollama{Color.RESET}      Ollama local (offline, privado, ilimitado)
            Endpoint: http://localhost:11434/v1
-           Modelos: qwen2.5:0.5b, qwen2.5:1.5b, qwen2.5:3b,
-                    llama3.2:1b, llama3.2:3b, phi3:mini, etc.
-           Lento, local, gratis
-
+           Modelos instalados:""")
+        # Mostrar modelos reales de Ollama
+        installed = self._get_installed_ollama_models()
+        if installed:
+            for name, size_bytes, params in installed:
+                size_gb = size_bytes / (1024**3)
+                param_str = f"{params}" if params and params != "?" else ""
+                print(f"           • {Color.GREEN}{name}{Color.RESET} ({size_gb:.1f} GB{f', {param_str}' if param_str else ''})")
+        else:
+            print(f"           {Color.GRAY}(Ollama no detectado o sin modelos){Color.RESET}")
+        print(f"""
   {Color.YELLOW}llamacpp{Color.RESET}    llama.cpp server (avanzado)
            Endpoint: http://localhost:8713/v1
            Requiere: model_path en config.py
@@ -964,6 +1014,60 @@ class NexusCLI:
             print(f"    Backend: {model_state.get('backend', '?')}")
             print(f"    Modelo:  {model_state.get('model_name', '?')}")
         print()
+
+    def _model_interactive_menu(self):
+        """Menu interactivo para seleccionar backend y modelo con numeros."""
+        print(f"""
+{Color.CYAN}╔══ Seleccion de Modelo ══╗{Color.RESET}
+
+  {Color.YELLOW}Backends disponibles:{Color.RESET}
+
+    1) {Color.GREEN}opencode{Color.RESET}  → OpenCode Go (cloud, rapido)
+              Modelo: deepseek-v4-flash
+    2) {Color.GREEN}ollama{Color.RESET}    → Ollama local (offline, ilimitado)
+              Modelos:""")
+        # Listar modelos Ollama reales
+        installed = self._get_installed_ollama_models()
+        if installed:
+            for i, (name, size_bytes, params) in enumerate(installed, 3):
+                size_gb = size_bytes / (1024**3)
+                param_str = f"{params}" if params and params != "?" else ""
+                icon = "🧠" if "embed" not in name.lower() else "📊"
+                print(f"    {i}) {icon} {Color.GREEN}{name}{Color.RESET} ({size_gb:.1f} GB{f', {param_str}' if param_str else ''})")
+            ollama_end = i + 1
+        else:
+            print(f"    {Color.DIM}(Ollama no detectado){Color.RESET}")
+            ollama_end = 3
+        
+        print(f"""
+    {ollama_end}) {Color.GREEN}symbolic{Color.RESET}  → Solo motor simbolico (sin modelo)
+
+  {Color.DIM}Escribe el numero o 'q' para cancelar{Color.RESET}
+""")
+        try:
+            choice = input(f"  {Color.YELLOW}Elige →{Color.RESET} ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return
+
+        if choice.lower() in ('q', '0', ''):
+            return
+
+        if choice == '1':
+            self._switch_model("opencode", "deepseek-v4-flash")
+        elif choice == '2':
+            self._switch_model("ollama", None)  # usa default
+        elif choice == str(ollama_end):
+            self._switch_model("symbolic")
+        elif choice.isdigit() and installed:
+            idx = int(choice) - 3
+            if 0 <= idx < len(installed):
+                name = installed[idx][0]
+                if "embed" not in name.lower():
+                    self._switch_model("ollama", name)
+                else:
+                    print(f"{Color.YELLOW}{name} es un modelo de embeddings, no de chat{Color.RESET}")
+        else:
+            print(f"{Color.RED}Opcion no valida: {choice}{Color.RESET}")
 
     def _switch_model(self, backend: str, model_name: str | None):
         """Cambia el backend SLM y persiste en el estado."""

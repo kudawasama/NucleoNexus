@@ -1,7 +1,7 @@
 {
   "nexus": {
-    "version": "0.1.0+build.69",
-    "commit": "11b72b8",
+    "version": "0.1.0+build.73",
+    "commit": "1f02bc8",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
     "total_interactions": 695,
@@ -39,7 +39,7 @@
     "initial_facts": 0
   },
   "model_state": {
-    "backend": "opencode",
-    "model_name": "deepseek-v4-flash"
+    "backend": "ollama",
+    "model_name": "qwen2.5:0.5b"
   }
 }

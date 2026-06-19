@@ -1,0 +1,732 @@
+{
+  "metadata": {
+    "fecha": "2026-06-18T22:40:05.566735",
+    "modelos_evaluados": [
+      "hermes3:3b",
+      "qwen2.5:3b",
+      "llama3.2:latest",
+      "qwen2.5:0.5b",
+      "llama3.2:1b",
+      "qwen3:4b",
+      "granite4:3b"
+    ],
+    "pruebas_por_categoria": {
+      "1_vida_cotidiana": 3,
+      "2_codigo": 3,
+      "3_tool_calling": 3,
+      "4_razonamiento": 3,
+      "5_contexto": 2
+    }
+  },
+  "resumen": {
+    "hermes3:3b": {
+      "pruebas_completadas": 14,
+      "errores": 0,
+      "tiempo_promedio_ms": 28027.4,
+      "tiempo_total_ms": 392384.3,
+      "chars_generados": 13283
+    },
+    "qwen2.5:3b": {
+      "pruebas_completadas": 14,
+      "errores": 0,
+      "tiempo_promedio_ms": 22680.9,
+      "tiempo_total_ms": 317532.1,
+      "chars_generados": 11866
+    },
+    "llama3.2:latest": {
+      "pruebas_completadas": 14,
+      "errores": 0,
+      "tiempo_promedio_ms": 24019.8,
+      "tiempo_total_ms": 336277.7,
+      "chars_generados": 9916
+    },
+    "qwen2.5:0.5b": {
+      "pruebas_completadas": 14,
+      "errores": 0,
+      "tiempo_promedio_ms": 7446.3,
+      "tiempo_total_ms": 104248.0,
+      "chars_generados": 13629
+    },
+    "llama3.2:1b": {
+      "pruebas_completadas": 14,
+      "errores": 0,
+      "tiempo_promedio_ms": 18939.9,
+      "tiempo_total_ms": 265159.0,
+      "chars_generados": 15279
+    },
+    "qwen3:4b": {
+      "pruebas_completadas": 4,
+      "errores": 10,
+      "tiempo_promedio_ms": 64373.5,
+      "tiempo_total_ms": 257494.0,
+      "chars_generados": 8687
+    },
+    "granite4:3b": {
+      "pruebas_completadas": 14,
+      "errores": 0,
+      "tiempo_promedio_ms": 25723.7,
+      "tiempo_total_ms": 360132.2,
+      "chars_generados": 10375
+    }
+  },
+  "resultados": {
+    "1_vida_cotidiana_1": {
+      "categoria": "1_vida_cotidiana",
+      "descripcion": "Conversación cotidiana en español",
+      "prompt": "¿Qué me recomiendas para cocinar esta noche? Tengo pollo, arroz y verduras. Responde en español.",
+      "hermes3:3b": {
+        "response": "Claro, basándome en tu inventario de ingredientes, te propuso un par de opc\u001b[3D\u001b[K\nopciones delictosas. Una opción sería una ensalada de pollo y vegetales. Pr\u001b[2D\u001b[K\nPrepara un dressingo con ajo, limón u ocumo (según tus preferencias) y une \u001b[K\nel pollo cortado en tiras con verduras frescas como espárragos, calabacín o\u001b[1D\u001b[K\no zanahorias. La ensalada quedará perfecta para un plato ligero y saludable\u001b[9D\u001b[K\nsaludable.\n\nOtra opción podría ser un estupendo curry de pollo. Para ello, cuela el pol\u001b[",
+        "response_full_len": 1020,
+        "duration_ms": 26203.3,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "Con los ingredientes que tienes - pollo, arroz y verduras - puedes preparar\u001b[8D\u001b[K\npreparar una sencilla pero deliciosa receta de Pollo al horno con verduras.\u001b[9D\u001b[K\nverduras.\n\nAquí te dejo algunos pasos para esta receta:\n\n1. Cocina el pollo: Puedes cortarlo en trozos pequeños o usar los filetes q\u001b[1D\u001b[K\nque ya traía la carne.\n2. Mezcla las verduras: Utiliza tus propias verduras preferidas, como pimie\u001b[5D\u001b[K\npimientos, zanahorias, apio y espinacas. Pelalas las verduras y mézclalas c\u001b[1D\u001b[K\ncon u",
+        "response_full_len": 1264,
+        "duration_ms": 26278.8,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "¡Excelente elección! Con estos ingredientes básicos, hay varias opciones de\u001b[2D\u001b[K\ndeliciosas que puedes preparar. Aquí te presento algunas recomendaciones:\n\n1. **Arroz con pollo**: Un clásico y sencillo plato. Puedes agregar verdura\u001b[7D\u001b[K\nverduras como cebolla, zanahoria, pimiento y tomate para darle un toque de \u001b[K\ncolor y sabor.\n2. **Pollo al curry**: Añade una cucharada de curry en polvo y una pizca de\u001b[2D\u001b[K\nde comino a la salsa de arroz. Luego, cocina el pollo con verduras como zan\u001b[3D\u001b[K",
+        "response_full_len": 1310,
+        "duration_ms": 39813.6,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "Entendido, aquí te dejo algunas recomendaciones para cocinar este plato:\n\n1. Pollo: El pollo es un sabor increíble con un manjar de arroz y verduras.\u001b[9D\u001b[K\nverduras.\n\n2. Arroz: Este platillo es la base de todo el proceso de cocinar, con arroz\u001b[5D\u001b[K\narroz a base de pollo para darle un sabor especial y mantener su higiene.\n\n3. Verduras: Las verduras ayudan a mejorar el sabor del pollo y al mismo ti\u001b[2D\u001b[K\ntiempo proporcionan una gran cantidad de fibra y nutrientes.\n\n4. Comidas para cocinar: El a",
+        "response_full_len": 918,
+        "duration_ms": 7215.5,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "¡Claro que sí! Con pollo, arroz y verduras, tienes una gran variedad de opc\u001b[3D\u001b[K\nopciones deliciosas para cocinar esta noche. Aquí te dejo algunas ideas:\n\n**Platos clásicos**\n\n1. Pollo al curry: Marínalo en una mezcla de aceite, jugo de limón, cebolla\u001b[7D\u001b[K\ncebolla picada, ajo picado y especias. Luego, sazona con sal, pimienta y co\u001b[2D\u001b[K\ncomino. Cocina en un poco de aceite caliente hasta que el pollo esté cocido\u001b[6D\u001b[K\ncocido. Sirve con arroz y verduras cocidas al vapor.\n2. Pollo a la parril",
+        "response_full_len": 2092,
+        "duration_ms": 24728.1,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "Con base a los ingredientes que mencionaste -pollo, arroz y verduras- te re\u001b[2D\u001b[K\nrecomendaría preparar un delicioso Pollo con Verduras al Vapor. Aquí tienes\u001b[6D\u001b[K\ntienes una receta sencilla:\n\n**Ingredientes:**\n1. 2 pollos a la carta (piedra o filete)\n2. Sal y pimienta\n3. 4 cucharadas de aceite de oliva\n4. 6 dientes de ajo, picados\n5. 2 ramitas de tomillo fresco\n6. 1 rama de menta fresca (opcional)\n7. Arroz integral o blanco\n8. Hierbas frescas para decorar\n\n**Instrucciones:**\n1. Precalienta el",
+        "response_full_len": 1700,
+        "duration_ms": 52440.3,
+        "error": ""
+      }
+    },
+    "1_vida_cotidiana_2": {
+      "categoria": "1_vida_cotidiana",
+      "descripcion": "Conversación cotidiana en español",
+      "prompt": "Explícame qué es el efecto invernadero como si tuviera 12 años. En español.",
+      "hermes3:3b": {
+        "response": "El \"efecto invernariero\" es un proceso por el cual la atmósfera de la Tierr\u001b[5D\u001b[K\nTierra protege a nuestro planeta de temperaturas extremas. Imagina que tú e\u001b[1D\u001b[K\nestás sentado en una gran silla de plástico.\n\nImagina que hay diferentes tipos de gases en nuestra atmosfera, como si fue\u001b[3D\u001b[K\nfueran partículas pequeñas y ligeras de esa silla. Algunos de estos gases l\u001b[1D\u001b[K\nllamamos \"gas de efecto invernadero\". Hay algunos gas naturalmente presente\u001b[8D\u001b[K\npresentes, como el dióxido de carbono (",
+        "response_full_len": 2592,
+        "duration_ms": 60117.6,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "¡Claro! Vamos a hablar de un tema interesante llamado \"efecto invernadero\".\u001b[13D\u001b[K\ninvernadero\". \n\nImagina que tienes una caja de vidrio grande donde guardas tus juguetes, pe\u001b[2D\u001b[K\npero no puedes abrir la puerta para que el sol pueda entrar y calentarla. E\u001b[1D\u001b[K\nEn esta caja, hay solo aire y tu juguete favorito. Si cierras la caja sin v\u001b[1D\u001b[K\nventanas, lo más probable es que se frote y termine estancándose, no calien\u001b[6D\u001b[K\ncaliente porque no tiene espacio para moverse (es como cuando un jug",
+        "response_full_len": 1844,
+        "duration_ms": 34841.5,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "¡Hola! Me alegra explicarte sobre el efecto invernadero de una manera senci\u001b[5D\u001b[K\nsencilla y fácil de entender.\n\nEl efecto invernadero es un problema que afecta a nuestro planeta, y es alg\u001b[3D\u001b[K\nalgo que debemos entender para poder hacer algo al respecto. ¿Sabes qué es \u001b[K\nlo que hace que la Tierra esté caliente? Bueno, es porque el aire que rodea\u001b[5D\u001b[K\nrodea la Tierra está lleno de gases que ayudan a retener el calor del Sol.\n\nImagina que estás en un cubo con una ventana transparente. Al ent",
+        "response_full_len": 2374,
+        "duration_ms": 58272.6,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "¡Hola! El efecto invernadero es una teoría climática que dice que la humeda\u001b[6D\u001b[K\nhumedad y las condiciones del clima dominan, no las precipitaciones.\n\nEntonces, el \"invernadero\" en este caso, parece ser un lugar o entorno dond\u001b[4D\u001b[K\ndonde los cambios climáticos se están produciendo de manera excesiva. ¿Sabe\u001b[5D\u001b[K\n¿Sabes cómo funciona eso? Imagina que tienes algo llamado \"suelo\" y que la \u001b[K\nhumedad es como el aire que respiras. Si te metes en ese \"suelo\", no puedes\u001b[6D\u001b[K\npuedes respirar suf",
+        "response_full_len": 1195,
+        "duration_ms": 8474.1,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "¡Hola! Me alegra explicarte sobre el efecto invernadero.\n\nImagina que estás en un coche frío durante todo el día, pero luego te calie\u001b[5D\u001b[K\ncalientes con la fábrica de azúcar. ¿Por qué? Bueno, eso es lo mismo que pa\u001b[2D\u001b[K\npasa con el aire del planeta. La Tierra absorbe (asima) el calor solar del \u001b[K\nsol y lo convierte en agua húmeda, que cae en las aguas del océano.\n\nLuego, el agua se esfriña y se convierte en vapor de agua, que va al cielo \u001b[K\nen forma de nubes. Pero aquí está la parte buena:",
+        "response_full_len": 1663,
+        "duration_ms": 22573.0,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "Claro, imagina que nuestro planeta Tierra es como una casa grande y agradab\u001b[7D\u001b[K\nagradable. Nuestro aliento caliente cuando respiramos o las calenturas que \u001b[K\nusamos en invierno mantienen la casa cálida y cómoda. Así mismo el sol nos \u001b[K\ncalienta con su luz brillante y hace que nuestros juguetes se huelgan.\n\nPero también, como cualquier casa grande, tiene ventanas grandes abiertas p\u001b[1D\u001b[K\npara que las airemos o cuando queremos respirar aire fresco. En esta situac\u001b[6D\u001b[K\nsituación, el aire ca",
+        "response_full_len": 1898,
+        "duration_ms": 47531.1,
+        "error": ""
+      }
+    },
+    "1_vida_cotidiana_3": {
+      "categoria": "1_vida_cotidiana",
+      "descripcion": "Conversación cotidiana en español",
+      "prompt": "Estoy pensando en aprender a tocar guitarra. ¿Qué me aconsejas? Respuesta corta, en español.",
+      "hermes3:3b": {
+        "response": "Para comenzar a aprender a tocar la guitarra, considera los siguientes paso\u001b[4D\u001b[K\npasos:\n\n1. Elige una técnica básica (acústica o eléctrica) que se adapte a tus inte\u001b[4D\u001b[K\nintereses y espacio.\n\n2. Compra una guitarra de acuerdo a tu nivel y necesidades iniciales.\n\n3. Busca lecciones básicas en línea, como videos de YouTube u online cursos\u001b[6D\u001b[K\ncursos, donde puedes encontrar explicaciones paso a paso.\n\n4. Practica diariamente, manteniendo un ritmo constante para consolidar tus\u001b[3D\u001b[K\ntus habi",
+        "response_full_len": 641,
+        "duration_ms": 21685.5,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "Practica regularmente y aprende desde la base.",
+        "response_full_len": 46,
+        "duration_ms": 8629.3,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "¡Excelente decisión! Aquí te dejo algunos consejos para empezar:\n\n1. **Aprende los fundamentos**: Comienza con la técnica básica de tocar, co\u001b[2D\u001b[K\ncomo acordes y escalas.\n2. **Elige un instrumento adecuado**: Si eres principiante, considera una g\u001b[1D\u001b[K\nguitarra acústica o una eléctrica con un amplificador simple.\n3. **Busca lecciones o tutoriales en línea**: Puedes encontrar recursos gra\u001b[3D\u001b[K\ngratuitos o de pago que te ayuden a aprender más rápido.\n4. **Practica regularmente**: Establece un",
+        "response_full_len": 597,
+        "duration_ms": 21069.4,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "¡Por supuesto! ¡Tienes razón! Aprender a tocar la guitarra es una excelente\u001b[9D\u001b[K\nexcelente idea. Aquí tienes algunas recomendaciones:\n\n1. **Conocimientos iniciales**: Antes de comenzar con un instrumento más co\u001b[2D\u001b[K\ncomplejo como la guitarra, es recomendable familiarizarte con los principio\u001b[9D\u001b[K\nprincipios básicos.\n\n2. **Educación en video y libros**: Compartir tus ideas o aprender de otros\u001b[5D\u001b[K\notros con videos en YouTube o libros son muy útiles para desarrollar tu hab\u001b[3D\u001b[K\nhabilidad.",
+        "response_full_len": 1720,
+        "duration_ms": 9598.0,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "¡Excelente decisión! Aprender a tocar la guitarra puede ser una pasión grat\u001b[4D\u001b[K\ngratificante y liberadora.\n\nAquí te dejo algunos consejos iniciales:\n\n- Comienza con una guitarra acústica o un acordeón (si no tienes experienci\u001b[10D\u001b[K\nexperiencia, un acordeón es una buena opción).\n- Busca tutoriales en línea para aprender los fundamentos básicos.\n- Practica 15 minutos al día, ajusta el tiempo según tus necesidades y nive\u001b[4D\u001b[K\nnivel de habilidad.\n- Considera asistir a clases presenciales si t",
+        "response_full_len": 714,
+        "duration_ms": 16484.3,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "Thinking...\nOkay, the user wants to know what I recommend for learning guitar. They wan\u001b[3D\u001b[K\nwant a short answer in Spanish.\n\nFirst, I should think about the key points for learning guitar. Start with \u001b[K\nchoosing the right guitar, maybe acoustic or electric. Then, basic chords, \u001b[K\nlike C, G, D, Em. Practice daily, maybe 15-30 minutes. Use a metronome for \u001b[K\nrhythm. Maybe recommend a beginner book or online tutorial. Also, stay cons\u001b[4D\u001b[K\nconsistent and be patient.\n\nWait, the user said \"res",
+        "response_full_len": 1925,
+        "duration_ms": 62306.8,
+        "error": ""
+      },
+      "granite4:3b": {
+        "response": "Para aprender a tocar la guitarra, te recomiendo lo siguiente:\n\n1. Adquiere una guitarra de calidad adecuada para principiantes.\n2. Aprende los nombres y ubicación de las cuerdas (m, nf, g, d, s, g').\n3. Practica ejercicios básicos como la escalera musical, ritmos simples e i\u001b[1D\u001b[K\nimprovisaciones.\n4. Investiga en línea o compra libros de teoría musical para comprender mej\u001b[3D\u001b[K\nmejor el concepto de acordes y melodías.\n5. Escucha música que te guste y trata de imitar lo que escuchas tocando.\n6",
+        "response_full_len": 820,
+        "duration_ms": 27067.9,
+        "error": ""
+      }
+    },
+    "2_codigo_1": {
+      "categoria": "2_codigo",
+      "descripcion": "Generación de código Python",
+      "prompt": "Escribe una función en Python que reciba una lista de números y devuelva el segundo más grande sin usar sorted(). Solo código, sin explicación.",
+      "hermes3:3b": {
+        "response": "def second_largest_unsorted(numbers):\n return max(set(numbers), key=lambda x: (max(numbers) if max(numbers)  0)).\u001b[4D\u001b[K\n0)).__mod__()",
+        "response_full_len": 134,
+        "duration_ms": 12992.6,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "```python\ndef second_largest(nums):\n    if len(nums) < 2:\n        return None\n    first = second = float('-inf')\n    for num in nums:\n        if num > first:\n            second, first = first, num\n        elif num > second and num != first:\n            second = num\n    return second if second != float('-inf') else None\n```",
+        "response_full_len": 324,
+        "duration_ms": 12088.4,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "```python\ndef segundo_mayor(lista):\n    maximo = minima = lista[0]\n    for num in lista[1:]:\n        if num > maximo:\n            maximo, minima = num, maximo\n        elif num < minima and num != maximo:\n            minima = num\n    return minima if minima != maximo else None\n```",
+        "response_full_len": 280,
+        "duration_ms": 15492.4,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "Claro, te dejo un ejemplo de cómo puedes hacerlo:\n\n```python\ndef segundo_mayor(lista):\n    maximo = float('-inf')  # Inicializamos con el valor minimo para la com\u001b[3D\u001b[K\ncomparación\n\n    for numero in lista:\n        if numero > maximo:\n            maximo = numero  # Actualizamos el mayor hasta que se encuentra\u001b[9D\u001b[K\nencuentra un número más grande\n    return maximo\n\n# Ejemplo de uso\nlista = [10, -2, 3, 8, 5]\nresultado = segundo_mayor(lista)\nprint(resultado)  # Devolverá 8\n```\n\nEn este código:\n- ",
+        "response_full_len": 911,
+        "duration_ms": 7360.9,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "```python\ndef segundo_mayor(num_list):\n    if len(num_list) < 2:\n        return None\n    num_list.sort(reverse=True)\n    return num_list[1]\n\nnum_list = [5, 3, 9, 8, 2]\nprint(segundo_mayor(num_list))  # Devuelve: 8\n```",
+        "response_full_len": 217,
+        "duration_ms": 13925.2,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "```python\ndef second_largest(numbers):\n    first = second = float('-inf')\n    for num in numbers:\n        if num > first:\n            second = first\n            first = num\n        elif num > second and num != first:\n            second = num\n    return second\n```",
+        "response_full_len": 263,
+        "duration_ms": 14214.8,
+        "error": ""
+      }
+    },
+    "2_codigo_2": {
+      "categoria": "2_codigo",
+      "descripcion": "Generación de código Python",
+      "prompt": "Escribe un decorador en Python que mida el tiempo de ejecución de una función. Solo código.",
+      "hermes3:3b": {
+        "response": "To measure the execution time of a function in Python, you can use the foll\u001b[4D\u001b[K\nfollowing code:\n\n```python\nimport time\n\ndef measure_function_execution(func):\n    def wrapper(*args, **kwargs):\n        start_time = time.perf_counter()  # or time.time() for higher preci\u001b[5D\u001b[K\nprecision\n        result = func(*args, **kwargs)\n        end_time = time.perf_counter()\n        execution_time = (end_time - start_time) * 1000  # Convert to milli\u001b[5D\u001b[K\nmilliseconds if needed\n        print(f\"Execution ti",
+        "response_full_len": 1827,
+        "duration_ms": 39631.1,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "Para crear un decorador que mida el tiempo de ejecución de una función en P\u001b[1D\u001b[K\nPython, puedes utilizar `time` para obtener la hora actual antes y después \u001b[K\nde ejecutar la función. Aquí está cómo lo harías:\n\n```python\nimport time\n\ndef timer(func):\n    def wrapper(*args, **kwargs):\n        start_time = time.time()\n        \n        result = func(*args, **kwargs)\n        \n        end_time = time.time()\n        execution_time = end_time - start_time\n        \n        print(f\"Función {func.__name",
+        "response_full_len": 1332,
+        "duration_ms": 28501.4,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "import time\nfrom functools import wraps\n\ndef medirTiempo(func):\n    @wraps(func)\n    def inner(*args, **kwargs):\n        start_time = time.time()\n        result = func(*args, **kwargs)\n        end_time = time.time()\n        tiempo_ejecucion = end_time - start_time\n        print(f\"Tiempo de ejecución: {tiempo_ejecucion} segundos\")\n        return result\n    return inner",
+        "response_full_len": 370,
+        "duration_ms": 16003.8,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "Claro, puedo ayudarte con eso. Aquí está un ejemplo de un decorador en Pyth\u001b[4D\u001b[K\nPython que mide la complejidad (el tiempo de ejecución) de una función:\n\n```python\ndef timed_function(func):\n    import time\n\n    def wrapper(*args, **kwargs):\n        start_time = time.time()\n        \n        result = func(*args, **kwargs)\n        end_time = time.time()\n\n        # Calcular la complejidad en términos de tiempo:\n        complexity = round((end_time - start_time) * 1000, 2)\n\n        return result, c",
+        "response_full_len": 1893,
+        "duration_ms": 10751.3,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "```python\nimport time\nfrom functools import wraps\n\ndef timer_decorator(func):\n    \"\"\"\n    A decorator to measure the execution time of a function.\n    \n    Args:\n        func: The function to be decorated.\n    \n    Returns:\n        A wrapper function that measures and returns the execution time of \u001b[K\nthe original function.\n    \"\"\"\n    @wraps(func)\n    def wrapper(*args, **kwargs):\n        start_time = time.time()\n        result = func(*args, **kwargs)\n        end_time = time.time()\n        \n   ",
+        "response_full_len": 1330,
+        "duration_ms": 19792.0,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "```python\nimport time\n\ndef execution_time(func):\n    \"\"\"\n    Decorator to measure the execution time of a function.\n    \n    Args:\n        func (function): The function whose execution time is to be measure\u001b[7D\u001b[K\nmeasured.\n\n    Returns:\n        function: A new function that wraps the original function and measu\u001b[5D\u001b[K\nmeasures its execution time.\n    \"\"\"\n\n    def wrapper(*args, **kwargs):\n        start_time = time.time()\n        \n        # Call the original function\n        result = func(*args,",
+        "response_full_len": 1056,
+        "duration_ms": 26275.5,
+        "error": ""
+      }
+    },
+    "2_codigo_3": {
+      "categoria": "2_codigo",
+      "descripcion": "Generación de código Python",
+      "prompt": "Corrige este código:\ndef fibonacci(n):\n    if n = 0: return 0\n    if n == 1: return 1\n    return fibonacci(n-1) + fibonacci(n-2)\n\nResponde solo con el código corregido.",
+      "hermes3:3b": {
+        "response": "def fibonacci(n):\n    if n in [0, 1]:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)",
+        "response_full_len": 97,
+        "duration_ms": 13223.9,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "def fibonacci(n):\n    if n == 0: \n        return 0\n    elif n == 1: \n        return 1\n    else:\n        return fibonacci(n-1) + fibonacci(n-2)",
+        "response_full_len": 142,
+        "duration_ms": 10434.7,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "```python\ndef fibonacci(n):\n    if n <= 0: \n        return 0\n    elif n == 1: \n        return 1\n    else:\n        return fibonacci(n-1) + fibonacci(n-2)\n```\nTen en cuenta que la igualdad (`=`) es incorrecta y debe reemplazarse con l\u001b[1D\u001b[K\nla operación de comparación (`==`) para evitar errores.",
+        "response_full_len": 295,
+        "duration_ms": 15738.9,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "```python\ndef fibonacci(n):\n    if n == 0: \n        return 0\n    elif n == 1:\n        return 1\n    else:\n        return fibonacci(n-1) + fibonacci(n-2)\n```",
+        "response_full_len": 155,
+        "duration_ms": 4117.0,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "Você pode usar a função `functools.reduce()` para simplificar o código:\n\n```python\nfrom functools import reduce\n\ndef fibonacci(n):\n    return reduce(lambda x, y: x + y, range(1, n+1))\n```\n\nEssa versão é mais legível e funciona da mesma forma que o seu original. A \u001b[K\nfunção `reduce()` calcula a soma de um conjunto de números começando com o \u001b[K\nprimeiro número do conjunto.",
+        "response_full_len": 375,
+        "duration_ms": 14398.9,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "```python\ndef fibonacci(n):\n    if n == 0: return 0\n    if n == 1: return 1\n    return fibonacci(n-1) + fibonacci(n-2)\n```",
+        "response_full_len": 122,
+        "duration_ms": 13747.0,
+        "error": ""
+      }
+    },
+    "3_tool_calling_1": {
+      "categoria": "3_tool_calling",
+      "descripcion": "Tool calling / Function calling",
+      "prompt": "Eres un asistente con acceso a herramientas. Responde con un JSON de acción.\n\nHerramientas disponibles:\n- get_weather(ciudad: str) -> dict\n- calculate(expresion: str) -> float\n- search_files(patron: str) -> list\n- web_search(query: str) -> list\n\nUsuario: \"¿Qué temperatura hace en Santiago?\"\n\nResponde SOLO con JSON: {\"tool\": \"...\", \"args\": {...}}",
+      "hermes3:3b": {
+        "response": "{\n \"tool\": \"get_weather\",\n \"args\": {\n \"ciudad\": \"Santiago\"\n }\n}",
+        "response_full_len": 63,
+        "duration_ms": 12963.0,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "{\"tool\": \"get_weather\", \"args\": {\"ciudad\": \"Santiago\"}}",
+        "response_full_len": 55,
+        "duration_ms": 8773.1,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "{\"tool\": \"get_weather\", \"args\": {\"ciudad\": \"Santiago\"}}",
+        "response_full_len": 55,
+        "duration_ms": 11882.9,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "{\"tool\": \"get_weather, args\": {\"ciudad\": \"santiago\"}}",
+        "response_full_len": 53,
+        "duration_ms": 3648.4,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "```json\n{\n  \"tool\": \"calculate\",\n  \"args\": {\n    \"expression\": \"get_weather(Santiago)\"\n  }\n}\n```",
+        "response_full_len": 96,
+        "duration_ms": 12680.6,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "Thinking...\nOkay, the user is asking, \"¿Qué temperatura hace en Santiago?\" which transl\u001b[6D\u001b[K\ntranslates to \"What's the temperature in Santiago?\" So I need to figure out\u001b[3D\u001b[K\nout which tool to use here.\n\nLooking at the available tools: get_weather(ciudad: str) -> dict, calculate\u001b[9D\u001b[K\ncalculate, search_files, web_search. The question is about the current weat\u001b[4D\u001b[K\nweather in Santiago, so the get_weather tool seems appropriate here. The to\u001b[2D\u001b[K\ntool takes a city name as a string.\n\nI shoul",
+        "response_full_len": 1380,
+        "duration_ms": 39259.0,
+        "error": ""
+      },
+      "granite4:3b": {
+        "response": "{\n  \"tool\": \"get_weather\",\n  \"args\": {\n    \"ciudad\": \"Santiago\"\n  }\n}",
+        "response_full_len": 69,
+        "duration_ms": 11801.3,
+        "error": ""
+      }
+    },
+    "3_tool_calling_2": {
+      "categoria": "3_tool_calling",
+      "descripcion": "Tool calling / Function calling",
+      "prompt": "Mismas herramientas. Usuario: \"Calcula 15% de 850 más 200\"\nResponde SOLO con JSON: {\"tool\": \"...\", \"args\": {...}}",
+      "hermes3:3b": {
+        "response": "{\n \"tool\": \"multiplication\",\n \"args\": {\n  \"operation\": \"add\",\n  \"numbers\": [\n   { \"value\": 850, \"operator\": \"%\" },\n   { \"value\": 15, \"unit\": \"%\" }\n  ],\n  \"result\": { \"value\": 80.5, \"operator\": \"x\", \"next\": 200 }\n \n  ,\n  \"result2\": 80.5 * 200\n }\n}",
+        "response_full_len": 246,
+        "duration_ms": 16836.0,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "{\"tool\": \"CalculatorTool\", \"args\": {\"operation\": \"multiply\", \"factor\": 15, \u001b[K\n\"base\": 850, \"addition\": 200}}",
+        "response_full_len": 109,
+        "duration_ms": 10305.0,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "{\"tool\": \"multiplicacion\", \"args\": {\"num1\": 850, \"num2\": 0.15, \"num3\": 200}\u001b[4D\u001b[K\n200}}",
+        "response_full_len": 88,
+        "duration_ms": 12859.0,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "{\"tool\": \"formula\", \"args\": []}",
+        "response_full_len": 31,
+        "duration_ms": 3557.5,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "```\n{\n  \"tool\": \"calc\",\n  \"args\": [\n    {\n      \"value\": \"15%\",\n      \"operator\": \"+\",\n      \"right\": \"850\",\n      \"left\": \"200\"\n    }\n  ]\n}\n```",
+        "response_full_len": 144,
+        "duration_ms": 13166.2,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "{\"tool\": \"mathematical calculation\", \"args\": {\"percentage\": 15, \"base_value\u001b[11D\u001b[K\n\"base_value\": 850, \"addition\": 200}}",
+        "response_full_len": 120,
+        "duration_ms": 12249.8,
+        "error": ""
+      }
+    },
+    "3_tool_calling_3": {
+      "categoria": "3_tool_calling",
+      "descripcion": "Tool calling / Function calling",
+      "prompt": "Mismas herramientas. Usuario: \"Busca en internet cómo hacer pan casero\"\nResponde SOLO con JSON: {\"tool\": \"...\", \"args\": {...}}",
+      "hermes3:3b": {
+        "response": "{\n  \"tool\": \"Hacer pan casero, se puede incluir:\n  1. Receta básica de pan casero (por ejemplo, receta de 'pan casero sin le\u001b[2D\u001b[K\nlevadura').\n  2. Ingredientes necesarios: harina integral o blanda, agua tibia, sal, y \u001b[K\nopcionalmente aceite o glicerol.\n  3. Procedimientos: mezclar ingredientes hasta formar una masa homogénea, \u001b[K\ndejar reposar (fermentar) la masa durante aproximadamente 30 minutos a temp\u001b[4D\u001b[K\ntemperatura ambiente, extender la masa con un rodillo para formar panecillo\u001b[9D\u001b[K",
+        "response_full_len": 784,
+        "duration_ms": 24590.5,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "{\"tool\":\"InternetSearchTool\",\"args\":{\"query\":\"cómo hacer pan casero\"}}",
+        "response_full_len": 70,
+        "duration_ms": 9082.6,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "{\"tool\": \"Google\", \"args\": {\"query\": \"receta de pan casero\", \"lang\": \"es\"}}",
+        "response_full_len": 75,
+        "duration_ms": 12347.2,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "{\"tool\": \"search internet\", \"args\": {}}",
+        "response_full_len": 39,
+        "duration_ms": 3590.0,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "```json\n{\n    \"tool\": \"horno a microondas\",\n    \"args\": [\"5 minutos, 180°C\"]\n}\n```\n\n---\n\n Buscar en internet cómo hacer pan casero.\n\n Buscando en internet encontré una receta para hacer pan casero sin levadur\u001b[7D\u001b[K\nlevadura ni hornidos. Para hacerlo necesitarás:\n\n- 500 gramos de harina\n- 100 gramos de azúcar\n- 1 cucharada de sal\n- 1 huevo\n- 50 ml de leche\n\nReparto la harina en una taza, luego agrego el azúcar y la sal. Vierte la l\u001b[1D\u001b[K\nleche y el huevo en un recipiente separado para hacer una",
+        "response_full_len": 722,
+        "duration_ms": 12428.5,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "Thinking...\nOkay, the user is asking me to search the internet for how to make homemade\u001b[8D\u001b[K\nhomemade bread. They want the response in JSON format with the tool and arg\u001b[3D\u001b[K\narguments.\n\nFirst, I need to figure out which tool to use. Since they want to search th\u001b[2D\u001b[K\nthe internet, the most appropriate tool here would be a web search tool. Th\u001b[2D\u001b[K\nThe tool name could be something like \"web_search\" or \"internet_search\".\n\nNext, the arguments. For a web search, the query is the main thing. Th",
+        "response_full_len": 1753,
+        "duration_ms": 51294.6,
+        "error": ""
+      },
+      "granite4:3b": {
+        "response": "{\n  \"tool\": \"search\",\n  \"args\": {\n    \"query\": \"cómo hacer pan casero\"\n  }\n}",
+        "response_full_len": 76,
+        "duration_ms": 11628.6,
+        "error": ""
+      }
+    },
+    "4_razonamiento_1": {
+      "categoria": "4_razonamiento",
+      "descripcion": "Razonamiento lógico y matemático",
+      "prompt": "Si un tren sale de A a las 8:00 a 60 km/h y otro sale de B a las 8:30 a 90 km/h hacia A, y la distancia es 300 km, ¿a qué hora se encuentran? Explica tu razonamiento.",
+      "hermes3:3b": {
+        "response": "Let's break this down step by step:\n\n1. Both trains are traveling towards point A from different points B (where\u001b[6D\u001b[K\n(where the second train starts from) is not specified but for calculations \u001b[K\nwe can assume it as 'X' for simplicity.\n\n2. The first train leaves at 8:00 am and travels at a speed of 60 km/h. \n3. The second train leaves at 8:30 am and travels at a speed of 90 km/h.\n\n4. The total distance between the two points A and X is 300 km.\n\n5. Let t be the time in hours after which the fi",
+        "response_full_len": 1232,
+        "duration_ms": 34851.1,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "Vamos a resolver este problema dividido en varios pasos.\n\n### Paso 1: Calcular el tiempo que lleva un tren de A a llegar a B.\nSupongamos que los trenes llegan al punto B (B) al mismo tiempo. Por lo tan\u001b[3D\u001b[K\ntanto, la distancia entre A y B es de 300 km. \n\nEl primer tren sale de A a las 8:00 y viaja a una velocidad constante de 60\u001b[2D\u001b[K\n60 km/h.\n\nTiempo que lleva para llegar:\n\\[ \\text{Tiempo} = \\frac{\\text{Distancia}}{\\text{Velocidad}} = \\frac{300\\, \u001b[K\n\\text{km}}{60\\, \\text{km/h}} = 5\\, \\text{",
+        "response_full_len": 2598,
+        "duration_ms": 69849.5,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "Para resolver este problema, podemos utilizar el concepto de velocidad rela\u001b[4D\u001b[K\nrelativa entre dos objetos que se mueven en direcciones opuestas.\n\nPrimero, necesitamos calcular la diferencia de velocidad entre los dos tren\u001b[4D\u001b[K\ntrenes:\n\nVelocidad del primer tren: 60 km/h\nVelocidad del segundo tren: 90 km/h\n\nDiferencia de velocidad: 90 - 60 = 30 km/h\n\nEsto significa que el segundo tren se mueve a una velocidad 30 km/h más ráp\u001b[3D\u001b[K\nrápida que el primer tren.\n\nA continuación, necesitamos cal",
+        "response_full_len": 1724,
+        "duration_ms": 45574.4,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "Para resolver esta ecuación teórica:\n\n1) Primero, necesitamos convertir el tempo del tren A en horas. El tren sal\u001b[3D\u001b[K\nsale a las 8:00 y llega a las 60 km/h. Para convertir este tiempo en horas:\u001b[6D\u001b[K\nhoras:\n   8:00 a 90 min.\n   8:00 = 08:00, 15:00 (convierte a minutos)\n   08:00 + 90 min. = 08:90\n2) Ahora sabemos que el tren A sale a las 8:00 y llega a las 60 km/h. A pes\u001b[3D\u001b[K\npesar de esto, se debe considerar que el tren A puede hacer lo siguiente:\n   - Si no hay un intervalo de tiempo entr",
+        "response_full_len": 1913,
+        "duration_ms": 13550.8,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "Para encontrar la hora en la que los trenes se encuentran, necesitamos dete\u001b[4D\u001b[K\ndeterminar cuánto tiempo han estado recorriendo el camino desde su partida \u001b[K\nhasta ahora.\n\nPrimero, calculamos la velocidad promedio de los dos trenes:\n\nVelocidad del tren A = 60 km/h\nVelocidad del tren B = 90 km/h\n\nVelocidad promedio = (Velocidad del tren A + Velocidad del tren B) / 2\n= (60 + 90) / 2\n= 150 / 2\n= 75 km/h\n\nAhora, calculemos la distancia recorrida por cada tren:\n\nDistancia recorrida por el tren A ",
+        "response_full_len": 3146,
+        "duration_ms": 37461.0,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "Para resolver este problema, primero debemos calcular cuánto tiempo tardan \u001b[K\nlos dos trenes en recorrer la distancia de 300 kilómetros entre sus puntos \u001b[K\nde partida hasta que se encuentren.\n\n1. El primer tren parte a las 8:00 y viaja a una velocidad de 60 km/h.\n2. El segundo tren parte a las 8:30 (o 8.5 horas) y viaja a una velocidad d\u001b[1D\u001b[K\nde 90 km/h, también hacia A.\n\nCalculemos la distancia que recorre cada tren antes del encuentro:\n\n- En el tiempo t (en horas) después de las 8:00, la d",
+        "response_full_len": 1307,
+        "duration_ms": 45152.2,
+        "error": ""
+      }
+    },
+    "4_razonamiento_2": {
+      "categoria": "4_razonamiento",
+      "descripcion": "Razonamiento lógico y matemático",
+      "prompt": "En una habitación hay 5 personas. Cada una saluda a las otras exactamente una vez. ¿Cuántos saludos hubo en total? Explica paso a paso.",
+      "hermes3:3b": {
+        "response": "Let's break down the problem step by step:\n\n1. There are 5 people in the room.\n2. Each person greets exactly one other person.\n3. To find the total number of greetings, we can imagine each person greeti\u001b[6D\u001b[K\ngreeting one by one.\n\nFor example, let's say Person A greets Person B. This leaves Person C as th\u001b[2D\u001b[K\nthe only person left who has not greeted anyone yet. Now,\n- Person C greets Person A (since Person A hadn't greeted anyone else).\n- Person B greets Person C.\n- Person A greets Person C ",
+        "response_full_len": 1974,
+        "duration_ms": 53948.1,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "Para resolver este problema, vamos a seguir estos pasos:\n\n1) **Identificar la cantidad de interacciones**: En esta situación, cada pe\u001b[2D\u001b[K\npersona da una sonrisa (saludo) a cada otra persona solo una vez.\n\n2) **Determinar el número de personas involucradas**: Hay 5 personas en tot\u001b[3D\u001b[K\ntotal. \n\n3. **Calcular las saludos individuales**: Cada persona dará un saludo a cad\u001b[3D\u001b[K\ncada una de las otras cuatro personas. Esto significa que Persona 1 hará 4 \u001b[K\nsaludos, Persona 2 hará 3 (ya que ya s",
+        "response_full_len": 1540,
+        "duration_ms": 36193.5,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "¡Claro! Para determinar el número de saludos, podemos seguir estos pasos:\n\n1. **Cada persona saluda a cada otra**: En primer lugar, notamos que cada p\u001b[1D\u001b[K\npersona puede saludar a todas las demás personas exactamente una vez.\n\n2. **Número total de saludos por persona**: Dado que hay 5 personas, cada p\u001b[1D\u001b[K\npersona puede saludar a otras 4 personas (ya que no se saluda a sí misma).\n\n3. **Multiplicación del número de personas por el número de saludos por per\u001b[3D\u001b[K\npersona**: Si multiplicamos e",
+        "response_full_len": 1288,
+        "duration_ms": 32726.3,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "Para resolver esta pregunta, debemos seguir los pasos siguientes:\n\n1) Se crean 5 salidas: Salir del asiento de abajo, Salir del taburete, Sali\u001b[4D\u001b[K\nSalir del piletón, Salir del chaleco y Salir del bolso.\n\n2) Cada persona saluda a todas las otras:\n   - A su propio asiento.\n   - A la primera persona que vio en el piletón.\n   - A la segunda persona que vio en el piletón.\n   - A la tercera persona que vio en el piletón.\n   - A la cuarta y última persona (que vio en el bolso) por lo que se cumpl\u001b[5",
+        "response_full_len": 877,
+        "duration_ms": 8257.4,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "¡Un problema clásico de combinaciones!\n\nPaso 1: Calcula el número de posibles salidas por persona cuando se saluda \u001b[K\na la siguiente persona.\n - Cuando se saluda a alguien, hay dos opciones: decir \"hola\" o \"buenas tar\u001b[3D\u001b[K\ntardes\".\n - Por lo tanto, cada persona puede realizar un total de 2 (saludos hacia o\u001b[1D\u001b[K\notra persona) + 1 (saludo hacia sí misma) = 3 posibles saludas.\n\nPaso 2: Calcula el número total de salidas posibles para todos los invitado\u001b[8D\u001b[K\ninvitados.\n - Hay 5 personas, por ",
+        "response_full_len": 1531,
+        "duration_ms": 23215.6,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "Para resolver este problema de combinatoria, primero debemos entender que c\u001b[1D\u001b[K\ncada persona saluda a las otras cuatro restantes. Entonces, necesitamos con\u001b[3D\u001b[K\ncontar el número total de saludos.\n\nPaso 1: Cada persona saluda a las otras 4 personas.\nPaso 2: Debemos considerar los saludos como pares (A-B y B-A son lo mismo),\u001b[7D\u001b[K\nmismo), por lo que debemos dividir entre 2 el total de saludos para evitar \u001b[K\ncontar cada saludo dos veces.\n\nCálculo:\n- Hay 5 personas en la habitación, por lo qu",
+        "response_full_len": 994,
+        "duration_ms": 32605.9,
+        "error": ""
+      }
+    },
+    "4_razonamiento_3": {
+      "categoria": "4_razonamiento",
+      "descripcion": "Razonamiento lógico y matemático",
+      "prompt": "Si todos los gatos son mamíferos, y algunos mamíferos vuelan, ¿podemos concluir que algunos gatos vuelan? Razona tu respuesta.",
+      "hermes3:3b": {
+        "response": "to respond to this, let's break down the given information:\n\n1. We know that all cats (gatos in Spanish) are mammals.\n2. We also know that some mammals can fly.\n\nNow, let's analyze if we can conclude that some cats can fly based on these\u001b[5D\u001b[K\nthese statements alone.\n\nConclusion:\nNo, we cannot conclusively infer that some cats can fly from the given info\u001b[4D\u001b[K\ninformation.\n\nHere's why:\n\nThe process of reasoning is as follows:\n\n- Step 1: Identify the categories involved - 'cats' and 'mammals'.\n",
+        "response_full_len": 1743,
+        "duration_ms": 38895.1,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "Basándome en la información proporcionada:\n\n1. Todos los gatos son mamíferos.\n2. Algunos mamíferos pueden volar.\n\nA partir de estas dos afirmaciones, podemos concluir lo siguiente:\n\n- Como todos los gatos son mamíferos, es cierto que una parte de estos (es \u001b[K\ndecir, algunos gatos) son mamíferos.\n- Sin embargo, no se menciona específicamente que algún gato puede volar. L\u001b[1D\u001b[K\nLa información dice que algunos mamíferos pueden volar, pero no especifica \u001b[K\nningún tipo en particular de mamífero.\n\n",
+        "response_full_len": 1216,
+        "duration_ms": 26679.6,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "Sí, podemos concluir que algunos gatos vuelan.\n\nAquí está la razonamiento:\n\n1. Todos los gatos son mamíferos (premisa).\n2. Algunos mamíferos pueden volar (conclusión).\n3. Como todos los gatos son mamíferos y hay mamíferos que pueden volar, pod\u001b[3D\u001b[K\npodemos inferir que algunos gatos también pueden volar.\n\nEn resumen, si somos conscientes de la relación entre el grupo de mamíferos\u001b[9D\u001b[K\nmamíferos y los gatos, y también sabemos que ciertos mamíferos (como los mu\u001b[2D\u001b[K\nmurciélagos) son capaces d",
+        "response_full_len": 584,
+        "duration_ms": 20710.4,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "No, podemos concluir que algunas gatos pueden volar según el informe de inf\u001b[3D\u001b[K\ninformación.\n\nAquí hay una razón para esto:\n\n1. Información principal: El informe menciona que \"todos los gatos son mamí\u001b[4D\u001b[K\nmamíferos\". Esto significa que a diferencia de los pelinegados (animales en\u001b[2D\u001b[K\nen la familia Canidae), los gatos no pertenecen a esa categoría.\n\n2. Interpretación: La afirmación \"si todos los gatos son mamíferos, y algun\u001b[5D\u001b[K\nalgunos mamíferos vuelan\" es una generalización del térmi",
+        "response_full_len": 1872,
+        "duration_ms": 10603.1,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "No podemos concluir que algunos gatos vuelan simplemente porque todos los g\u001b[1D\u001b[K\ngatos son mamíferos y algunos mamíferos vuelan.\n\nLa relación entre la especie de un animal (gato o mamífero) y su capacidad \u001b[K\npara volar no es necesariamente una consecuencia lógica. Es posible que hay\u001b[3D\u001b[K\nhaya gatos que no vuelan, incluso si todos los gatos son mamíferos, y vicev\u001b[5D\u001b[K\nviceversa. Además, hay muchos mamíferos que pueden volar, como los humanos,\u001b[8D\u001b[K\nhumanos, los águilas y algunos propios a",
+        "response_full_len": 657,
+        "duration_ms": 16041.8,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "Desde un punto de vista lógico, podemos deducir la siguiente conclusión:\n\n1. Todos los gatos son mamíferos: Esta afirmación establece una relación en\u001b[2D\u001b[K\nentre el ser gato y el ser mamíforo.\n2. Algunos mamíferos vuelan: Esta afirmación se refiere a una proporción de\u001b[2D\u001b[K\nde los mamíferos que tienen la capacidad de volar.\n\nA partir de estas dos premisas, no podemos concluir que algunos gatos vuela\u001b[5D\u001b[K\nvuelan. La razón es que, aunque todos los gatos son mamíferos y algunos mam\u001b[3D\u001b[K\nmamíf",
+        "response_full_len": 973,
+        "duration_ms": 29470.1,
+        "error": ""
+      }
+    },
+    "5_contexto_1": {
+      "categoria": "5_contexto",
+      "descripcion": "Comprensión de contexto",
+      "prompt": "Lee esta información:\n\nPersona: María García\nEdad: 34 años\nProfesión: Ingeniera de software\nCiudad: Barcelona\nHobbies: Escalada, fotografía, cocina italiana\nMascota: Un gato llamado \"Neo\"\nProyecto actual: App de recetas con IA\n\nBasado en esta información, responde: ¿Qué tipo de app está desarrollando María?",
+      "hermes3:3b": {
+        "response": "María García está desenvolviendo unapp de recetas con inteligencia artifici\u001b[8D\u001b[K\nartificial (IA). Este proyecto aparente centra en crear una aplicación que \u001b[K\nofrezca variados recetarios italianos, probablemente incluyendo platillos t\u001b[1D\u001b[K\ntradicionales y creativos, así como recomendaciones basadas en la IA para m\u001b[1D\u001b[K\nmejorar la experiencia del usuario al elegir recetas.",
+        "response_full_len": 381,
+        "duration_ms": 16299.3,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "María García está desarrollando una aplicación para teléfonos inteligentes \u001b[K\n(app) que se centra en recetas y tiene incorporada Inteligencia Artificial \u001b[K\n(IA). Este proyecto se ha denominado como \"App de recetas con IA\".",
+        "response_full_len": 224,
+        "duration_ms": 11173.8,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "Basándome en la información proporcionada, parece que María está trabajando\u001b[10D\u001b[K\ntrabajando en una aplicación (app) relacionada con la cocina. La mención de\u001b[2D\u001b[K\ndel proyecto \"App de recetas con IA\" sugiere que la aplicación tiene como o\u001b[1D\u001b[K\nobjetivo recopilar y compartir recetas, posiblemente utilizando inteligenci\u001b[11D\u001b[K\ninteligencia artificial para mejorar la experiencia del usuario o ofrecer s\u001b[1D\u001b[K\nsugerencias personalizadas.",
+        "response_full_len": 444,
+        "duration_ms": 16141.2,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "La persona que mencionó es María García. Ella se dedica a la ingeniería de \u001b[K\nsoftware y tiene varias hobbies incluyendo escalada, fotografía y cocina it\u001b[2D\u001b[K\nitaliana. Por lo tanto, parece que ella está desarrollando un proyecto llam\u001b[4D\u001b[K\nllamado \"App de recetas con IA\" o simplemente una aplicación de recetas bas\u001b[3D\u001b[K\nbasada en AI.\n\nAunque no especificó claramente cuál era su propósito, se puede afirmar que\u001b[3D\u001b[K\nque esta es una posible app para la ciudad de Barcelona. La escalada y la ",
+        "response_full_len": 1116,
+        "duration_ms": 6845.1,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "¡Hola! Me alegra compartir contigo mi proyecto actual.\n\nComo ingeniera de software y aficionada a la tecnología y la comida italian\u001b[7D\u001b[K\nitaliana, estoy desarrollando una aplicación móvil que combina la creativid\u001b[9D\u001b[K\ncreatividad culinaria con la inteligencia artificial. La app se llama \"Rice\u001b[5D\u001b[K\n\"Ricea\" (también podemos llamarla \"RecetaGenia\").\n\nLa idea es crear un sistema de recetas personalizado con IA que te ayude a \u001b[K\ncrear tus propias recetas según tus preferencias y restricciones ",
+        "response_full_len": 1367,
+        "duration_ms": 19369.4,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "Thinking...\nOkay, let's see. I need to figure out what type of app María García is deve\u001b[4D\u001b[K\ndeveloping based on the information provided.\n\nFirst, the user gave me her name, age, profession, city, hobbies, pet, and \u001b[K\ncurrent project. The current project is listed as \"App de recetas con IA\". \u001b[K\nSo, translating that from Spanish, \"App de recetas con IA\" would be \"Recipe\u001b[7D\u001b[K\n\"Recipe app with AI\" or \"AI recipe app\".\n\nWait, the question is asking \"¿Qué tipo de app está desarrollando María?\" w",
+        "response_full_len": 3629,
+        "duration_ms": 104633.6,
+        "error": ""
+      },
+      "granite4:3b": {
+        "response": "María García está desarrollando una aplicación (App) de recetas que incorpo\u001b[7D\u001b[K\nincorpora tecnología de inteligencia artificial (IA). Esta aplica podría of\u001b[2D\u001b[K\nofrecer funcionalidades innovadoras como sugerencias personalizadas de rece\u001b[4D\u001b[K\nrecetas basadas en gustos individuales, técnicas de cocina avanzadas o incl\u001b[4D\u001b[K\nincluso la creación de recetas desde base de datos específicas.",
+        "response_full_len": 395,
+        "duration_ms": 15817.7,
+        "error": ""
+      }
+    },
+    "5_contexto_2": {
+      "categoria": "5_contexto",
+      "descripcion": "Comprensión de contexto",
+      "prompt": "Contexto:\n- La reunión es el viernes a las 3pm\n- Asistirán: Carlos (marketing), Ana (desarrollo), Luis (diseño)\n- Tema: Rediseño de la landing page\n- Ana tiene un conflicto hasta las 3:30pm\n- Luis necesita las especificaciones antes del jueves\n\nPregunta: ¿A qué hora puede realmente empezar la reunión con todos presentes?",
+      "hermes3:3b": {
+        "response": "Basado en el contexto proporcionado, la reunión está programada para el vie\u001b[3D\u001b[K\nviernes a las 3:00 PM y asisten Carlos (marketing), Ana (desarrollo) e Luis\u001b[4D\u001b[K\nLuis (diseño). Ana tiene un conflicto hasta las 3:30 PM. Dado que todos se \u001b[K\nhan señalado presentes para la reunión, se puede concluir que la reunión co\u001b[2D\u001b[K\ncomienza inmediatamente después de que todas las personas designadas estén \u001b[K\npresentes y listas para participar. Por lo tanto, Ana llegaría al máximo a \u001b[K\nlas 3:00 PM pa",
+        "response_full_len": 549,
+        "duration_ms": 20147.2,
+        "error": ""
+      },
+      "qwen2.5:3b": {
+        "response": "Basándome en el contexto proporcionado, aquí hay una evaluación de cuál pod\u001b[3D\u001b[K\npodría ser la hora óptima para comenzar la reunión:\n\n- La reunión está programada para las 3pm viernes.\n- Ana tiene un compromiso hasta las 3:30pm.\n\nUna vez que Ana termine su compromiso a las 3:30pm, Luis puede tener tiempo\u001b[6D\u001b[K\ntiempo suficiente para revisar y compilar sus especificaciones de diseño an\u001b[2D\u001b[K\nantes de la reunión. \n\nPor lo tanto, podríamos considerar comenzar la reunión a las 3:15pm (cuando\u001b[7D",
+        "response_full_len": 1102,
+        "duration_ms": 24700.9,
+        "error": ""
+      },
+      "llama3.2:latest": {
+        "response": "Considerando que Ana tiene un conflicto hasta las 3:30pm, lo más prudente s\u001b[1D\u001b[K\nsería planificar que comience la reunión aproximadamente a las 2:45-3:00 pm\u001b[2D\u001b[K\npm. Esto le dará suficiente tiempo para llegar y asistir a la reunión sin t\u001b[1D\u001b[K\ntener que dejarla o participar en su conflicto.\n\nAsí que, si es posible, podrían empezar la reunión alrededor de las 2:45pm,\u001b[7D\u001b[K\n2:45pm, cuando Ana esté disponible para participar.",
+        "response_full_len": 432,
+        "duration_ms": 17645.6,
+        "error": ""
+      },
+      "qwen2.5:0.5b": {
+        "response": "La reunión de los viernes a las 3 pm se podría comenzar en la siguiente fec\u001b[3D\u001b[K\nfecha:\n\n1. Inicialmente, la reunión se llevará a cabo por el sábado a las 9 am.\n2. Luego, el sábado se realizarán las 3 pm.\n3. El domingo se completará la redacción para el documento final.\n\nAhora que Luis necesita las especificaciones antes del jueves, podría ser n\u001b[1D\u001b[K\nnecesario que se agilice algo en la agenda. Algunas sugerencias:\n\n1. Incluir a Luis en su lista de invitados o agregarle una nueva fecha.\n2. Cr",
+        "response_full_len": 936,
+        "duration_ms": 6678.9,
+        "error": ""
+      },
+      "llama3.2:1b": {
+        "response": "Para determinar la hora más adecuada para empezar la reunión, debemos consi\u001b[5D\u001b[K\nconsiderar el tiempo necesario para la conferencia y los esfuerzos de prepa\u001b[5D\u001b[K\npreparación.\n\nLa reunión comienza a las 3 pm. El conflicto de Ana hasta las 3:30 pm signi\u001b[5D\u001b[K\nsignifica que debe estar preparada y lista para el evento antes de esa hora\u001b[4D\u001b[K\nhora. Sin embargo, Luis necesita las especificaciones antes del jueves, lo \u001b[K\nque significa que también debe estar listo para la reunión.\n\nDado que Luis ",
+        "response_full_len": 1225,
+        "duration_ms": 18894.4,
+        "error": ""
+      },
+      "qwen3:4b": {
+        "response": "",
+        "response_full_len": 0,
+        "duration_ms": 120000,
+        "error": "TIMEOUT"
+      },
+      "granite4:3b": {
+        "response": "Teniendo en cuenta el contexto proporcionado, la reunión está programada pa\u001b[2D\u001b[K\npara comenzar a las 3 p.m. viernes, pero Ana tiene un conflicto hasta las 3\u001b[1D\u001b[K\n3:30 p.m. Sin embargo, Luis necesita las especificaciones antes del jueves.\u001b[7D\u001b[K\njueves.\n\nPor lo tanto, el momento más adecuado para iniciar la reunión con todos pre\u001b[3D\u001b[K\npresentes sería al principio de la sesión de 3 a 3:30 p.m., es decir, a las\u001b[3D\u001b[K\nlas 3 p.m. viernes. Este horario permite que Luis tenga suficiente tiempo p\u001b",
+        "response_full_len": 582,
+        "duration_ms": 20130.0,
+        "error": ""
+      }
+    }
+  }
+}
