@@ -8,6 +8,10 @@ y renombra los archivos con el formato:
 
     {numero} - {PROVEEDOR_CORTO} - {MES AÑO}.pdf
 
+Incluye deteccion automatica de conflictos: si dos proveedores
+comparten la misma marca (ej: ENEL Distribucion / ENEL Generacion),
+los diferencia incluyendo la palabra de giro.
+
 Uso:
     python tools/pdf_renamer.py "C:/ruta/carpeta"
     python tools/pdf_renamer.py "C:/ruta/archivo.zip" --dry-run
@@ -28,7 +32,7 @@ MESES = {
     9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE",
 }
 
-# Palabras a eliminar de la razon social (sufijos legales + conectores)
+# Conectores y articulos
 _STOP = {
     "de", "del", "de la", "de las", "de los", "y", "e", "el", "la",
     "los", "las", "un", "una", "en", "al", "por", "para", "con",
@@ -40,28 +44,25 @@ _SUFIJOS = [
     " E.I.R.L.", " EIRL",
 ]
 
-# Palabras de giro generico que no aportan identidad
+# Palabras de giro (se filtran solo si NO hay conflictos)
 _GIRO = {
     "arriendo", "compra", "venta", "bienes", "inmuebles",
     "amoblados", "equipos", "maquinarias", "distribucion",
-    "distribución", "logistico", "logístico", "centro",
+    "distribución", "generacion", "generación", "transmision",
+    "transmisión", "logistico", "logístico", "centro",
     "comercial", "industrial", "profesional",
     "sociedad", "empresa", "nacional", "general",
 }
 
-# Palabras geograficas/sufijos que no identidad
+# Geograficos (nunca identidad)
 _GEO = {"chile", "santiago", "region", "regional", "metropolitana"}
 
 
-def _abreviar_proveedor(razon_social: str) -> str:
-    """Deriva nombre corto (~10-12 chars) desde la razon social del PDF.
+def _abreviar_proveedor(razon_social: str, disambiguate: bool = False) -> str:
+    """Deriva nombre corto (~10-12 chars) desde la razon social.
 
-    Estrategia:
-    1. Limpiar sufijos legales, conectores y palabras de giro
-    2. Separar por guion si existe — la parte derecha suele ser la identidad
-    3. Si la empresa pertenece al grupo Megacentro → prefijo MEGA + palabra clave
-    4. Palabra clave > 8 chars → truncar a 6 (ej: Buenaventura → BUENAV)
-    5. Sino → usar la(s) palabra(s) significativa(s) tal cual
+    Con disambiguate=True NO se filtran palabras de giro, asi que
+    'ENEL Distribucion Chile' → 'ENELDISTRIB' en vez de solo 'ENEL'.
     """
     nombre = razon_social.strip()
 
@@ -72,18 +73,18 @@ def _abreviar_proveedor(razon_social: str) -> str:
             nombre = nombre[:-len(suf)].strip()
             break
 
-    # ── 2. Separar por guion: "X - Y" → la parte derecha es la identidad ──
+    # ── 2. Separar por guion → parte derecha es identidad ──
     if " - " in nombre:
         partes = nombre.split(" - ")
         if len(partes) >= 2:
             nombre = partes[-1].strip()
 
-    # ── 3. Tokenizar y filtrar ──
-    # Reemplazar puntuacion por espacios
+    # ── 3. Tokenizar ──
     nombre_clean = re.sub(r'[^\w\s]', ' ', nombre)
     tokens = nombre_clean.split()
+
+    # Siempre filtrar STOP y GEO
     tokens = [t for t in tokens if t.lower() not in _STOP]
-    tokens = [t for t in tokens if t.lower() not in _GIRO]
     tokens = [t for t in tokens if t.lower() not in _GEO]
 
     if not tokens:
@@ -92,21 +93,48 @@ def _abreviar_proveedor(razon_social: str) -> str:
         return "DESCONOCIDO"
 
     # ── 4. Detectar grupo Megacentro ──
-    # "Megacentro Carrascal", "Centro Logístico ... Megacentro - Enea"
-    # "Rentas Buenaventura", "Rentas Miraflores"
-    # (Rentco es independiente, NO lleva MEGA)
     full_upper = razon_social.upper()
     es_grupo_mega = "MEGACENTRO" in full_upper
     es_rentas = full_upper.startswith("RENTAS")
     if es_grupo_mega or es_rentas:
-        clave = tokens[-1].upper()  # la ultima palabra es la mas especifica
+        clave = tokens[-1].upper()
         if len(clave) > 8:
             clave = clave[:6]
         return f"MEGA{clave}"
 
-    # ── 5. Otros proveedores: primer token = marca ──
-    # Casi siempre la primera palabra es el nombre de marca
-    return tokens[0].upper()[:12]
+    # ── 5. Proveedor generico ──
+    if not disambiguate:
+        # Modo normal: filtrar GIRO, usar primer token como marca
+        tokens = [t for t in tokens if t.lower() not in _GIRO]
+        if not tokens:
+            tokens = [t for t in nombre_clean.split() if t.lower() not in _STOP]
+            tokens = [t for t in tokens if t.lower() not in _GEO]
+        if not tokens:
+            return "DESCONOCIDO"
+        return tokens[0].upper()[:12]
+
+    # ── Modo desambiguacion: incluir GIRO para diferenciar ──
+    # Tomar primeros 2 tokens significativos
+    # Si hay 3+ tokens, tomar primero + tercero (el segundo suele ser generico)
+    # O primero + segundo directamente
+    keep = []
+    for t in tokens:
+        if t.lower() not in _STOP and t.lower() not in _GEO:
+            keep.append(t.upper())
+        if len(keep) == 2:
+            break
+
+    if len(keep) == 0:
+        return "DESCONOCIDO"
+    if len(keep) == 1:
+        return keep[0][:12]
+
+    # Combinar: primer token completo + segundo abreviado (max 12 chars)
+    p1, p2 = keep[0], keep[1]
+    if len(p1) >= 6:
+        return f"{p1[:6]}{p2[:4]}"
+    else:
+        return f"{p1}{p2[:6]}"
 
 
 def _extraer_de_pdf(path: str) -> dict | None:
@@ -121,7 +149,7 @@ def _extraer_de_pdf(path: str) -> dict | None:
         doc = pymupdf.open(path)
         text = "\n".join(page.get_text() for page in doc)
         doc.close()
-    except Exception as e:
+    except Exception:
         return None
 
     lines = [l.strip() for l in text.split("\n") if l.strip()]
@@ -151,7 +179,7 @@ def _extraer_de_pdf(path: str) -> dict | None:
 
 
 def _encontrar_pdfs(origen: str) -> tuple[list[tuple[str, str]], Path | None]:
-    """Retorna (lista (ruta_completa, nombre_archivo), temp_dir_opcional)."""
+    """Retorna (lista (ruta_completa, nombre_relativo), temp_dir_opcional)."""
     path = Path(origen)
     if not path.exists():
         print(f"ERROR: No existe: {origen}")
@@ -187,12 +215,21 @@ def _encontrar_pdfs(origen: str) -> tuple[list[tuple[str, str]], Path | None]:
     sys.exit(1)
 
 
-def procesar(origen: str, dry_run: bool = False):
-    """Renombra PDFs y retorna resultado estructurado.
-    
-    Returns:
-        dict con 'origen', 'destino', 'resultados' y 'errores'
-    """
+def _detectar_conflictos(resultados: list) -> set:
+    """Detecta si dos proveedores distintos comparten el mismo nombre corto."""
+    grupos = {}
+    for item in resultados:
+        corto = item["proveedor"]
+        rs = item["razon_social"]
+        if corto not in grupos:
+            grupos[corto] = set()
+        grupos[corto].add(rs)
+
+    return {corto for corto, rses in grupos.items() if len(rses) > 1}
+
+
+def procesar(origen: str, dry_run: bool = False) -> dict:
+    """Renombra PDFs. Retorna dict con resultados estructurados."""
     pdfs, temp_dir = _encontrar_pdfs(origen)
     using_temp = temp_dir is not None
 
@@ -210,6 +247,7 @@ def procesar(origen: str, dry_run: bool = False):
         print(f"  Destino: {destino_base}")
     print(f"{'='*65}\n")
 
+    # ── Primera pasada: extraer datos con nombres candidatos ──
     resultados = []
     errores = []
     output_lines = []
@@ -221,42 +259,64 @@ def procesar(origen: str, dry_run: bool = False):
             output_lines.append(f"  ✗ {fname:50s} → No se pudo leer")
             continue
 
-        new_name = f"{data['numero']} - {data['corto']} - {data['mes']} {data['anio']}.pdf"
         resultados.append({
             "origen": fname,
-            "destino": new_name,
-            "numero": data['numero'],
-            "proveedor": data['corto'],
-            "mes": data['mes'],
-            "anio": data['anio'],
-            "razon_social": data['razon_social'],
+            "destino": None,
+            "fullpath": fullpath,
+            "numero": data["numero"],
+            "proveedor": data["corto"],
+            "mes": data["mes"],
+            "anio": data["anio"],
+            "razon_social": data["razon_social"],
         })
-        output_lines.append(f"  {fname:50s} → {new_name}")
+
+    # ── Detectar conflictos (mismo nombre corto, distinta razon social) ──
+    conflictos = _detectar_conflictos(resultados)
+    if conflictos:
+        output_lines.append(f"\n  ⚠ Conflicto detectado: {', '.join(sorted(conflictos))}")
+        output_lines.append(f"    (dos proveedores comparten el mismo nombre)")
+        output_lines.append(f"    Regenerando con desambiguación...\n")
+
+        for item in resultados:
+            if item["proveedor"] in conflictos:
+                item["proveedor"] = _abreviar_proveedor(
+                    item["razon_social"], disambiguate=True
+                )
+
+    # ── Generar nombre destino final ──
+    for item in resultados:
+        item["destino"] = (
+            f"{item['numero']} - {item['proveedor']} - "
+            f"{item['mes']} {item['anio']}.pdf"
+        )
+        output_lines.append(f"  {item['origen']:50s} → {item['destino']}")
 
         if dry_run:
-            output_lines.append(f"    Razón social: {data['razon_social']}")
+            output_lines.append(f"    Razón social: {item['razon_social']}")
 
+    # ── Ejecutar renombre ──
     if not dry_run and resultados:
         ok = 0
         for item in resultados:
-            old_path = Path(pdfs[[p[1] for p in pdfs].index(item['origen'])][0])
-            new_name = item['destino']
+            old_path = Path(item["fullpath"])
+            new_name = item["destino"]
             if using_temp:
                 dest = destino_base / new_name
                 if dest.exists():
-                    item['estado'] = 'ya_existe'
+                    item["estado"] = "ya_existe"
                     continue
                 shutil.copy2(str(old_path), str(dest))
                 ok += 1
-                item['estado'] = 'copiado'
+                item["estado"] = "copiado"
             else:
                 new_path = old_path.parent / new_name
                 if new_path.exists():
-                    item['estado'] = 'ya_existe'
+                    item["estado"] = "ya_existe"
                     continue
                 old_path.rename(new_path)
                 ok += 1
-                item['estado'] = 'renombrado'
+                item["estado"] = "renombrado"
+
         output_lines.append(f"\n  ✅ {ok} archivos renombrados.")
     elif dry_run and resultados:
         output_lines.append(f"\n  📋 Simulación — no se modificó ningún archivo.")
@@ -272,6 +332,20 @@ def procesar(origen: str, dry_run: bool = False):
         "errores": errores,
         "respuesta": "\n".join(output_lines),
     }
+
+
+# ── Entry points ─────────────────────────────────────────────
+
+
+def procesar_desde_cli(origen: str, dry_run: bool = False):
+    """Wrapper para CLI de Nexus. Muestra output y retorna resumen."""
+    res = procesar(origen, dry_run=dry_run)
+    print(res["respuesta"])
+    conflictos = [r["proveedor"] for r in res["resultados"]
+                  if r.get("conflicto")]
+    hechos = len([r for r in res["resultados"]
+                  if r.get("estado") in ("renombrado", "copiado")])
+    return f"Listo. {hechos} archivos procesados."
 
 
 def main():
@@ -294,7 +368,8 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    procesar(args.origen, dry_run=args.dry_run)
+    res = procesar(args.origen, dry_run=args.dry_run)
+    print(res["respuesta"])
 
 
 if __name__ == "__main__":
