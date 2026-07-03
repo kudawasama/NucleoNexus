@@ -215,15 +215,36 @@ class NexusCLI:
         tab_idx = 0
         last_was_tab = False
 
+        def _render_suggestions():
+            current_text = "".join(buf)
+            if current_text.startswith('/'):
+                matches = [cmd for cmd in self._all_commands if cmd.startswith(current_text)]
+                if matches:
+                    # Mostrar sugerencias en la línea de abajo usando secuencias ANSI
+                    sug_line = f"  {Color.DIM}Sugerencias: {Color.GREEN}" + f"{Color.RESET}, {Color.GREEN}".join(matches[:8]) + f"{Color.RESET}"
+                    if len(matches) > 8:
+                        sug_line += f" {Color.DIM}(+{len(matches)-8} más){Color.RESET}"
+                    sys.stdout.write(f"\033[s\n\r\033[K{sug_line}\033[u")
+                else:
+                    sys.stdout.write("\033[s\n\r\033[K\033[u")
+            else:
+                sys.stdout.write("\033[s\n\r\033[K\033[u")
+            sys.stdout.flush()
+
         while True:
             try:
                 ch = msvcrt.getwch()
             except (KeyboardInterrupt, SystemExit):
+                sys.stdout.write("\033[s\n\r\033[K\033[u")
+                sys.stdout.flush()
                 print()
                 raise KeyboardInterrupt
             
             # Detectar Enter
             if ch == '\r' or ch == '\n':
+                # Limpiar sugerencias de forma definitiva
+                sys.stdout.write("\033[s\n\r\033[K\033[u")
+                sys.stdout.flush()
                 line = "".join(buf)
                 print()
                 return line
@@ -235,30 +256,29 @@ class NexusCLI:
                     buf.pop()
                     sys.stdout.write('\b \b')
                     sys.stdout.flush()
+                _render_suggestions()
             
             # Detectar Tab
             elif ch == '\t':
                 current_text = "".join(buf)
                 if current_text.startswith('/') or (last_was_tab and tab_prefix):
                     if not last_was_tab:
-                        # Iniciar busqueda de coincidencias
                         tab_prefix = current_text
                         tab_matches = [cmd for cmd in self._all_commands if cmd.startswith(tab_prefix)]
                         tab_idx = 0
                     else:
-                        # Rotar coincidencia si se presiona Tab consecutivamente
                         if tab_matches:
                             tab_idx = (tab_idx + 1) % len(tab_matches)
                     
                     if tab_matches:
                         match = tab_matches[tab_idx]
-                        # Borrar la palabra actual en pantalla
                         sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
                         buf = list(match)
                         sys.stdout.write(match)
                         sys.stdout.flush()
-                    
+                        
                     last_was_tab = True
+                    _render_suggestions()
                     continue
             
             # Detectar teclas especiales (Flechas)
@@ -277,6 +297,7 @@ class NexusCLI:
                         buf = list(self.history[hist_idx])
                         sys.stdout.write("".join(buf))
                         sys.stdout.flush()
+                        _render_suggestions()
                 # Flecha Abajo (P)
                 elif ch2 == 'P' and self.history:
                     if hist_idx < len(self.history) - 1:
@@ -285,11 +306,13 @@ class NexusCLI:
                         buf = list(self.history[hist_idx])
                         sys.stdout.write("".join(buf))
                         sys.stdout.flush()
+                        _render_suggestions()
                     elif hist_idx == len(self.history) - 1:
                         hist_idx += 1
                         sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
                         buf = []
                         sys.stdout.flush()
+                        _render_suggestions()
             
             # Caracter normal
             else:
@@ -297,6 +320,7 @@ class NexusCLI:
                 buf.append(ch)
                 sys.stdout.write(ch)
                 sys.stdout.flush()
+                _render_suggestions()
 
     def _setup_autocomplete(self):
         """Configura autocompletado con Tab para comandos /."""

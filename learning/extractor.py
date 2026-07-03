@@ -200,3 +200,7 @@ def learn_from_response(text: str, memory) -> int:
 def reinforce_from_feedback(text: str, memory) -> int:
     """Wrapper v1. Refuerza hechos ante feedback positivo."""
     return 1 if handle_feedback(text, memory) else 0
+
+
+# Alias para mantener retrocompatibilidad con todo el codebase
+extract_facts_from_text = extract_facts
