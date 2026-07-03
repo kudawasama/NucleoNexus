@@ -1,0 +1,287 @@
+[
+  {
+    "fact": "Internet es un conjunto descentralizado de redes de comunicaciones interconectadas, que utilizan la familia de protocolos TCP/IP, lo cual garantiza que las redes físicas heterogéneas que la componen constituyen una red lógica única de alcance mundial.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Sus orígenes se remontan a 1969, cuando se estableció la primera conexión de ordenadores, conocida como ARPANET, entre tres universidades de California.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En informática, la World Wide Web o red informática mundial es un sistema que funciona a través de internet, por el cual se pueden transmitir diversos tipos de datos a través del Protocolo de Transferencia de Hipertextos o HTTP, que son los enlaces de la página web.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El aprendizaje automático (AA); también llamado automatizado, computacional de máquinas, o maquinal, es el subcampo de las ciencias de la computación y una rama de la inteligencia artificial, cuyo objetivo es desarrollar técnicas que permitan que las computadoras aprendan.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se dice que un agente aprende cuando su desempeño mejora con la experiencia y mediante el uso de datos; es decir, cuando la habilidad no estaba presente en su genotipo o rasgos de nacimiento.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En el aprendizaje automático, una red neuronal artificial es un modelo dentro de los llamados sistemas conexionistas, inspirado en la estructura y función de las redes neuronales biológicas en los cerebros animales.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una ANN consta de unidades o nodos conectados llamados neuronas artificiales, que modelan vagamente las neuronas del cerebro.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Partiendo de un estado inicial y una entrada determinada, la aplicación de los pasos sucesivos de un algoritmo conduce a un estado final que proporciona una solución al problema planteado.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "A todo este conjunto de órdenes escritas mediante un lenguaje de programación se le denomina programa informático.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Python es un lenguaje de alto nivel de programación interpretado cuya filosofía hace hincapié en la legibilidad de su código.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se trata de un lenguaje de programación multiparadigma, ya que soporta parcialmente la orientación a objetos, programación imperativa y, en menor medida, programación funcional.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una base de datos se encarga no solo de almacenar datos, sino también de conectarlos entre sí en una unidad lógica.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En términos generales, una base de datos es un conjunto de datos estructurados que pertenecen a un mismo contexto y, en cuanto a su función, se utiliza para administrar de forma electrónica grandes cantidades de información.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un sistema operativo (SO) es el conjunto de programas de un sistema informático que gestiona los recursos del hardware y provee servicios a los programas de aplicación de software.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Estos programas se ejecutan en modo privilegiado respecto de los restantes.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "GNU/Linux es una familia de sistemas operativos tipo Unix compuesto por software libre y de código abierto.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "GNU/Linux surge de las contribuciones de varios proyectos de software, entre los cuales destacan GNU y el núcleo Linux.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una computadora, computador u ordenador es una máquina programable que ejecuta una serie de comandos para procesar los datos de entrada, obteniendo convenientemente información que posteriormente se envía a las unidades de salida.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una computadora está compuesta por numerosos y diversos circuitos integrados y varios elementos de apoyo, extensión y accesorios, que en conjunto pueden ejecutar tareas diversas con suma rapidez y bajo el control de un programa (software).",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El teléfono inteligente es un dispositivo móvil que combina las funciones de un teléfono móvil y de un PDA.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Estos dispositivos funcionan sobre una plataforma informática móvil, con mayor capacidad de almacenar y capaz de realizar tareas simultáneamente, tareas que realiza una computadora, y con una mayor conectividad que un teléfono convencional.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un robot es una entidad virtual o mecánica artificial.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En la práctica, esto es por lo general un sistema electromecánico que, por su apariencia o sus movimientos, ofrece la sensación de tener un propósito propio.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una impresora 3D es una máquina capaz de crear piezas, figuras y objetos con volumen partiendo previamente de un diseño realizado por ordenador con un programa CAD.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Este tipo de máquinas surge con la idea de convertir archivos digitales en prototipos reales.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La energía solar es una energía renovable, obtenida a partir del aprovechamiento de la radiación electromagnética procedente del Sol.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La radiación solar que alcanza la Tierra ha sido aprovechada por el ser humano desde la antigüedad, mediante diferentes tecnologías que han ido evolucionando.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La energía eólica es una forma de energía renovable que se obtiene a partir del viento, mediante el aprovechamiento de la energía cinética generada por el movimiento de masas de aire.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Históricamente, la energía eólica fue utilizada para moler granos o extraer agua, pero actualmente su uso principal es la generación de energía eléctrica.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un vehículo eléctrico es un vehículo propulsado por uno o más motores eléctricos.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Puede alimentarse a través de una fuente externa que suministre energía eléctrica, o bien, pueden ser autónomos al tener instalados baterías, paneles solares, o un generador eléctrico que transforme un combustible en electricidad.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "De esta forma, gracias a técnicas criptográficas, la información contenida en un bloque solo puede ser repudiada o editada modificando todos los bloques anteriores.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una criptomoneda es un medio digital de intercambio que utiliza criptografía \"fuerte\" para asegurar las transacciones, controlar la creación de unidades adicionales y verificar la transferencia de activos usando tecnologías de registro distribuido.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las criptomonedas son un tipo de divisa alternativa o moneda digital.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El consenso entre nodos se logra mediante un proceso computacional intensivo basado en el sistema de prueba de trabajo al que se denomina «minería», que garantiza la seguridad de la cadena de bloques.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La realidad virtual (RV) es una experiencia simulada que hace uso de un casco de realidad virtual y sensores de posición, para dar al usuario la sensación de estar inmerso en un mundo virtual.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La realidad aumentada o realidad augmentada (RA) es el término que se usa para describir al conjunto de tecnologías que permiten que un usuario visualice parte del mundo real a través de un dispositivo tecnológico con información gráfica añadida por este.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El dispositivo, o conjunto de dispositivos, añaden información virtual a la información física ya existente, es decir, una parte virtual aparece en la realidad.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El internet de las cosas (IdC) describe objetos físicos con sensores, capacidad de procesamiento, software y otros entes que se conectan e intercambian datos con otros dispositivos y sistemas a través de internet u otras redes de comunicación.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El Internet de las cosas se ha considerado un término erróneo porque los dispositivos no necesitan estar conectados a la Internet pública.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Para ello existen una serie de estándares, protocolos, métodos, reglas, herramientas, y leyes concebidas para minimizar los posibles riesgos a la infraestructura o a la propia información.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En criptografía, el cifrado es el proceso de codificación de la información.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Este proceso convierte la representación original de la información, conocida como texto plano, en una forma alternativa conocida como texto cifrado.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La computación en la nube, conocida también como servicios en la nube, informática en la nube, nube de cómputo o simplemente «la nube», es el uso de una red de servidores remotos conectados a internet para almacenar, administrar y procesar datos, servidores, bases de datos, redes y software.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En lugar de depender de un servicio físico instalado, se tiene acceso a una estructura donde el software y el hardware están virtualmente integrados.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los macrodatos, también llamados datos masivos, inteligencia de datos o datos a gran escala, es un término que hace referencia a conjuntos de datos tan grandes y complejos que precisan de aplicaciones informáticas no tradicionales de procesamiento de datos para tratarlos adecuadamente.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los datos son la reproducción simbólica de un atributo o variable cuantitativa o cualitativa; según la RAE «Información sobre algo concreto que permite su conocimiento exacto o sirve para deducir las consecuencias derivadas de un hecho».",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En telecomunicaciones, 5G son las siglas utilizadas para referirse a la quinta generación de tecnologías de telefonía móvil.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Es la sucesora de la tecnología 4G la cual le provee conectividad a la mayoría de teléfonos móviles actuales.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En el contexto de los vuelos espaciales, un satélite artificial o, solamente, satélite, es un objeto que ha sido puesto en la órbita de algún cuerpo celeste intencionadamente.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Estos objetos se llaman satélites «artificiales» para distinguirlos de los satélites «naturales» —como la Luna— y generalmente recogen información para luego transmitirla.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El Sistema de Posicionamiento Global, originalmente llamado Navstar GPS, es un sistema que permite a un dispositivo receptor localizar su propia posición sobre la Tierra con una precisión de hasta centímetros, aunque lo común son unos pocos metros.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El sistema fue desarrollado, instalado y empleado por el Departamento de Defensa de Estados Unidos, y actualmente es propiedad de la Fuerza Espacial de los Estados Unidos.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Wi-Fi es el nombre comercial propiedad de la Wi-Fi Alliance para designar su familia de protocolos de comunicación inalámbrica basados en el estándar IEEE 802.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "11 para redes de área local sin cables.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Bluetooth es una especificación industrial para redes inalámbricas de área personal (WPAN) creado por Bluetooth Special Interest Group, Inc.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Que posibilita la transmisión de voz y datos entre diferentes dispositivos mediante un enlace por radiofrecuencia en la banda ISM de los 2.",
+    "category": "tecnologia",
+    "source": "wikipedia"
+  }
+]

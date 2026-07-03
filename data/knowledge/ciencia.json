@@ -1,22 +1,507 @@
 [
-  {"fact": "La fotosíntesis es el proceso por el cual las plantas, algas y algunas bacterias convierten la luz solar, el agua y el dióxido de carbono en glucosa y oxígeno.",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "El agua está compuesta por dos átomos de hidrógeno y uno de oxígeno (H2O).",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "La velocidad de la luz en el vacío es de aproximadamente 300.000 kilómetros por segundo.",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "El corazón humano bombea aproximadamente 5 litros de sangre por minuto.",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "La Tierra orbita alrededor del Sol a una distancia promedio de 150 millones de kilómetros.",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "El ADN es la molécula que contiene la información genética de todos los seres vivos.",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "La energía no se crea ni se destruye, solo se transforma (primera ley de la termodinámica).",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "El cerebro humano tiene aproximadamente 86 mil millones de neuronas.",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "La gravedad es la fuerza que atrae a los objetos con masa entre sí.",
-   "category": "ciencia", "source": "knowledge_base"},
-  {"fact": "Las células son la unidad básica de la vida. Todos los seres vivos están formados por células.",
-   "category": "ciencia", "source": "knowledge_base"}
+  {
+    "fact": "La fotosíntesis es el proceso por el cual las plantas, algas y algunas bacterias convierten la luz solar, el agua y el dióxido de carbono en glucosa y oxígeno.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "El agua está compuesta por dos átomos de hidrógeno y uno de oxígeno (H2O).",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "La velocidad de la luz en el vacío es de aproximadamente 300.000 kilómetros por segundo.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "El corazón humano bombea aproximadamente 5 litros de sangre por minuto.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "La Tierra orbita alrededor del Sol a una distancia promedio de 150 millones de kilómetros.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "El ADN es la molécula que contiene la información genética de todos los seres vivos.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "La energía no se crea ni se destruye, solo se transforma (primera ley de la termodinámica).",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "El cerebro humano tiene aproximadamente 86 mil millones de neuronas.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "La gravedad es la fuerza que atrae a los objetos con masa entre sí.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "Las células son la unidad básica de la vida. Todos los seres vivos están formados por células.",
+    "category": "ciencia",
+    "source": "knowledge_base"
+  },
+  {
+    "fact": "La fotosíntesis o función clorofílica es un proceso químico que consiste en la conversión de materia inorgánica a materia orgánica gracias a la energía que aporta la luz solar.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En este proceso, la energía lumínica se transforma en energía química, siendo el NADPH (nicotín adenín dinucleótido fosfato) y el ATP (adenosín trifosfato) las primeras moléculas en las que queda almacenada esta energía química.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La gravedad es un fenómeno natural por el cual los objetos y campos de materia dotados de masa o energía son atraídos entre sí, efecto mayormente observable en la interacción entre los planetas, galaxias y demás objetos del universo.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Es una distorsión del espacio-tiempo y es una de las cuatro interacciones fundamentales que origina la fuerza que experimenta un cuerpo físico en las cercanías de un objeto astronómico y la primera de estas en ser estudiada.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La evolución biológica es el conjunto de cambios en caracteres fenotípicos y genéticos de poblaciones biológicas a través de generaciones.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Dicho proceso ha originado la diversidad de formas de vida que existen sobre la Tierra a partir de un antepasado común.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La célula (del latín cellula, diminutivo de cella, ‘celda’) es la unidad morfológica y funcional de todos los seres vivos que existen.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "De hecho, la célula es el elemento de menor tamaño que puede considerarse vivo.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El átomo es la unidad fundamental de los elementos químicos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los átomos son microscópicos; los tamaños típicos son alrededor de 100 pm.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La tabla periódica de los elementos es una disposición de los elementos químicos en forma de tabla, ordenados por su número atómico, por su configuración de electrones y sus propiedades químicas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Este ordenamiento muestra tendencias periódicas como elementos con comportamiento similar en la misma columna.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El ácido desoxirribonucleico —conocido por las siglas ADN— es un ácido nucleico que contiene las instrucciones genéticas fundamentales para el desarrollo, funcionamiento y reproducción de todos los seres vivos y algunos virus ; también es responsable de la transmisión hereditaria.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La función principal de la molécula de ADN es el almacenamiento a largo plazo de información para construir otros componentes de las células, como las proteínas y las moléculas de ARN.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El término energía tiene diversas acepciones y definiciones, relacionadas con la idea de una capacidad para obrar, surgir, transformar o poner en movimiento.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un ecosistema es un sistema biológico constituido por una comunidad de organismos vivos (biocenosis) y el medio físico donde se relacionan (biotopo).",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se trata de una unidad compuesta de organismos interdependientes que comparten el mismo hábitat.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El término genética alude al área de estudio de la biología que busca comprender y explicar cómo se transmite la herencia biológica de generación en generación mediante el ADN.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se trata de una de las funciones fundamentales de la biología moderna, y abarca en su interior un gran número de disciplinas propias e interdisciplinarias que se relacionan directamente con la bioquímica, la medicina y la biología celular.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La mecánica cuántica es la rama de la física que estudia la naturaleza a escalas espaciales pequeñas, los sistemas atómicos, subatómicos, sus interacciones con la radiación electromagnética y otras fuerzas, en términos de cantidades observables.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se basa en la observación de que todas las formas de energía se liberan en unidades discretas o paquetes llamados cuantos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La teoría general de la relatividad o relatividad general es una teoría del campo gravitatorio y de los sistemas de referencia generales, publicada por Albert Einstein en 1915 y 1916.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En cosmología, se entiende por Big Bang, o Gran Explosión en español, al comienzo del universo, es decir, el punto inicial del cual surgió la materia, el espacio y el tiempo.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El término proviene del astrofísico Fred Hoyle, que lo utilizó a modo de burla.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El sistema solar es el sistema planetario que liga gravitacionalmente a un conjunto de objetos astronómicos que giran directa o indirectamente en una órbita alrededor de una única estrella conocida con el nombre de Sol.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La Vía Láctea (del latín Via Lactea, 'camino de leche') es una galaxia espiral barrada donde se encuentra el sistema solar y a su vez la Tierra.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Según las observaciones, posee una masa de 1012 masas solares y, por su forma, es una galaxia del tipo espiral barrada, por lo que posee un giro dextrógiro vista desde el norte celeste.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los agujeros negros pueden ser capaces de emitir un tipo de radiación, la radiación de Hawking, conjeturada por Stephen Hawking en la década de 1970.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una estrella es un objeto astronómico luminoso con forma de esferoide, que se mantiene debido al equilibrio hidrostático alcanzado por su propia gravedad.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La estrella más cercana a la Tierra es el Sol.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un planeta es un objeto astronómico que orbita una estrella y que es lo suficientemente masivo como para ser redondeado por su propia gravedad, pero no lo suficientemente masivo como para causar fusión termonuclear, y que ha despejado su región vecina de planetesimales.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una galaxia (del griego γαλαξίας ‘lechoso’ en alusión a la Vía Láctea) es un conjunto de estrellas, nubes de gas, planetas, polvo cósmico, materia oscura y energía unidas gravitatoriamente en una estructura más o menos definida.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La palabra «galaxia» procede de los griegos, cuyos mitos atribuían el origen de la Vía Láctea a las gotas de leche derramadas en el universo por la diosa Hera mientras alimentaba al infante Hércules.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El universo es el conjunto de todas las entidades físicamente detectables que interactúan entre ellas dentro del espacio-tiempo de acuerdo a las diversas leyes físicas definidas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Sin embargo, el término también se utiliza informalmente en sentidos contextuales ligeramente diferentes y alude a conceptos como cosmos, mundo, naturaleza o realidad.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las bacterias son microorganismos procariotas que presentan un tamaño de unos pocos micrómetros y diversas formas, incluyendo esferas (cocos), barras (bacilos), filamentos curvados (vibrios) y helicoidales.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las bacterias son células procariotas, por lo que, a diferencia de las células eucariotas, no tienen el núcleo definido ni presentan, en general, orgánulos membranosos internos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En biología, un virus es un agente infeccioso microscópico acelular que solo puede replicarse dentro de las células de los seres vivos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los virus están constituidos por moléculas largas de ADN o ARN, rodeadas de proteínas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El sistema inmunitario es el conjunto de elementos y procesos biológicos en el interior de un organismo que le permite mantener la homeostasis o equilibrio interno frente a agresiones externas, ya sean de naturaleza biológica o fisicoquímicas e internas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Reconoce lo dañino y reacciona frente a ello.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una vacuna es una preparación destinada a generar inmunidad adquirida contra una enfermedad, mediante la estimulación de la producción de anticuerpos o linfocitos T.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Normalmente una vacuna contiene un agente que se asemeja a un microorganismo causante de la patología y a menudo se hace a partir de formas debilitadas o muertas del microbio, sus toxinas o una de sus proteínas de superficie.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La sinapsis es una aproximación especializada entre neuronas, ya sea entre dos neuronas de asociación, una neurona y una célula receptora, o entre una neurona y una célula efectora.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En estos contactos se lleva a cabo la transmisión del impulso nervioso.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una hormona es una sustancia química secretada en la sangre por una célula especial cuyo propósito es indicar a otras células que realicen determinadas funciones.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Desde el punto de vista químico, las hormonas son moléculas de naturaleza orgánica, principalmente proteicas, y cumplen su función en muy pequeña cantidad.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Estos complejos procesos interrelacionados son la base de la vida a escala molecular y permiten las diversas actividades de las células: crecer, reproducirse, mantener sus estructuras y responder a estímulos, entre otras.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La electricidad es el conjunto de fenómenos físicos relacionados con la presencia y flujo de carga eléctricas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se manifiesta en una gran variedad de fenómenos como los rayos, la electricidad estática, la inducción electromagnética o el flujo de corriente eléctrica.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El magnetismo es el conjunto de fenómenos físicos mediados por campos magnéticos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Estos pueden ser generados por las corrientes eléctricas o por los momentos magnéticos intrínsecos de las partículas constituyentes de los materiales.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La radiación electromagnética es un tipo de campo electromagnético variable, es decir, una combinación de campos eléctricos y magnéticos oscilantes, que se propagan a través del espacio transportando energía de un lugar a otro.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Desde el punto de vista clásico, la radiación electromagnética son las ondas electromagnéticas generadas por las fuentes del campo electromagnético y que se propagan a la velocidad de la luz.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física, se denomina  espectro electromagnético al conjunto de todos los tipos de radiación que se desplazan en ondas, es decir, al conjunto de todas las ondas electromagnéticas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Referido a un objeto se denomina espectro electromagnético o simplemente espectro a la radiación electromagnética que emite o absorbe una sustancia.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una reacción química, también llamada cambio químico o fenómeno químico, es todo proceso termodinámico en el cual dos o más especies químicas se transforman, cambiando su estructura molecular y sus enlaces, en otras sustancias llamadas productos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los reactantes pueden ser elementos o compuestos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En química, un enlace es el proceso químico generado por las interacciones atractivas entre átomos y moléculas, y que confiere estabilidad a los compuestos químicos diatómicos y poliatómicos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La explicación de tales fuerzas atractivas es un área compleja que está descrita por las leyes de la química cuántica.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El potencial de hidrógeno (pH) es un índice utilizado ampliamente en química que expresa el grado de acidez o alcalinidad de una disolución acuosa.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El pH está relacionado con la concentración iones de hidrógeno presentes en determinadas disoluciones.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La catálisis es el proceso por el cual se aumenta la velocidad de una reacción química, debido a la participación de una sustancia llamada catalizador; aquellas que desactivan la catálisis son denominados inhibidores.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una característica importante es que la masa del catalizador no se modifica durante la reacción química, lo que lo diferencia de un reactivo, cuya masa va disminuyendo a lo largo de la reacción.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un terremoto, también llamado sismo o seísmo en España, temblor de tierra o movimiento telúrico, es la sacudida brusca y pasajera de la corteza terrestre.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los más comunes se producen por actividad de fallas geológicas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un volcán es una estructura geológica en la tierra o en el mar, generalmente una montaña, por la que emerge el magma que se divide en lava y gases provenientes del interior de la Tierra.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El ascenso del magma ocurre en episodios de actividad violenta denominados erupciones, que pueden variar en intensidad, duración y frecuencia, desde suaves corrientes de lava hasta explosiones extremadamente destructivas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una placa tectónica o placa litosférica es un fragmento de litosfera relativamente rígido que se mueve sobre la astenosfera, una zona relativamente plástica.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Toda la litosfera está dividida en placas tectónicas, quince de ellas de gran tamaño y más de cuarenta microplacas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La atmósfera terrestre es la parte gaseosa de la Tierra, siendo por esto la capa más externa y menos densa del planeta.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Está constituida por varios gases que varían en cantidad según la presión a diversas alturas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El ciclo hidrológico o ciclo del agua es el proceso de circulación del agua entre los distintos compartimentos que forman la hidrósfera.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se trata de un ciclo biogeoquímico en el que hay una intervención mínima de reacciones químicas, porque el agua solo se traslada de unos lugares a otros, o cambia de estado físico.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El efecto invernadero es un proceso en el que la radiación térmica emitida por la superficie planetaria es absorbida por los gases de efecto invernadero (GEI) atmosféricos y es irradiada en todas las direcciones.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Dado que parte de esta radiación es devuelta hacia la superficie terrestre y la atmósfera inferior, ello resulta en un incremento de la temperatura superficial media respecto a lo que habría en ausencia de los GEI.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se denomina capa de ozono, ozonosfera u ozonósfera a la zona de la estratosfera terrestre que contiene una concentración relativamente alta de ozono.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La estratosfera, que se extiende aproximadamente desde los 15 km a los 50 km de altitud, contiene el 90 % del ozono presente en la atmósfera y absorbe del 97 al 99 % de la radiación ultravioleta de alta frecuencia (150-300 nm).",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La biodiversidad comprende igualmente la variedad de ecosistemas y las diferencias genéticas dentro de cada especie que permiten la combinación de múltiples formas de vida, y cuyas mutuas interacciones con el resto del entorno fundamentan el sustento de la vida sobre el mundo.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En biología, la mitosis es un proceso que ocurre en el núcleo de las células eucariotas y que precede inmediatamente a la división celular.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Consiste en el reparto equitativo del material hereditario (ADN) característico.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La meiosis es una de las formas de la reproducción celular y se produce en las gónadas para la producción de gametos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Es un proceso de división celular en la que una célula diploide (2n) experimenta dos divisiones sucesivas, con la capacidad de generar cuatro células haploides (n).",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las proteínas o prótidos son macromoléculas formadas por cadenas lineales de aminoácidos.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La secuencia de cada una de estas biomoléculas complejas está determinada por la secuencia de nucleótidos de su gen correspondiente.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las enzimas\n son biomoléculas comúnmente producidas por los organismos vivos que actúan como catalizadores de sus reacciones químicas en el metabolismo.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Comúnmente son de naturaleza proteica, pero también se han descrito otros biocatalizadores de ARN llamados ribozimas.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un antibiótico, considerando la etimología, es una sustancia química producida por un ser vivo o derivado sintético, que mata o impide el crecimiento de ciertas clases de microorganismos sensibles.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Generalmente, son fármacos usados en el tratamiento de infecciones por bacterias, de allí que se les conozca como «antibacterianos».",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La fermentación o metabolismo fermentativo es un proceso catabólico de oxidación incompleta, que no requiere oxígeno, y cuyo producto final es un compuesto orgánico.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Es propio del metabolismo de muchos microorganismos y según los productos finales, existen diversos tipos de fermentación.",
+    "category": "ciencia",
+    "source": "wikipedia"
+  }
 ]
