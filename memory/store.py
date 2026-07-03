@@ -54,6 +54,12 @@ class NexusMemory:
     def get_facts_by_category(self, category: str) -> list[dict]:
         return self.semantic.get_facts_by_category(category)
 
+    def get_consolidable_facts(self, min_confidence: float = 0.8) -> list[dict]:
+        return self.semantic.get_consolidable_facts(min_confidence)
+
+    def mark_as_consolidated(self, fact_id: int):
+        return self.semantic.mark_as_consolidated(fact_id)
+
     # ─── Delegación a memoria procedural ──────────────────────
 
     def learn_pattern(self, name: str, pattern: str, response: str,

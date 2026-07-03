@@ -102,13 +102,58 @@ class SemanticMemory:
                     logger.debug(f"Worker generando embedding para hecho #{fact_id}...")
                     vec = get_embedding(fact_text)
                     if vec:
-                        blob = _json.dumps(vec).encode("utf-8")
+                        # Buscar hechos similares existentes en la base de datos (con embedding calculado y diferente id)
                         cur.execute(
-                            "UPDATE semantic SET embedding = ? WHERE id = ?",
-                            (blob, fact_id)
+                            "SELECT id, fact, confidence, access_count, embedding "
+                            "FROM semantic WHERE embedding IS NOT NULL AND id != ?",
+                            (fact_id,)
                         )
-                        worker_conn.commit()
-                        logger.info(f"Worker guardó embedding para hecho #{fact_id}")
+                        existing_rows = cur.fetchall()
+                        
+                        duplicate_found = False
+                        for ext_row in existing_rows:
+                            try:
+                                ext_vec = _json.loads(ext_row['embedding'].decode("utf-8"))
+                                from memory.embeddings import cosine_similarity
+                                sim = cosine_similarity(vec, ext_vec)
+                                if sim >= 0.88:  # Umbral de similitud semántica
+                                    ext_id = ext_row['id']
+                                    ext_fact = ext_row['fact']
+                                    ext_conf = ext_row['confidence']
+                                    ext_access = ext_row['access_count'] or 0
+                                    
+                                    # Consolidar en el hecho existente
+                                    new_conf = min(1.0, ext_conf + 0.1)
+                                    new_access = ext_access + 1
+                                    
+                                    cur.execute(
+                                        "UPDATE semantic SET confidence = ?, access_count = ?, updated_at = ? WHERE id = ?",
+                                        (new_conf, new_access, time.time(), ext_id)
+                                    )
+                                    # Eliminar el nuevo hecho duplicado redundante
+                                    cur.execute("DELETE FROM semantic WHERE id = ?", (fact_id,))
+                                    worker_conn.commit()
+                                    
+                                    logger.info(
+                                        f"Consolidación semántica: '{fact_text[:40]}' fusionado en "
+                                        f"'{ext_fact[:40]}' (similitud: {sim:.2f})"
+                                    )
+                                    duplicate_found = True
+                                    break
+                            except Exception as ex:
+                                logger.debug(f"Error procesando similitud en consolidación: {ex}")
+                                continue
+                        
+                        if not duplicate_found:
+                            # Proceder con la actualización normal de vector
+                            blob = _json.dumps(vec).encode("utf-8")
+                            cur.execute(
+                                "UPDATE semantic SET embedding = ? WHERE id = ?",
+                                (blob, fact_id)
+                            )
+                            worker_conn.commit()
+                            logger.info(f"Worker guardó embedding para hecho #{fact_id}")
+                            
                         if fact_id in failed_attempts:
                             del failed_attempts[fact_id]
                     else:
@@ -444,14 +489,37 @@ class SemanticMemory:
         return results[:top_k]
 
     def get_facts_by_category(self, category: str) -> list[dict]:
-        with self.lock:
-            cur = self.conn.cursor()
-            cur.execute(
-                "SELECT fact, confidence, source, created_at FROM semantic "
-                "WHERE category = ? ORDER BY confidence DESC LIMIT 100",
-                (category,)
-            )
-            return [dict(r) for r in cur.fetchall()]
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT fact, confidence, source, created_at FROM semantic "
+            "WHERE category = ? ORDER BY confidence DESC LIMIT 100",
+            (category,)
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def get_consolidable_facts(self, min_confidence: float = 0.8) -> list[dict]:
+        """Devuelve hechos aprendidos en runtime listos para consolidar a JSON.
+
+        Solo incluye hechos con confidence >= min_confidence cuyo source
+        NO sea 'knowledge_base' (esos ya están en los JSON de origen).
+        """
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT id, fact, category, confidence, source FROM semantic "
+            "WHERE confidence >= ? AND source != 'knowledge_base' "
+            "ORDER BY confidence DESC LIMIT 50",
+            (min_confidence,)
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def mark_as_consolidated(self, fact_id: int):
+        """Marca un hecho como consolidado (cambia source a 'knowledge_base')."""
+        cur = self.conn.cursor()
+        cur.execute(
+            "UPDATE semantic SET source = 'knowledge_base' WHERE id = ?",
+            (fact_id,)
+        )
+        self.conn.commit()
 
     def count(self) -> int:
         with self.lock:

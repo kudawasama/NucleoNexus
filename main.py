@@ -38,6 +38,7 @@ Arquitectura:
 import sys
 import os
 import re
+import json
 import logging
 from pathlib import Path
 
@@ -324,6 +325,10 @@ class NexusCore:
         # 2c. Reforzar hechos si el usuario dio feedback positivo
         reinforced = reinforce_from_feedback(user_input, self.memory)
 
+        # 2d. Consolidar hechos que alcanzaron confianza alta
+        consolidated = self._consolidate_facts()
+        metadata["facts_consolidated"] = consolidated
+
         metadata["facts_learned"] = facts_from_web
         metadata["facts_extracted"] = learned_input
 
@@ -465,6 +470,65 @@ class NexusCore:
         if learned:
             logger.info(f"Aprendidos {learned} hechos de la web (query: {query[:50]})")
         return learned
+
+    def _consolidate_facts(self) -> int:
+        """Consolida hechos con confianza alta en los archivos JSON de conocimiento.
+
+        Cuando un hecho aprendido en runtime alcanza confidence >= 0.8,
+        se exporta al JSON de su categoria para que persista entre reinicios.
+        Luego se marca como 'knowledge_base' para no reprocesarlo.
+
+        Returns:
+            Cantidad de hechos consolidados.
+        """
+        facts = self.memory.get_consolidable_facts(min_confidence=0.8)
+        if not facts:
+            return 0
+
+        consolidated = 0
+        for fact in facts:
+            fact_id = fact["id"]
+            fact_text = fact["fact"]
+            category = fact.get("category", "general")
+
+            # Determinar el archivo JSON de destino
+            json_path = KNOWLEDGE_DIR / f"{category}.json"
+
+            # Cargar existentes
+            existing = []
+            if json_path.exists():
+                try:
+                    existing = json.loads(json_path.read_text(encoding="utf-8"))
+                except Exception:
+                    existing = []
+
+            # Verificar duplicado
+            existing_texts = {item.get("fact", "") for item in existing}
+            if fact_text in existing_texts:
+                # Ya existe en el JSON, solo marcar como consolidado
+                self.memory.mark_as_consolidated(fact_id)
+                consolidated += 1
+                continue
+
+            # Agregar al JSON
+            existing.append({
+                "fact": fact_text,
+                "category": category,
+                "source": "knowledge_base",
+            })
+            json_path.write_text(
+                json.dumps(existing, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            # Marcar como consolidado en la BD
+            self.memory.mark_as_consolidated(fact_id)
+            consolidated += 1
+            logger.info(f"Consolidado: {fact_text[:60]}... → {json_path.name}")
+
+        if consolidated:
+            logger.info(f"Total consolidados: {consolidated} hechos")
+        return consolidated
 
     def _get_response(self, user_input: str, on_status: callable = None) -> tuple:
         """Selecciona y ejecuta el backend adecuado según el modo actual.
