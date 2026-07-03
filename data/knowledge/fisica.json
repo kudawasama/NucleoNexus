@@ -1,0 +1,227 @@
+[
+  {
+    "fact": "La física es la ciencia natural que estudia la naturaleza de los componentes y fenómenos más fundamentales del Universo como lo son la energía, la materia, la fuerza, el movimiento, el espacio-tiempo, las magnitudes y propiedades naturales fundamentales y las interacciones fundamentales.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La mecánica clásica es la rama de la física que estudia las leyes del comportamiento de cuerpos físicos macroscópicos en reposo y a velocidades pequeñas comparadas con la velocidad de la luz.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En la mecánica clásica en general existen tres aspectos invariantes: el tiempo es absoluto, la evolución temporal de los sistemas se realiza de acuerdo con el principio de mínima acción y las leyes físicas son deterministas.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física clásica, la fuerza es un fenómeno que modifica el movimiento de un cuerpo o bien lo deforma.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las fuerzas pueden representarse mediante vectores, ya que poseen magnitud y dirección.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física, la aceleración es una magnitud derivada vectorial que nos indica la variación de velocidad por unidad de tiempo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En el contexto de la mecánica vectorial newtoniana se representa normalmente por  o  y su módulo por.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física, la masa es una magnitud física y propiedad general de la materia que expresa la inercia o resistencia al cambio de movimiento de un cuerpo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "De manera más precisa es la propiedad de un cuerpo que determina su aceleración, cuando éste se encuentra bajo la influencia de una fuerza dada.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física moderna, el peso es una medida de la fuerza gravitatoria que actúa sobre un objeto.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El peso equivale a la fuerza que ejerce un cuerpo sobre un punto de apoyo, originada por la acción del campo gravitatorio local sobre la masa del cuerpo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En mecánica clásica, se dice que una fuerza realiza un trabajo cuando hay un desplazamiento del centro de masas del cuerpo sobre el que se aplica la fuerza, en la dirección de dicha fuerza.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El trabajo de la fuerza sobre ese cuerpo será equivalente a la energía necesaria para desplazarlo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física, la energía cinética es aquella que un cuerpo posee debido a su movimiento relativo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se define como el trabajo necesario para acelerar un cuerpo de una masa determinada desde el reposo hasta la velocidad indicada.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La energía potencial es la energía mecánica asociada a la localización de un cuerpo dentro de un campo de fuerzas o a la existencia de un campo de fuerza en el interior de un cuerpo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La energía potencial de un cuerpo es una consecuencia de que el sistema de fuerzas que actúa sobre el mismo sea conservativo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La termodinámica es la rama de la física que describe los estados de equilibrio termodinámico a nivel macroscópico.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Constituye una teoría fenomenológica que estudia sistemas reales a partir de razonamientos deductivos, sin modelizar y siguiendo un método experimental.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En termodinámica, la entropía es una magnitud física para un sistema termodinámico en equilibrio.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Mide el número de microestados compatibles con el macroestado de equilibrio; también se puede decir que mide el grado de organización del sistema, o que es la razón de un incremento entre energía interna frente a un incremento de temperatura del sistema termodinámico.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La teoría de la relatividad incluye tanto a la teoría de la relatividad especial como la de la relatividad general, formuladas principalmente por Albert Einstein a principios del siglo XX, que pretendían resolver la incompatibilidad existente entre la mecánica newtoniana y el electromagnetismo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La velocidad de la luz en el vacío es una constante universal que utilizando las unidades internacionales tiene el valor de 299 792 458 metros por segundo, aunque suele aproximarse a 3 × 108 m/s, en lenguaje común 300 000 kilómetros por segundo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se simboliza con la letra , proveniente del latín celéritās (en español, ‘celeridad’ o ‘rapidez’).",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física, un agujero de gusano, también conocido como puente de Einstein-Rosen, es una estructura hipotética asociada a un espacio-tiempo cuya topología es múltiplemente convexa.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Dicha estructura es una solución posible de las ecuaciones de campo de Einstein de la relatividad general, que esencialmente consiste en un puente a través del espacio y el tiempo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En astrofísica y cosmología física, se denomina materia oscura a un tipo de materia que se estima aproximadamente en un 85% de la materia del universo, y que no es energía oscura, materia bariónica ni neutrinos.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Su nombre hace referencia a que se considera que no emite ningún tipo de radiación electromagnética.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En cosmología física, la energía oscura es una forma de energía que estaría presente en todo el espacio, produciendo una presión que tiende a acelerar la expansión del universo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Considerar la existencia de la energía oscura es la manera más frecuente de explicar las observaciones recientes de que el universo parece estar en expansión acelerada desde hace unos 6145 millones de años.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física nuclear, la fisión es la división de un núcleo en núcleos más livianos, además de algunos subproductos como neutrones libres, fotones y otros fragmentos del núcleo como partículas alfa y beta, además de gran cantidad de energía.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Su descubrimiento se debe a Otto Hahn y Lise Meitner, aunque solo Hahn fue el único en recibir el premio Nobel por este descubrimiento.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física nuclear, la fusión nuclear es una reacción nuclear en la que varios núcleos atómicos se unen y forman un núcleo más pesado.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Estas reacciones son, en general, exotérmicas cuando ocurre entre átomos más ligeros que el hierro y endotérmicas si son más pesados.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La óptica es la rama de la física que estudia el comportamiento y las propiedades de la luz, incluidas sus interacciones con la materia y la construcción de instrumentos que se sirven de ella o la detectan.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La óptica generalmente describe el comportamiento de la luz visible, de la radiación ultravioleta y de la radiación infrarroja.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La refracción es el cambio de dirección y velocidad que experimenta una onda de luz al pasar de un medio a otro, ya sea líquido o gaseoso, con distinto índice refractivo.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Solo se produce si la onda incide oblicuamente sobre la superficie de separación de los dos medios y si estos tienen índices de refracción distintos.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un o una lente es un dispositivo óptico transmisor que enfoca o dispersa un haz de luz por medio de la refracción.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Sin embargo, otros dispositivos como las lentes de Fresnel, que desvían la luz por medio del fenómeno de difracción, son de gran utilidad y uso por su bajo costo constructivo y el reducido espacio que ocupan.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un láser es un dispositivo que utiliza en simultáneo un efecto de la mecánica cuántica, la emisión inducida o estimulada, para generar un haz de luz coherente tanto espacial como temporalmente.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La coherencia espacial se corresponde con la capacidad de un haz para permanecer con un pequeño tamaño al transmitirse por el vacío en largas distancias y la coherencia temporal se relaciona con la capacidad para concentrar la emisión en un rango espectral muy estrecho.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El efecto Doppler es el cambio de frecuencia aparente de una onda producido por el movimiento relativo de la fuente respecto a su observador.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En física, una onda (del latín unda) consiste en la propagación de una fluctuación o perturbación en alguna propiedad del espacio, por ejemplo, densidad, presión, campo eléctrico o campo magnético, implicando un transporte de energía sin transporte de materia.",
+    "category": "fisica",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El espacio perturbado puede contener materia o no (vacío).",
+    "category": "fisica",
+    "source": "wikipedia"
+  }
+]

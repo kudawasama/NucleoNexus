@@ -1,11 +1,11 @@
 {
   "nexus": {
-    "version": "0.1.0+build.91",
-    "commit": "415cd75",
+    "version": "0.1.0+build.92",
+    "commit": "4d55ad1",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
     "total_interactions": 704,
-    "total_learned_facts": 460,
+    "total_learned_facts": 838,
     "total_skills": 15,
     "confidence_level": 0.804,
     "awake_time": 0
@@ -33,10 +33,10 @@
   },
   "knowledge_stats": {
     "episodic_memories": 1549,
-    "semantic_facts": 460,
+    "semantic_facts": 838,
     "procedural_patterns": 0,
     "skills_learned": 15,
-    "initial_facts": 460
+    "initial_facts": 838
   },
   "model_state": {
     "backend": "ollama",

@@ -1,0 +1,287 @@
+[
+  {
+    "fact": "La medicina es la ciencia de la salud dedicada a la prevención, diagnóstico, pronóstico y tratamiento de las enfermedades, lesiones y problemas de salud de los seres humanos y animales.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Al profesional de la salud capacitado para aplicar tales conocimientos técnicos se le conoce como médico o, coloquialmente, como doctor.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La anatomía humana es una rama de la biología humana que se dedica al estudio de la forma y estructura del cuerpo humano y las relaciones que existen entre las diferentes partes que lo componen.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El término procede del griego ana que significa arriba y tomos que significa cortar.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El aparato circulatorio o cardiovascular es un sistema de transporte interno que utilizan los animales para mover dentro de su organismo elementos nutritivos como el oxígeno, dióxido de carbono, hormonas, metabolitos y otras sustancias.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Existe tanto en los vertebrados como en la mayoría de los invertebrados aunque su estructura y función tiene considerables variaciones dependiendo del tipo de animal.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El sistema nervioso es un conjunto de células especializadas en la conducción de señales eléctricas, está formado por neuronas y células gliales.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las neuronas reciben, procesan y transmiten la información que de esta forma puede viajar de un lugar a otro del organismo.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El aparato digestivo es el conjunto de órganos encargados del proceso de la digestión, es decir, la transformación de los alimentos para que puedan ser absorbidos y utilizados por las células del organismo.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las funciones que realiza son: transporte de alimentos, secreción de jugos digestivos, absorción de nutrientes y excreción de desechos mediante el proceso de defecación.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La mayor parte de los animales disponen de sistemas respiratorios que tiene la función de intercambiar gases entre sus células y el ambiente que los rodea, su estructura y función es muy variable dependiendo del tipo de organismo.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El aparato respiratorio o sistema respiratorio es el conjunto de órganos que sirven para intercambiar gases con el medio ambiente.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "También se acompaña de anormalidades en el metabolismo de los lípidos, proteínas, sales minerales y electrolitos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El término cáncer es el nombre común que recibe un conjunto de enfermedades relacionadas en las que se observa un proceso descontrolado en la división de las células del cuerpo.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Según la definición de Rupert Allan Willis, un patólogo australiano, una neoplasia es una masa anormal de tejido cuyo crecimiento excede el de los tejidos normales y no está relacionado con estos, que persiste del mismo modo excesivo aún después de finalizar el estímulo que le dio origen.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La hipertensión arterial (HTA) es una enfermedad crónica caracterizada por un incremento continuo de las cifras de la presión sanguínea por encima de los límites sobre los cuales aumenta el riesgo cardiovascular.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La obesidad es el quinto factor principal de riesgo de muerte humana en el mundo.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La nutrición humana se define como la provisión adecuada de macronutrientes y micronutrientes que garanticen el adecuado funcionamiento fisiológico, el crecimiento, la reproducción y la prevención de enfermedades.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En las últimas décadas, el estudio de los micronutrientes ha adquirido importancia relevante en materia de salud pública, debido al reconocimiento de su implicancia en el mantenimiento de la salud, la inmunidad, el desarrollo cognitivo y la prevención de enfermedades crónicas.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los primeros auxilios consisten en la atención inmediata que se le da a una persona enferma, lesionada o accidentada en el lugar de los acontecimientos, antes de llamar a los servicios médicos de emergencia o ser trasladado a un centro asistencial u hospitalario.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La anestesia es un acto médico controlado en el que se usan fármacos para bloquear la sensibilidad táctil y dolorosa de un paciente, sea en todo o parte de su cuerpo y sea con o sin compromiso de conciencia.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La anestesia general se caracteriza por brindar hipnosis, amnesia, analgesia, relajación muscular y abolición de reflejos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se denomina cirugía a la práctica que implica la manipulación mecánica de las estructuras anatómicas con un fin médico, bien sea diagnóstico, terapéutico o pronóstico.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "De acuerdo con la Organización Mundial de la Salud (2012) una cirugía mayor es todo procedimiento realizado en el quirófano, que comporte la incisión, manipulación o sutura de un tejido y que generalmente requiere anestesia regional, general, raquídea o sedación profunda para controlar el dolor.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Una radiografía es una imagen registrada en una placa o película fotográfica, o de forma digital en una base de datos, obtenida al exponer al receptor a una fuente de radiación de alta energía, comúnmente rayos X o radiación gamma procedente de isótopos radiactivos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Al interponer un objeto entre la fuente de radiación y el receptor, las partes más densas aparecen con diferentes tonos dentro de una escala de grises.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La ecografía, también llamada ultrasonografía o ecosonografía, es un procedimiento de diagnóstico usado en los hospitales y clínicas que emplea el ultrasonido para crear imágenes bidimensionales o tridimensionales.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un pequeño instrumento muy similar a un \"micrófono\" llamado transductor emite ondas de ultrasonidos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Un antibiótico, considerando la etimología, es una sustancia química producida por un ser vivo o derivado sintético, que mata o impide el crecimiento de ciertas clases de microorganismos sensibles.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Generalmente, son fármacos usados en el tratamiento de infecciones por bacterias, de allí que se les conozca como «antibacterianos».",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las penicilinas son antibióticos del grupo de los betalactámicos empleados en el tratamiento de infecciones provocadas por bacterias sensibles.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La mayoría de las penicilinas son derivados del ácido 6-aminopenicilánico, difiriendo entre sí según la sustitución en la cadena lateral de su grupo amino.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La insulina es una hormona polipeptídica, producida y secretada por las células beta de los islotes de Langerhans del páncreas.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La insulina permite la entrada de glucosa en las células, así interviene en el control de la glucemia y en el metabolismo de los nutrientes, para la síntesis de componentes celulares como el glucógeno y los triglicéridos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El ácido acetilsalicílico o AAS (C9H8O4), conocido popularmente como aspirina, nombre de una marca que pasó al uso común, es un fármaco de la familia de los salicilatos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se utiliza como medicamento para tratar el dolor (analgésico), la fiebre (antipirético) y la inflamación (antiinflamatorio), debido a su efecto inhibitorio, no selectivo, de la ciclooxigenasa.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El sistema endocrino, también llamado sistema de glándulas de secreción interna, es el conjunto de órganos y tejidos del organismo, que segregan un tipo de sustancias llamadas hormonas.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La tiroides o el tiroides es una glándula del sistema endocrino situada en la parte anterior del cuello, delante de la tráquea.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El páncreas es un órgano del aparato digestivo y del sistema endocrino de los vertebrados.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "En los seres humanos se localiza en la cavidad abdominal, justo detrás del estómago.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El colesterol es un lípido que se encuentra en la membrana plasmática eucariota, los tejidos corporales de todos los animales y en el plasma sanguíneo de los vertebrados.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Pese a que las cifras elevadas de colesterol en la sangre tienen consecuencias perjudiciales para la salud, es una sustancia estructural esencial para la membrana plasmática.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El eritrocito —también llamado glóbulo rojo o hematíe— es una célula de la sangre, concretamente la más numerosa.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La hemoglobina es uno de sus principales componentes, y su función es transportar el oxígeno hacia los diferentes tipos de tejidos del cuerpo.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los leucocitos o glóbulos blancos son un conjunto heterogéneo de células sanguíneas que son ejecutoras de la respuesta inmunitaria, interviniendo así en la defensa del organismo contra sustancias extrañas o agentes infecciosos (antígenos).",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Se originan en la médula ósea y en el tejido linfático.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Las plaquetas o trombocitos son pequeños fragmentos citoplasmáticos, irregulares, carentes de núcleo, de 2-3 µm de diámetro, derivados de la fragmentación de sus células precursoras, los megacariocitos; la vida media de una plaqueta oscila entre 8 y 11 días.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Desempeñan un papel fundamental en la hemostasia y son una fuente natural de factores de crecimiento.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El sistema linfático es la estructura anatómica que transporta la linfa.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Guarda algunas similitudes con el aparato circulatorio, pero el líquido que se transporta no es sangre, sino linfa.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La alergia es una reacción inmunitaria del organismo frente a una sustancia generalmente inocua para el anfitrión, que se manifiesta por unos signos y síntomas característicos cuando este se expone a ella.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Durante mucho tiempo la alergia se ha considerado equivalente a la hipersensibilidad y por ello se ha considerado erróneamente como una reacción inmunitaria exagerada ante una sustancia.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "El asma es una enfermedad del sistema respiratorio caracterizada por una inflamación crónica de la vía aérea, cuyas manifestaciones clínicas son heterogéneas y variables en el tiempo y consisten en sibilancias (pitos), dificultad respiratoria, opresión torácica y tos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La neumonía o pulmonía es una enfermedad inflamatoria de los pulmones que afecta principalmente a los pequeños sacos de aire, conocidos como alvéolos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "Los síntomas suelen incluir una combinación de tos productiva o seca, dolor en el pecho, fiebre y dificultad para respirar.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La tuberculosis, llamada alternativa e históricamente peste blanca o tisis, es una infección bacteriana contagiosa que afecta a los pulmones, pero puede propagarse a otros órganos.",
+    "category": "salud",
+    "source": "wikipedia"
+  },
+  {
+    "fact": "La especie de bacteria más importante y representativa causante de la tuberculosis es Mycobacterium tuberculosis o bacilo de Koch, perteneciente al complejo Mycobacterium tuberculosis.",
+    "category": "salud",
+    "source": "wikipedia"
+  }
+]
