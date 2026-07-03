@@ -489,13 +489,14 @@ class SemanticMemory:
         return results[:top_k]
 
     def get_facts_by_category(self, category: str) -> list[dict]:
-        cur = self.conn.cursor()
-        cur.execute(
-            "SELECT fact, confidence, source, created_at FROM semantic "
-            "WHERE category = ? ORDER BY confidence DESC LIMIT 100",
-            (category,)
-        )
-        return [dict(r) for r in cur.fetchall()]
+        with self.lock:
+            cur = self.conn.cursor()
+            cur.execute(
+                "SELECT fact, confidence, source, created_at FROM semantic "
+                "WHERE category = ? ORDER BY confidence DESC LIMIT 100",
+                (category,)
+            )
+            return [dict(r) for r in cur.fetchall()]
 
     def get_consolidable_facts(self, min_confidence: float = 0.8) -> list[dict]:
         """Devuelve hechos aprendidos en runtime listos para consolidar a JSON.
@@ -503,23 +504,25 @@ class SemanticMemory:
         Solo incluye hechos con confidence >= min_confidence cuyo source
         NO sea 'knowledge_base' (esos ya están en los JSON de origen).
         """
-        cur = self.conn.cursor()
-        cur.execute(
-            "SELECT id, fact, category, confidence, source FROM semantic "
-            "WHERE confidence >= ? AND source != 'knowledge_base' "
-            "ORDER BY confidence DESC LIMIT 50",
-            (min_confidence,)
-        )
-        return [dict(r) for r in cur.fetchall()]
+        with self.lock:
+            cur = self.conn.cursor()
+            cur.execute(
+                "SELECT id, fact, category, confidence, source FROM semantic "
+                "WHERE confidence >= ? AND source != 'knowledge_base' "
+                "ORDER BY confidence DESC LIMIT 50",
+                (min_confidence,)
+            )
+            return [dict(r) for r in cur.fetchall()]
 
     def mark_as_consolidated(self, fact_id: int):
         """Marca un hecho como consolidado (cambia source a 'knowledge_base')."""
-        cur = self.conn.cursor()
-        cur.execute(
-            "UPDATE semantic SET source = 'knowledge_base' WHERE id = ?",
-            (fact_id,)
-        )
-        self.conn.commit()
+        with self.lock:
+            cur = self.conn.cursor()
+            cur.execute(
+                "UPDATE semantic SET source = 'knowledge_base' WHERE id = ?",
+                (fact_id,)
+            )
+            self.conn.commit()
 
     def count(self) -> int:
         with self.lock:
