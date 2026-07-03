@@ -300,19 +300,20 @@ class NexusCLI:
 
     def _setup_autocomplete(self):
         """Configura autocompletado con Tab para comandos /."""
+        # Lista de comandos para autocompletar (siempre disponible para Windows/Unix)
+        self._all_commands = [
+            "/help", "/status", "/stats", "/fase", "/hechos", "/memoria",
+            "/skills", "/hora", "/buscar", "/aprende", "/aprende-web",
+            "/recuerda", "/analiza", "/olvida", "/limpiar-web",
+            "/model", "/model list", "/model use", "/model test",
+            "/backend", "/personalidad", "/export", "/version",
+            "/update", "/clear", "/reset", "/exit", "/agent",
+            "/renombrar", "/verbose"
+        ]
+        
         if not HAS_READLINE:
             return
         try:
-            # Lista de comandos para autocompletar
-            self._all_commands = [
-                "/help", "/status", "/stats", "/fase", "/hechos", "/memoria",
-                "/skills", "/hora", "/buscar", "/aprende", "/aprende-web",
-                "/recuerda", "/analiza", "/olvida", "/limpiar-web",
-                "/model", "/model list", "/model use", "/model test",
-                "/backend", "/personalidad", "/export", "/version",
-                "/update", "/clear", "/reset", "/exit", "/agent",
-                "/renombrar", "/verbose"
-            ]
             def completer(text, state):
                 options = [cmd for cmd in self._all_commands if cmd.startswith(text)]
                 if state < len(options):
