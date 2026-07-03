@@ -114,6 +114,17 @@ class NexusCore:
         facts_loaded = load_knowledge_to_memory(self.memory, str(KNOWLEDGE_DIR))
         self.state.set("knowledge_stats", "initial_facts", value=facts_loaded)
 
+        # 2c. Sincronizar estado con los conteos reales de la BD
+        # (antes solo se actualizaba initial_facts, pero semantic_facts
+        #  y episodic_memories se quedaban en 0 aunque la BD tuviera datos)
+        real_stats = self.memory.stats()
+        self.state.set("knowledge_stats", "semantic_facts",
+                       value=real_stats["semantic"])
+        self.state.set("knowledge_stats", "episodic_memories",
+                       value=real_stats["episodic"])
+        self.state.set("nexus", "total_learned_facts",
+                       value=real_stats["semantic"])
+
         # 2c. Restaurar modelo persistido (si /model use se uso antes)
         self._restore_persisted_model()
 

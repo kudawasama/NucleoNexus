@@ -44,8 +44,9 @@ class NexusMemory:
     # ─── Delegación a memoria semántica ───────────────────────
 
     def learn_fact(self, fact: str, category: str = "general",
-                   confidence: float = 0.5, source: str = None) -> bool:
-        return self.semantic.learn_fact(fact, category, confidence, source)
+                   confidence: float = 0.5, source: str = None,
+                   **kwargs) -> bool:
+        return self.semantic.learn_fact(fact, category, confidence, source, **kwargs)
 
     def query_knowledge(self, query: str, top_k: int = 3) -> list[dict]:
         return self.semantic.query_knowledge(query, top_k)
