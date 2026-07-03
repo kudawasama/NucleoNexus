@@ -1,13 +1,13 @@
 {
   "nexus": {
-    "version": "0.1.0+build.94",
-    "commit": "b0ae2ce",
+    "version": "0.1.0+build.95",
+    "commit": "b6754f3",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
-    "total_interactions": 705,
+    "total_interactions": 706,
     "total_learned_facts": 838,
     "total_skills": 15,
-    "confidence_level": 0.805,
+    "confidence_level": 0.806,
     "awake_time": 0
   },
   "personality": {
@@ -25,18 +25,18 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 26.65,
-    "responses_given": 705,
-    "successful_responses": 705,
+    "avg_response_time_ms": 26.61,
+    "responses_given": 706,
+    "successful_responses": 706,
     "failed_responses": 0,
-    "last_response_time": 1783116687.7798216
+    "last_response_time": 1783117007.3401783
   },
   "knowledge_stats": {
-    "episodic_memories": 1549,
+    "episodic_memories": 1551,
     "semantic_facts": 838,
     "procedural_patterns": 0,
     "skills_learned": 15,
-    "initial_facts": 703
+    "initial_facts": 708
   },
   "model_state": {
     "backend": "ollama",

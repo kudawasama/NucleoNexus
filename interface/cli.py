@@ -62,15 +62,14 @@ class Color:
 
 
 # ─── ASCII Art ────────────────────────────────────────────────
-NEXUS_ASCII = f"""{Color.rgb(0, 180, 255)}╔══════════════════════════════════╗
-║     {Color.rgb(255, 200, 50)}███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗{Color.rgb(0, 180, 255)}    ║
-║     {Color.rgb(255, 200, 50)}████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝{Color.rgb(0, 180, 255)}    ║
-║     {Color.rgb(255, 200, 50)}██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║███████╗{Color.rgb(0, 180, 255)}    ║
-║     {Color.rgb(255, 200, 50)}██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║╚════██║{Color.rgb(0, 180, 255)}    ║
-║     {Color.rgb(255, 200, 50)}██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝███████║{Color.rgb(0, 180, 255)}    ║
-║     {Color.rgb(255, 200, 50)}╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝{Color.rgb(0, 180, 255)}    ║
-╚══════════════════════════════════╝{Color.RESET}
-{Color.DIM}  IA Ultra-Ligera · Aprendizaje Incremental · SLM-Ready{Color.RESET}
+NEXUS_ASCII = f"""
+  {Color.rgb(0, 180, 255)}███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗
+  {Color.rgb(0, 195, 255)}████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝
+  {Color.rgb(0, 210, 255)}██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║███████╗
+  {Color.rgb(0, 225, 255)}██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║╚════██║
+  {Color.rgb(0, 240, 255)}██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝███████║
+  {Color.rgb(0, 255, 255)}╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝{Color.RESET}
+  {Color.DIM}  IA Ultra-Ligera · Aprendizaje Incremental · SLM-Ready{Color.RESET}
 """
 
 
@@ -134,15 +133,18 @@ class NexusCLI:
         commit = self.core.state.get("nexus", "commit", default="?")
         backend = self.core.state.get("capabilities", "backend", default="symbolic")
         repo = "github.com/kudawasama/NucleoNexus"
-        print(f"{Color.CYAN}╔══════════════════════════════════════════════════╗{Color.RESET}")
-        print(f"{Color.CYAN}║{Color.RESET}  Fase: {Color.YELLOW}{phase}{Color.RESET}     "
-              f"{Color.DIM}v{version}{Color.RESET}  " 
-              f"{Color.DIM}#{commit}{Color.RESET}   {Color.CYAN}║{Color.RESET}")
-        print(f"{Color.CYAN}║{Color.RESET}  Backend: {Color.GREEN}{backend}{Color.RESET}"
-              f"            {Color.DIM}{repo}{Color.RESET}  {Color.CYAN}║{Color.RESET}")
-        print(f"{Color.CYAN}║{Color.RESET}  Escribe '{Color.GREEN}/help{Color.RESET}' para comandos  "
-              f"'{Color.GREEN}/exit{Color.RESET}' para salir {Color.CYAN}║{Color.RESET}")
-        print(f"{Color.CYAN}╚══════════════════════════════════════════════════╝{Color.RESET}")
+        
+        # Generar las lineas de forma alineada dinamica
+        line1 = f"  Fase: {Color.YELLOW}{phase}{Color.RESET}  ·  v{version}  ·  #{commit}"
+        line2 = f"  Backend: {Color.GREEN}{backend}{Color.RESET}  ·  {repo}"
+        line3 = f"  Escribe '{Color.GREEN}/help{Color.RESET}' para comandos  ·  '{Color.GREEN}/exit{Color.RESET}' para salir"
+        
+        border = f"{Color.rgb(0, 180, 255)}─────────────────────────────────────────────────────────────────{Color.RESET}"
+        print(border)
+        print(line1)
+        print(line2)
+        print(line3)
+        print(border)
         print()
 
     def run(self):
@@ -152,9 +154,10 @@ class NexusCLI:
 
         while self.running:
             try:
-                user_input = input(f"{Color.rgb(0, 180, 255)}Nexus{Color.RESET}"
-                                   f"{Color.GRAY}@{Color.RESET}"
-                                   f"{Color.rgb(255, 200, 50)}φ{Color.RESET} ")
+                prompt = (f"{Color.rgb(0, 180, 255)}Nexus{Color.RESET}"
+                          f"{Color.GRAY}@{Color.RESET}"
+                          f"{Color.rgb(255, 200, 50)}φ{Color.RESET} ")
+                user_input = self._get_input(prompt)
             except (EOFError, KeyboardInterrupt):
                 print()
                 self._cmd_exit()
@@ -193,6 +196,107 @@ class NexusCLI:
 
             # Mostrar respuesta con estilo
             self._show_response(response, metadata)
+
+    def _get_input(self, prompt: str) -> str:
+        """Lee la entrada del usuario. En Windows sin readline, usa msvcrt para Tab y flechas."""
+        if os.name != 'nt' or HAS_READLINE:
+            return input(prompt)
+
+        import msvcrt
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+
+        buf = []
+        hist_idx = len(self.history)
+        
+        # Para el autocompletado ciclico con Tab
+        tab_prefix = None
+        tab_matches = []
+        tab_idx = 0
+        last_was_tab = False
+
+        while True:
+            try:
+                ch = msvcrt.getwch()
+            except (KeyboardInterrupt, SystemExit):
+                print()
+                raise KeyboardInterrupt
+            
+            # Detectar Enter
+            if ch == '\r' or ch == '\n':
+                line = "".join(buf)
+                print()
+                return line
+            
+            # Detectar Backspace
+            elif ch == '\x08':
+                last_was_tab = False
+                if buf:
+                    buf.pop()
+                    sys.stdout.write('\b \b')
+                    sys.stdout.flush()
+            
+            # Detectar Tab
+            elif ch == '\t':
+                current_text = "".join(buf)
+                if current_text.startswith('/') or (last_was_tab and tab_prefix):
+                    if not last_was_tab:
+                        # Iniciar busqueda de coincidencias
+                        tab_prefix = current_text
+                        tab_matches = [cmd for cmd in self._all_commands if cmd.startswith(tab_prefix)]
+                        tab_idx = 0
+                    else:
+                        # Rotar coincidencia si se presiona Tab consecutivamente
+                        if tab_matches:
+                            tab_idx = (tab_idx + 1) % len(tab_matches)
+                    
+                    if tab_matches:
+                        match = tab_matches[tab_idx]
+                        # Borrar la palabra actual en pantalla
+                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
+                        buf = list(match)
+                        sys.stdout.write(match)
+                        sys.stdout.flush()
+                    
+                    last_was_tab = True
+                    continue
+            
+            # Detectar teclas especiales (Flechas)
+            elif ch in ('\x00', '\xe0'):
+                last_was_tab = False
+                try:
+                    ch2 = msvcrt.getwch()
+                except Exception:
+                    continue
+                
+                # Flecha Arriba (H)
+                if ch2 == 'H' and self.history:
+                    if hist_idx > 0:
+                        hist_idx -= 1
+                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
+                        buf = list(self.history[hist_idx])
+                        sys.stdout.write("".join(buf))
+                        sys.stdout.flush()
+                # Flecha Abajo (P)
+                elif ch2 == 'P' and self.history:
+                    if hist_idx < len(self.history) - 1:
+                        hist_idx += 1
+                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
+                        buf = list(self.history[hist_idx])
+                        sys.stdout.write("".join(buf))
+                        sys.stdout.flush()
+                    elif hist_idx == len(self.history) - 1:
+                        hist_idx += 1
+                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
+                        buf = []
+                        sys.stdout.flush()
+            
+            # Caracter normal
+            else:
+                last_was_tab = False
+                buf.append(ch)
+                sys.stdout.write(ch)
+                sys.stdout.flush()
 
     def _setup_autocomplete(self):
         """Configura autocompletado con Tab para comandos /."""
@@ -335,19 +439,10 @@ class NexusCLI:
             return
 
     def _show_response(self, response: str, metadata: dict):
-        """Muestra la respuesta formateada con metadatos técnicos.
-
-        Línea 1: backend + tiempo + modelo + tokens
-        Línea 2: versión + git + skills + interacciones + confianza
-
-        Args:
-            response: Texto de respuesta
-            metadata: Dict con backend, model, tokens, version,
-                     skills_count, phase, interactions, git
-        """
+        """Muestra la respuesta formateada con metadatos técnicos en una sola línea elegante."""
         phase = self.core.state.get("nexus", "phase", default="Proto")
         
-        # Indicador de fase
+        # Indicador de fase con color distintivo
         phase_indicator = {
             "Proto": f"{Color.GRAY}[φ]{Color.RESET}",
             "Básico": f"{Color.BLUE}[◈]{Color.RESET}",
@@ -369,60 +464,50 @@ class NexusCLI:
                 line = f"{line} {word}" if line else word
         if line:
             print(f"  {line}")
+        print()
         
-        # ─── Línea 1: backend + tiempo + modelo + tokens ─────────
+        # Unificar metadatos en una sola línea fina y elegante
         backend = metadata.get("backend", "symbolic")
         model = metadata.get("model", "")
         elapsed = metadata.get("duration_ms", 0) or metadata.get("total_duration_ms", 0)
-        tokens_prompt = metadata.get("tokens_prompt", 0)
         tokens_gen = metadata.get("tokens_generated", 0)
         tool = metadata.get("tool_called", "")
-        
-        # Badge de backend + tool
-        if backend == "slm":
-            badge = f"{Color.rgb(255, 165, 0)}SLM{Color.RESET}"
-        else:
-            badge = f"{Color.GRAY}φ{Color.RESET}"
-        
-        tech_parts = [f"{badge} {elapsed:.0f}ms"]
-        if tool:
-            tech_parts.append(f"🔧 {tool}")
-        if model:
-            tech_parts.append(f"· {model}")
-        if tokens_gen:
-            tech_parts.append(f"· {tokens_gen} tok")
-        if tokens_prompt:
-            tech_parts.append(f"· {tokens_prompt} ctx")
-        
-        print(f"{Color.DIM}  ─── {' '.join(tech_parts)}{Color.RESET}")
-        
-        # ─── Línea 2: versión + git + skills + interacciones ─────
         ver = metadata.get("version", "")
         skills_n = metadata.get("skills_count", 0)
         interactions = metadata.get("interactions", 0)
         mode = metadata.get("mode", "")
         git = self._git_info
         
-        sys_parts = []
+        # Etiqueta de backend
+        if backend == "slm":
+            engine_lbl = f"{Color.ORANGE}SLM{Color.RESET}"
+        else:
+            engine_lbl = f"{Color.GRAY}φ{Color.RESET}"
+
+        parts = [f"{engine_lbl} {elapsed:.0f}ms"]
+        if tool:
+            parts.append(f"🔧 {tool}")
+        if model:
+            parts.append(model)
+        if tokens_gen:
+            parts.append(f"{tokens_gen} tok")
         if ver:
-            sys_parts.append(f"v{ver}")
+            parts.append(f"v{ver}")
         if git:
-            sys_parts.append(f"#{git}")
+            parts.append(f"#{git}")
         if mode:
-            sys_parts.append(mode)
+            parts.append(mode)
         if skills_n:
-            sys_parts.append(f"{skills_n} tools")
+            parts.append(f"{skills_n} tools")
         if interactions:
-            sys_parts.append(f"{interactions} int")
-        
+            parts.append(f"{interactions} int")
+            
         conf = self.core.state.get("nexus", "confidence_level", default=0)
         bar = "█" * int(conf * 10) + "░" * (10 - int(conf * 10))
+        parts.append(f"[{bar}] {conf:.0%}")
         
-        if sys_parts:
-            print(f"{Color.GRAY}  ─── {' · '.join(sys_parts)} · [{bar}] {conf:.0%}{Color.RESET}")
-        else:
-            print(f"{Color.GRAY}  ─── [{bar}] {conf:.0%}{Color.RESET}")
-        print()
+        # Imprimir metadatos en una sola línea con separadores de puntos flotantes
+        print(f"  {Color.DIM}─── {' · '.join(parts)}{Color.RESET}\n")
 
     def _handle_command(self, cmd: str):
         """Maneja comandos internos de la CLI."""
