@@ -242,8 +242,8 @@ class TestCognitionAndAgent(unittest.TestCase):
                             synthesized = parsed.get("respuesta", raw)
                         else:
                             synthesized = raw
-                        except Exception:
-                            synthesized = raw
+                    except Exception:
+                        synthesized = raw
                 else:
                     synthesized = str(raw)
             else:
