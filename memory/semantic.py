@@ -13,6 +13,14 @@ import logging
 logger = logging.getLogger("nexus.memory.semantic")
 
 
+class ContradictionError(Exception):
+    """Excepción lanzada cuando un hecho contradice otro con confianza alta (> 0.8)."""
+    def __init__(self, existing_fact: str, confidence: float):
+        self.existing_fact = existing_fact
+        self.confidence = confidence
+        super().__init__(f"Contradice el hecho existente: '{existing_fact}' (confianza: {confidence})")
+
+
 class SemanticMemory:
     """Memoria semántica — hechos y conceptos con confianza."""
 
@@ -243,12 +251,18 @@ class SemanticMemory:
 
     def learn_fact(self, fact: str, category: str = "general",
                    confidence: float = 0.5, source: str = None,
-                   with_embedding: bool = True) -> bool:
+                   with_embedding: bool = True, force: bool = False) -> bool:
         """Aprende un hecho. Si ya existe, refuerza confianza.
 
         Con la optimizacion asincrona, el embedding se calcula en segundo plano
         por el worker si `with_embedding` es True (dejándolo inicialmente en NULL).
         """
+        # 1. Verificar contradicción si no se fuerza
+        if not force:
+            contradiction = self.check_contradiction(fact)
+            if contradiction:
+                raise ContradictionError(contradiction["fact"], contradiction["confidence"])
+
         with self.lock:
             cur = self.conn.cursor()
             now = time.time()
@@ -278,6 +292,81 @@ class SemanticMemory:
                 )
                 self.conn.commit()
                 return True
+
+    def check_contradiction(self, fact: str) -> dict | None:
+        """Compara un hecho nuevo con hechos existentes para detectar contradicciones semánticas directas.
+
+        Devuelve un diccionario con el hecho contradictorio y su confianza si se detecta alguno,
+        o None si no hay contradicciones.
+        """
+        try:
+            # Buscar hechos con similitud semántica en la BD usando la búsqueda híbrida actual
+            existing = self.query_knowledge(fact, top_k=5)
+        except Exception:
+            return None
+
+        # Normalizar y tokenizar el nuevo hecho
+        w1 = set(fact.lower().replace(".", "").replace(",", "").split())
+        stop_words = {
+            'el', 'la', 'los', 'las', 'un', 'una', 'y', 'de', 'del', 'al', 'con', 'en', 'para', 'por', 'a',
+            'es', 'son', 'esta', 'este', 'se', 'lo', 'le', 'sus'
+        }
+        sig1 = w1 - stop_words
+
+        for item in existing:
+            # Solo verificar contradicciones con hechos que tengan confianza alta (> 0.8)
+            conf = item["metadata"].get("confidence", 0.0)
+            if conf <= 0.8:
+                continue
+
+            existing_fact = item["text"]
+            w2 = set(existing_fact.lower().replace(".", "").replace(",", "").split())
+            sig2 = w2 - stop_words
+
+            # Tienen que hablar del mismo tema (al menos una palabra significativa común)
+            common = sig1 & sig2
+            if not common:
+                continue
+
+            # 1. Contradicción por negación (ej: "X es Y" vs "X no es Y")
+            has_no1 = "no" in w1
+            has_no2 = "no" in w2
+            if has_no1 != has_no2:
+                other_words1 = sig1 - {"no"}
+                other_words2 = sig2 - {"no"}
+                if other_words1 and other_words2:
+                    overlap = len(other_words1 & other_words2) / max(len(other_words1), len(other_words2))
+                    if overlap >= 0.6:  # Solapamiento semántico alto
+                        return {"fact": existing_fact, "confidence": conf}
+
+            # 2. Contradicción por antónimos directos
+            antonimos = [
+                ("caliente", "frio"), ("caliente", "frío"),
+                ("rapido", "lento"), ("rápido", "lento"),
+                ("bueno", "malo"),
+                ("alto", "bajo"),
+                ("grande", "pequeño"), ("grande", "pequeno"),
+                ("facil", "dificil"), ("fácil", "difícil"),
+                ("abierto", "cerrado"),
+                ("verdadero", "falso"),
+                ("positivo", "negativo"),
+                ("activo", "inactivo"),
+                ("seguro", "inseguro"),
+                ("correcto", "incorrecto"),
+                ("valido", "invalido"), ("válido", "inválido"),
+                ("fuerte", "debil"), ("fuerte", "débil"),
+                ("luz", "oscuridad"), ("luz", "sombra")
+            ]
+            for a, b in antonimos:
+                if (a in w1 and b in w2) or (b in w1 and a in w2):
+                    other1 = sig1 - {a, b}
+                    other2 = sig2 - {a, b}
+                    if other1 and other2:
+                        overlap = len(other1 & other2) / max(len(other1), len(other2))
+                        if overlap >= 0.5:
+                            return {"fact": existing_fact, "confidence": conf}
+
+        return None
 
     def query_knowledge(self, query: str, top_k: int = 3) -> list[dict]:
         """Busca hechos por relevancia semántica de términos significativos.

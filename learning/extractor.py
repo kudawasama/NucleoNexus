@@ -169,9 +169,15 @@ def learn_from_all(text: str, memory, source: str = "auto") -> int:
     facts = extract_facts(text)
     learned = 0
     for fact in facts:
-        # Confianza base baja (0.2) - sube con repeticion
-        memory.learn_fact(fact, category="aprendizaje", confidence=0.2, source=source)
-        learned += 1
+        try:
+            # Confianza base baja (0.2) - sube con repeticion
+            memory.learn_fact(fact, category="aprendizaje", confidence=0.2, source=source)
+            learned += 1
+        except Exception as e:
+            if e.__class__.__name__ == "ContradictionError":
+                logger.debug(f"Extractor descartó hecho contradictorio '{fact}': {e}")
+            else:
+                logger.error(f"Error guardando hecho extraído '{fact}': {e}")
     return learned
 
 

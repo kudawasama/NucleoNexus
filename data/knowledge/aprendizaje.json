@@ -13,5 +13,10 @@
     "fact": "que es la fotosintesis",
     "category": "aprendizaje",
     "source": "knowledge_base"
+  },
+  {
+    "fact": "Python es un lenguaje de programacion",
+    "category": "aprendizaje",
+    "source": "knowledge_base"
   }
 ]

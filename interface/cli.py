@@ -1426,13 +1426,32 @@ class NexusCLI:
             print(f"  Usa: /aprende-web {fact}")
             return
 
-        # Guardar el hecho
-        self.core.memory.learn_fact(
-            fact, category="aprendizaje",
-            confidence=0.5, source="usuario"
-        )
-        print(f"{Color.GREEN}✓ Aprendido: {fact}{Color.RESET}")
-        print(f"  {Color.DIM}Categoría: aprendizaje | Confianza: 0.5{Color.RESET}")
+        # Guardar el hecho detectando contradicciones
+        try:
+            self.core.memory.learn_fact(
+                fact, category="aprendizaje",
+                confidence=0.5, source="usuario"
+            )
+            print(f"{Color.GREEN}✓ Aprendido: {fact}{Color.RESET}")
+            print(f"  {Color.DIM}Categoría: aprendizaje | Confianza: 0.5{Color.RESET}")
+        except Exception as e:
+            if e.__class__.__name__ == "ContradictionError":
+                print(f"\n{Color.RED}⚠ Contradicción detectada con un hecho existente:{Color.RESET}")
+                print(f"  Existente: \"{e.existing_fact}\" (Confianza: {e.confidence:.2f})")
+                print(f"  Nuevo:     \"{fact}\"")
+                
+                # Pedir confirmación interactiva
+                ans = self._get_input("¿Deseas guardar el nuevo hecho de todas formas? (s/n): ")
+                if ans.lower().strip() in ['s', 'si', 'sí', 'y', 'yes']:
+                    self.core.memory.learn_fact(
+                        fact, category="aprendizaje",
+                        confidence=0.5, source="usuario", force=True
+                    )
+                    print(f"{Color.GREEN}✓ Guardado (forzado): {fact}{Color.RESET}")
+                else:
+                    print(f"{Color.YELLOW}Cancelado. Hecho no guardado.{Color.RESET}")
+            else:
+                print(f"{Color.RED}Error al guardar hecho: {e}{Color.RESET}")
 
     def _cmd_learn_web(self, cmd: str = ""):
         """Busca en la web y aprende los resultados. Uso: /aprende-web <tema>"""

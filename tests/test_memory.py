@@ -129,6 +129,50 @@ class TestMemoryAndSynonyms(unittest.TestCase):
         """/olvida algo que no existe no falla."""
         self.cli._cmd_forget("/olvida algo_que_no_existe_12345")
 
+    def test_contradiction_detection_raises_error(self):
+        """Si existe una contradicción con un hecho de confianza > 0.8, debe lanzar ContradictionError."""
+        # Limpiar
+        cur = self.nexus.memory.semantic.conn.cursor()
+        cur.execute("DELETE FROM semantic WHERE fact LIKE '%sol es%'")
+        self.nexus.memory.semantic.conn.commit()
+
+        # Guardar hecho con confianza 1.0 (alta)
+        self.nexus.memory.learn_fact(
+            "el sol es caliente y brillante",
+            category="test_contra", confidence=1.0, source="test_contra"
+        )
+
+        # Intentar aprender un hecho contradictorio (antónimo: frío) con force=False
+        from memory.semantic import ContradictionError
+        with self.assertRaises(ContradictionError):
+            self.nexus.memory.learn_fact(
+                "el sol es frio y oscuro",
+                category="test_contra", confidence=0.5, source="test_contra",
+                force=False
+            )
+
+    def test_contradiction_detection_allows_force(self):
+        """Si force=True, debe permitir guardar el hecho contradictorio."""
+        # Guardar hecho con confianza 1.0 (alta)
+        self.nexus.memory.learn_fact(
+            "el agua es liquida y transparente",
+            category="test_contra", confidence=1.0, source="test_contra",
+            force=True
+        )
+
+        # Intentar aprender hecho contradictorio (negación) con force=True
+        try:
+            self.nexus.memory.learn_fact(
+                "el agua no es liquida",
+                category="test_contra", confidence=0.5, source="test_contra",
+                force=True
+            )
+            success = True
+        except Exception:
+            success = False
+
+        self.assertTrue(success, "debió permitir guardar con force=True")
+
     def test_arch_memory_3_types(self):
         """Memoria debe tener los 3 tipos: episodica, semantica, procedural."""
         self.assertIsNotNone(self.nexus.memory.episodic)
