@@ -642,26 +642,16 @@ class NexusCore:
             try:
                 mem_facts = self.memory.query_knowledge(user_input, top_k=3)
                 mem_records = self.memory.recall(user_input, top_k=2)
-                prompt = self.context.build_react(
-                    user_input,
-                    memory_facts=mem_facts,
-                    memory_records=mem_records,
-                    # Modelos tiny (<1B) usan JSON + few-shot en vez de ReAct
-                    small_model=("0.5b" in (self.slm.model_name or "").lower()),
-                )
-
-                # ─── SELF-CONSISTENCY (mejora #7 del roadmap) ───
-                # Para modelos pequenos, generar 2 respuestas y elegir la
-                # mejor (la mas larga, asumiendo que tiene mas contenido util).
+                        # ─── SELF-CONSISTENCY (mejora #7 del roadmap) ───
+                # Para modelos pequeños, generar 3 respuestas y elegir el consenso semántico
                 is_tiny = any(p in (self.slm.model_name or "").lower()
                               for p in ["0.5b", "tiny", "nano"])
-                n_attempts = 2 if is_tiny else 1
+                n_attempts = 3 if is_tiny else 1
 
-                best_response = ""
-                best_metadata = None
+                candidates = []
                 for attempt in range(n_attempts):
                     slm_result = self.slm.generate(user_input, system_prompt=prompt,
-                                                structured=True)
+                                                 structured=True)
                     if slm_result:
                         raw_json = slm_result["response"]
                         # Intentar parsear JSON
@@ -746,27 +736,26 @@ class NexusCore:
                                         else:
                                             respuesta = str(result_data)[:500]
                             # accion == "responder" o desconocida: usar respuesta directa
-
-                            # Usar la mejor respuesta (mas larga)
-                            if len(respuesta) > len(best_response):
-                                best_response = respuesta
-                                best_metadata = {
-                                    "model": slm_result.get("model"),
-                                    "tokens_prompt": slm_result.get("tokens_prompt", 0),
-                                    "tokens_generated": slm_result.get("tokens_generated", 0),
-                                    "duration_ms": slm_result.get("duration_ms", 0),
-                                    "total_duration_ms": slm_result.get("total_duration_ms", 0),
-                                }
+                            
+                            attempt_metadata = {
+                                "model": slm_result.get("model"),
+                                "tokens_prompt": slm_result.get("tokens_prompt", 0),
+                                "tokens_generated": slm_result.get("tokens_generated", 0),
+                                "duration_ms": slm_result.get("duration_ms", 0),
+                                "total_duration_ms": slm_result.get("total_duration_ms", 0),
+                            }
+                            candidates.append((respuesta, attempt_metadata))
                         except _json.JSONDecodeError:
-                            # JSON invalido - usar raw
-                            if len(raw_json) > len(best_response):
-                                best_response = raw_json
-                                best_metadata = {
-                                    "model": slm_result.get("model"),
-                                    "tokens_prompt": 0,
-                                    "tokens_generated": 0,
-                                    "duration_ms": slm_result.get("duration_ms", 0),
-                                }
+                            attempt_metadata = {
+                                "model": slm_result.get("model"),
+                                "tokens_prompt": 0,
+                                "tokens_generated": 0,
+                                "duration_ms": slm_result.get("duration_ms", 0),
+                            }
+                            candidates.append((raw_json, attempt_metadata))
+
+                # Seleccionar la mejor respuesta basada en consenso por embeddings
+                best_response, best_metadata = self._select_consensus_response(candidates)
 
                 if best_response:
                     # Limpiar formato ReAct si el modelo lo usó
@@ -785,23 +774,31 @@ class NexusCore:
             try:
                 system_prompt = self.context.build(user_input)
                 # Self-consistency: si el modelo es pequeno (<=1B),
-                # generar 2 respuestas y elegir la mejor
+                # generar 3 respuestas y elegir el consenso
                 is_tiny = any(p in (self.slm.model_name or "").lower()
                               for p in ["0.5b", "tiny", "nano"])
-                n_attempts = 2 if is_tiny else 1
-                best_response = ""
-                best_len = 0
+                n_attempts = 3 if is_tiny else 1
+                
+                candidates = []
                 for attempt in range(n_attempts):
                     slm_result = self.slm.generate(user_input, system_prompt=system_prompt)
                     if slm_result:
                         response = slm_result["response"]
-                        if len(response) > best_len:
-                            best_response = response
-                            best_len = len(response)
+                        attempt_metadata = {
+                            "model": slm_result.get("model"),
+                            "tokens_prompt": slm_result.get("tokens_prompt", 0),
+                            "tokens_generated": slm_result.get("tokens_generated", 0),
+                            "duration_ms": slm_result.get("duration_ms", 0),
+                        }
+                        candidates.append((response, attempt_metadata))
+                        
+                best_response, best_metadata = self._select_consensus_response(candidates)
                 if best_response:
                     metadata["backend"] = "slm"
                     metadata["model"] = self.slm.model_name
                     metadata["self_consistency"] = n_attempts > 1
+                    if best_metadata:
+                        metadata.update(best_metadata)
                     return best_response, metadata
             except Exception as e:
                 logger.warning(f"SLM fallo, usando simbolico: {e}")
@@ -810,6 +807,55 @@ class NexusCore:
         response = self.symbolic.process(user_input, actions_registry=self.actions,
                                     skip_bookkeeping=True)
         return response, metadata
+
+    def _select_consensus_response(self, candidates: list) -> tuple:
+        """Selecciona el candidato de respuesta que representa el consenso semántico usando embeddings.
+
+        Calcula la similitud de coseno cruzada de cada respuesta frente a las demás,
+        retornando la respuesta con la mayor similitud promedio (centroide).
+        Si no hay suficientes candidatos o falla el motor de embeddings,
+        aplica un fallback a la respuesta de mayor longitud.
+        """
+        if not candidates:
+            return "", None
+        if len(candidates) == 1:
+            return candidates[0]
+
+        try:
+            from memory.embeddings import get_embedding, is_available, cosine_similarity
+            if is_available():
+                # 1. Obtener embeddings para todos los candidatos
+                vecs = []
+                valid_candidates = []
+                for resp, meta in candidates:
+                    if resp and resp.strip():
+                        vec = get_embedding(resp)
+                        if vec:
+                            vecs.append(vec)
+                            valid_candidates.append((resp, meta))
+
+                # 2. Calcular similitud coseno promedio cruzada
+                if len(valid_candidates) >= 2:
+                    best_idx = 0
+                    best_avg_sim = -1.0
+
+                    for i in range(len(valid_candidates)):
+                        sims = []
+                        for j in range(len(valid_candidates)):
+                            if i != j:
+                                sim = cosine_similarity(vecs[i], vecs[j])
+                                sims.append(sim)
+                        avg_sim = sum(sims) / len(sims) if sims else 0.0
+                        if avg_sim > best_avg_sim:
+                            best_avg_sim = avg_sim
+                            best_idx = i
+
+                    return valid_candidates[best_idx]
+        except Exception as e:
+            logger.debug(f"Error al calcular consistencia por embeddings: {e}")
+
+        # Fallback de seguridad: la respuesta más larga
+        return max(candidates, key=lambda x: len(x[0]) if x[0] else 0)
 
     # ─── Tool Intents: ejecucion directa sin SLM ─────────────
 

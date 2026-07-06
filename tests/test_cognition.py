@@ -121,6 +121,31 @@ class TestCognitionAndAgent(unittest.TestCase):
         finally:
             self.nexus.slm.model_name = original_model
 
+    def test_select_consensus_response_basic(self):
+        """Verifica que _select_consensus_response elige el candidato correcto."""
+        # 1. Caso fallback a la respuesta más larga (sin embeddings)
+        candidates = [
+            ("corta", {}),
+            ("esta respuesta es la mas larga de todas", {}),
+            ("mediana de longitud", {})
+        ]
+        # Forzar que is_available devuelva False para probar el fallback de longitud
+        from unittest.mock import patch
+        with patch('memory.embeddings.is_available', return_value=False):
+            resp, meta = self.nexus._select_consensus_response(candidates)
+            self.assertEqual(resp, "esta respuesta es la mas larga de todas")
+        
+        # 2. Caso con embeddings deterministas
+        # El consenso de similitud de coseno debería elegir una de las frases del sol
+        # frente a la frase del coche rojo que es un outlier.
+        candidates_similar = [
+            ("El sol brilla en el cielo despejado.", {"id": 1}),
+            ("El sol brilla en el cielo azul.", {"id": 2}),
+            ("El coche es de color rojo brillante.", {"id": 3}),
+        ]
+        resp_cons, meta_cons = self.nexus._select_consensus_response(candidates_similar)
+        self.assertIn("sol", resp_cons.lower(), f"Consenso falló al filtrar outlier. Eligió: {resp_cons}")
+
     def test_agent_runs_without_error(self):
         """El agente ejecuta sin lanzar excepciones."""
         from cognition.agent import NexusAgent
