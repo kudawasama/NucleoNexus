@@ -155,7 +155,7 @@ class NexusCore:
         logger.info("OK Motor Simbolico")
 
         # 7. Inyector de Contexto
-        self.context = ContextBuilder(self.state, self.skills, self.memory)
+        self.context = ContextBuilder(self.state, self.skills, self.memory, actions=self.actions)
         logger.info("OK Inyector de Contexto")
 
         # Actualizar estado inicial
@@ -256,6 +256,20 @@ class NexusCore:
             handler=_recall,
             parameters={
                 "query": {"type": "string", "description": "Tema a buscar en la memoria"},
+            },
+        )
+
+        # Accion: buscar en memoria semantica
+        def _query_memory(query: str):
+            results = self.memory.query_knowledge(query, top_k=3)
+            return {"results": results}
+
+        self.actions.register_fn(
+            name="query_memory",
+            description="Busca hechos o conceptos en la base de conocimiento semántica permanente de Nexus",
+            handler=_query_memory,
+            parameters={
+                "query": {"type": "string", "description": "Consulta de búsqueda para encontrar hechos"},
             },
         )
 
@@ -753,6 +767,22 @@ class NexusCore:
                                                 respuesta = str(result_data)[:500]
                                         else:
                                             respuesta = str(result_data)[:500]
+                            # Fallback dinámico para cualquier acción en ActionRegistry (F5.2 Auto-memory)
+                            elif self.actions.get(accion):
+                                metadata["tool_called"] = accion
+                                tool_params = parsed.get("parametros", parsed)
+                                if not isinstance(tool_params, dict):
+                                    tool_params = {}
+                                for k, v in parsed.items():
+                                    if k not in ["accion", "respuesta", "parametros"] and k not in tool_params:
+                                        tool_params[k] = v
+                                        
+                                tool_result = self.actions.execute(accion, **tool_params)
+                                if tool_result.get("success"):
+                                    res = tool_result.get("result", "")
+                                    respuesta = str(res)[:500]
+                                else:
+                                    respuesta = f"Error ejecutando {accion}: {tool_result.get('error', 'desconocido')}"
                             # accion == "responder" o desconocida: usar respuesta directa
                             
                             attempt_metadata = {

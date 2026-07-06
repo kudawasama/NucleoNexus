@@ -101,7 +101,9 @@ class NexusAgent:
 
         # 2. EXECUTE: ejecutar el plan segun el tipo
         try:
-            if task_type == "investigate":
+            if task_type == "chained":
+                self._plan_chained(task, result)
+            elif task_type == "investigate":
                 self._plan_investigate(task, result)
             elif task_type == "explain":
                 self._plan_explain(task, result)
@@ -127,7 +129,10 @@ class NexusAgent:
         """Detecta el tipo de tarea basandose en palabras clave."""
         task_lower = task.lower()
 
-        # Prioridad: code_search > document > explain > investigate
+        # Prioridad: chained > code_search > document > explain > investigate
+        if any(sep in task_lower for sep in ["y luego", "y después", "y despues", "&&", " -> "]):
+            return "chained"
+
         for kw in self.CODE_KEYWORDS:
             if kw in task_lower:
                 return "code_search"
@@ -143,6 +148,66 @@ class NexusAgent:
 
         # Default
         return "investigate"
+
+    def _plan_chained(self, task: str, result: AgentResult):
+        """Plan: ejecutar una secuencia encadenada de subtareas."""
+        import re as _re
+        delimiters = r"\s*(?:y luego|y después|y despues|&&|->)\s*"
+        subtasks = _re.split(delimiters, task, flags=_re.IGNORECASE)
+        
+        last_output = ""
+        last_file = ""
+        last_url = ""
+        
+        for idx, subtask in enumerate(subtasks):
+            subtask = subtask.strip()
+            if not subtask:
+                continue
+                
+            logger.info(f"Subtarea encadenada [{idx+1}/{len(subtasks)}]: {subtask}")
+            
+            # Adaptar la subtarea inyectando nombres de archivos o URLs previas
+            adapted_task = subtask
+            if last_file and "archivo" in subtask.lower() and not any(f in subtask.lower() for f in [".py", ".txt", ".md", ".json", ".csv"]):
+                # Intentar inyectar el nombre del archivo
+                adapted_task = subtask.replace("el archivo", f"el archivo {last_file}")
+                
+            if last_url and "web" in subtask.lower() and "http" not in subtask.lower():
+                adapted_task = subtask.replace("la web", f"la url {last_url}").replace("el sitio", f"la url {last_url}")
+                
+            sub_type = self._detect_task_type(adapted_task)
+            if sub_type == "chained":
+                sub_type = "investigate"
+                
+            sub_result = AgentResult(task=adapted_task)
+            if sub_type == "investigate":
+                self._plan_investigate(adapted_task, sub_result)
+            elif sub_type == "explain":
+                self._plan_explain(adapted_task, sub_result)
+            elif sub_type == "document":
+                self._plan_document(adapted_task, sub_result)
+            elif sub_type == "code_search":
+                self._plan_code_search(adapted_task, sub_result)
+                
+            # Combinar pasos
+            for step in sub_result.steps:
+                result.steps.append(step)
+                if step.success:
+                    last_output = step.output
+                    if step.tool == "search_files":
+                        files = self._parse_file_results(step.output)
+                        if files:
+                            last_file = files[0]
+                    elif step.tool == "web_search":
+                        urls = self._extract_urls_from_results(step.output)
+                        if urls:
+                            last_url = urls[0]
+                            
+            result.facts_learned += sub_result.facts_learned
+            if not sub_result.success:
+                result.success = False
+                result.error = sub_result.error
+                return
 
     # ─── Plan: Investigar (web search + learn) ──────────────
     def _plan_investigate(self, task: str, result: AgentResult):

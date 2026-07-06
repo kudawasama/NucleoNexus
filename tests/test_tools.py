@@ -40,5 +40,38 @@ class TestSystemTools(unittest.TestCase):
         r, m = self.nexus.process("visita kudawa.com")
         self.assertIn(m.get("tool_called"), ("browse_url", "web_search"), f"browse_url no funciona: {m}")
 
+    def test_dynamic_action_routing(self):
+        """Verifica que el orquestador resuelve dinámicamente cualquier herramienta registrada en ActionRegistry."""
+        # 1. Registrar una acción de prueba en ActionRegistry
+        def _dummy_tool(valor: str):
+            return f"accion_ejecutada: {valor}"
+
+        self.nexus.actions.register_fn(
+            name="mi_herramienta_custom",
+            description="Una herramienta dinamica de test",
+            handler=_dummy_tool,
+            parameters={
+                "valor": {"type": "string"}
+            }
+        )
+
+        original_generate = self.nexus.slm.generate
+        original_model = self.nexus.slm.model_name
+        
+        # Simular respuesta del SLM en modo estructurado llamando a la herramienta registrada
+        self.nexus.slm.model_name = "qwen2.5:0.5b"  # Forzar modo estructurado
+        self.nexus.slm.generate = lambda *a, **k: {
+            "response": '{"accion": "mi_herramienta_custom", "valor": "secreto123"}',
+            "model": "qwen2.5:0.5b"
+        }
+
+        try:
+            r, m = self.nexus.process("ejecuta mi herramienta de test")
+            self.assertEqual(m.get("tool_called"), "mi_herramienta_custom")
+            self.assertIn("secreto123", r)
+        finally:
+            self.nexus.slm.generate = original_generate
+            self.nexus.slm.model_name = original_model
+
 if __name__ == "__main__":
     unittest.main()

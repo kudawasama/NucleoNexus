@@ -389,5 +389,93 @@ class TestCognitionAndAgent(unittest.TestCase):
             self.nexus.slm.model_name = original_model
             self.nexus.slm.generate = original_generate
 
+    def test_agent_chained_tasks(self):
+        """Verifica que el agente puede encadenar múltiples subtareas en secuencia."""
+        from cognition.agent import NexusAgent
+        agent = NexusAgent(self.nexus)
+        
+        # Tarea encadenada: investigar fotosintesis y luego buscar en codigo query_knowledge
+        task = "investiga sobre fotosintesis y luego busca en codigo la funcion query_knowledge"
+        result = agent.run(task)
+        
+        self.assertTrue(result.success)
+        self.assertGreater(len(result.steps), 1, "Debería haber múltiples pasos en la tarea encadenada")
+        
+        # Verificar que se corrieron las herramientas correspondientes a ambos sub-planes
+        tools_run = [s.tool for s in result.steps]
+        self.assertIn("web_search", tools_run)
+        self.assertIn("search_files", tools_run)
+
+    def test_dataset_generator(self):
+        """Valida que el generador de dataset LoRA produzca la estructura ChatML correcta."""
+        import json
+        from pathlib import Path
+        
+        dataset_path = Path("dataset_training_lora.json")
+        self.assertTrue(dataset_path.exists(), "El archivo de dataset no fue generado")
+        
+        with open(dataset_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        self.assertGreaterEqual(len(data), 50, "Debería haber al menos 50 ejemplos de entrenamiento")
+        
+        # Validar primer ejemplo
+        first_ex = data[0]
+        self.assertIn("messages", first_ex)
+        messages = first_ex["messages"]
+        self.assertGreaterEqual(len(messages), 3)
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertEqual(messages[1]["role"], "user")
+        self.assertEqual(messages[2]["role"], "assistant")
+        
+        # Asistente debe responder en formato JSON
+        assistant_content = messages[2]["content"]
+        parsed_json = json.loads(assistant_content)
+        self.assertIn("accion", parsed_json)
+
+    def test_structured_generation_repair(self):
+        """Verifica que validate_and_repair_json corrige llaves rotas y nombres de claves erróneos."""
+        from cognition.slm import validate_and_repair_json
+        
+        # Caso 1: Claves en inglés (action -> accion, response -> respuesta)
+        raw = '{"action": "responder", "response": "saludo secreto"}'
+        res = validate_and_repair_json(raw)
+        self.assertEqual(res["accion"], "responder")
+        self.assertEqual(res["respuesta"], "saludo secreto")
+        
+        # Caso 2: Llave rota al final
+        raw_broken = '{"accion": "responder", "respuesta": "hola"'
+        res_broken = validate_and_repair_json(raw_broken)
+        self.assertEqual(res_broken["accion"], "responder")
+        self.assertEqual(res_broken["respuesta"], "hola")
+
+    def test_structured_generation_self_correction_loop(self):
+        """Verifica que el bucle de autocorrección se activa ante un JSON mal formado."""
+        original_post = None
+        import requests
+        original_post = requests.post
+        
+        call_count = 0
+        def mock_post(url, json, **k):
+            nonlocal call_count
+            call_count += 1
+            mock_res = type('FakeResponse', (), {'status_code': 200, 'headers': {}})()
+            if call_count == 1:
+                # Primer intento: JSON inválido
+                mock_res.json = lambda: {"response": "este no es un json", "model": "qwen2.5:0.5b"}
+            else:
+                # Segundo intento (corrección): JSON válido
+                mock_res.json = lambda: {"response": '{"accion": "responder", "respuesta": "corregido"}', "model": "qwen2.5:0.5b"}
+            return mock_res
+
+        requests.post = mock_post
+        try:
+            res = self.nexus.slm._generate_ollama_structured("pregunta", "sistema")
+            self.assertIsNotNone(res)
+            self.assertIn("corregido", res["response"])
+            self.assertEqual(call_count, 2, "Debería haber realizado 2 llamadas (una fallida y otra de autocorrección)")
+        finally:
+            requests.post = original_post
+
 if __name__ == "__main__":
     unittest.main()

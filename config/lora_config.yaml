@@ -1,0 +1,44 @@
+# Configuración de Fine-Tuning LoRA para NucleoNexus (Qwen-0.5B / Qwen-1.5B)
+# =========================================================================
+
+# Modelo Base
+model_type: AutoModelForCausalLM
+base_model: Qwen/Qwen2.5-0.5B-Instruct
+
+# Configuración de SFT / Dataset
+dataset_path: dataset_training_lora.json
+dataset_format: chatml
+sequence_len: 2048
+
+# Configuración de LoRA (Adapter)
+adapter: lora
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+# Hiperparámetros de Entrenamiento
+epochs: 3
+micro_batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 0.0002
+optimizer: adamw_torch
+lr_scheduler: cosine
+
+# Estrategia de Guardado y Logging
+logging_steps: 10
+save_strategy: epoch
+output_dir: ./lora_output_model
+
+# Optimización de Memoria
+fp16: true
+bf16: false
+gradient_checkpointing: true
+local_rank:

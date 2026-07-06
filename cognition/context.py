@@ -27,10 +27,11 @@ class ContextBuilder:
     """
 
     def __init__(self, state_engine: StateEngine, skill_registry: SkillRegistry,
-                 memory=None):
+                 memory=None, actions=None):
         self.state = state_engine
         self.skills = skill_registry
         self.memory = memory  # Sistema de memoria opcional
+        self.actions = actions  # Registro de acciones opcional
 
     def build(self, user_input: str = "", personality_override: dict = None,
               light_mode: bool = False) -> str:
@@ -167,8 +168,14 @@ Reglas de oro:
     def _build_tools_block(self) -> str:
         """Bloque compacto de herramientas para inyectar al prompt del SLM."""
         lines = ["=== HERRAMIENTAS ==="]
-        lines.append("Puedes usar: web_search (web), read_file, write_file, "
-                     "search_files (grep), run_command (shell), python_eval")
+        if self.actions:
+            tools_list = []
+            for action in self.actions.list():
+                tools_list.append(f"{action.name} ({action.description[:60]})")
+            lines.append("Puedes usar: " + ", ".join(tools_list))
+        else:
+            lines.append("Puedes usar: web_search (web), read_file, write_file, "
+                         "search_files (grep), run_command (shell), python_eval, query_memory, learn_fact")
         lines.append(
             'Para usarlas: {"accion": "usar_herramienta", '
             '"herramienta": "web_search", "parametros": {"query": "..."}}'

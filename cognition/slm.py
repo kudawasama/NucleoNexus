@@ -22,6 +22,64 @@ from typing import Optional
 logger = logging.getLogger("nexus.cognition.slm")
 
 
+def validate_and_repair_json(raw_json: str) -> dict:
+    """Verifica y repara campos comunes de la estructura JSON de Nexus."""
+    import json as _json
+    
+    # Limpieza preliminar de markdown json
+    cleaned = raw_json.strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+    if cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    cleaned = cleaned.strip()
+
+    try:
+        data = _json.loads(cleaned)
+    except _json.JSONDecodeError:
+        # Intentar una reparación simple si faltan comillas o llaves al final
+        repaired = cleaned
+        if not repaired.startswith("{"):
+            idx = repaired.find("{")
+            if idx != -1:
+                repaired = repaired[idx:]
+        if not repaired.endswith("}"):
+            idx = repaired.rfind("}")
+            if idx != -1:
+                repaired = repaired[:idx+1]
+            else:
+                repaired += "}"
+        data = _json.loads(repaired)
+        
+    if not isinstance(data, dict):
+        raise ValueError("El JSON debe ser un objeto/diccionario.")
+        
+    # Mapeo de sinónimos comunes para robustez
+    if "action" in data and "accion" not in data:
+        data["accion"] = data.pop("action")
+    if "response" in data and "respuesta" not in data:
+        data["respuesta"] = data.pop("response")
+    if "response" in data and "respuesta" in data and (data["respuesta"] == "" or data["respuesta"] is None):
+        data["respuesta"] = data.pop("response")
+        
+    # Validar campos obligatorios
+    if "accion" not in data:
+        data["accion"] = "responder"
+        
+    if "respuesta" not in data:
+        data["respuesta"] = ""
+        
+    # Asegurar consistencia de herramientas
+    if data["accion"] in ["usar_herramienta", "usar-herramienta"]:
+        data["accion"] = "usar_herramienta"
+        if "herramienta" not in data:
+            data["accion"] = "responder"
+            
+    return data
+
+
 class SLMBackend:
     """Backend para modelos de lenguaje locales (SLM).
     
@@ -170,10 +228,14 @@ class SLMBackend:
         if self.mode == "ollama":
             return self._generate_ollama(prompt, system_prompt)
         elif self.mode == "openai":
-            result = self._generate_openai(prompt, system_prompt)
+            result = self._generate_openai(prompt, system_prompt, structured=structured)
             if result and structured:
-                # Envolver en dict para mantener consistencia con structured mode
-                return {"response": result, "model": self.model_name}
+                # Envolver en dict y reparar para mantener consistencia con structured mode
+                try:
+                    repaired = validate_and_repair_json(result)
+                    return {"response": json.dumps(repaired, ensure_ascii=False), "model": self.model_name}
+                except Exception:
+                    return {"response": result, "model": self.model_name}
             return result
         elif self.mode == "llamacpp":
             return self._generate_llamacpp(prompt, system_prompt)
@@ -220,21 +282,47 @@ class SLMBackend:
             if r.status_code == 200:
                 data = r.json()
                 raw = data.get("response", "")
-                # Verificar que es JSON válido
+                
                 import json as _json
                 try:
-                    _json.loads(raw)
+                    repaired = validate_and_repair_json(raw)
                     return {
-                        "response": raw,
+                        "response": _json.dumps(repaired, ensure_ascii=False),
                         "model": data.get("model", self.model_name),
                         "tokens_prompt": data.get("prompt_eval_count", 0),
                         "tokens_generated": data.get("eval_count", 0),
                         "duration_ms": round(data.get("eval_duration", 0) / 1_000_000, 1),
                         "total_duration_ms": round(data.get("total_duration", 0) / 1_000_000, 1),
                     }
-                except _json.JSONDecodeError:
-                    logger.warning(f"JSON inválido del SLM: {raw[:60]}")
-                    return None
+                except Exception as err:
+                    logger.warning(f"JSON inválido o mal estructurado: {raw[:100]}. Error: {err}. Iniciando autocorrección...")
+                    
+                    # Intentar autocorrección enviando la respuesta rota y el mensaje del error
+                    correction_prompt = (
+                        f"Tu respuesta anterior no era un JSON válido o no respetaba el esquema:\n"
+                        f"{raw}\n\n"
+                        f"Error de validación: {err}\n\n"
+                        f"Corrige la respuesta y devuelve ÚNICAMENTE un JSON válido:"
+                    )
+                    payload["prompt"] = prompt + "\n\n" + correction_prompt
+                    
+                    try:
+                        r2 = requests.post("http://localhost:11434/api/generate", json=payload, timeout=45)
+                        if r2.status_code == 200:
+                            data2 = r2.json()
+                            raw2 = data2.get("response", "")
+                            repaired2 = validate_and_repair_json(raw2)
+                            logger.info("Autocorrección JSON exitosa en segundo intento.")
+                            return {
+                                "response": _json.dumps(repaired2, ensure_ascii=False),
+                                "model": data2.get("model", self.model_name),
+                                "tokens_prompt": data2.get("prompt_eval_count", 0),
+                                "tokens_generated": data2.get("eval_count", 0),
+                                "duration_ms": round(data2.get("eval_duration", 0) / 1_000_000, 1),
+                                "total_duration_ms": round(data2.get("total_duration", 0) / 1_000_000, 1),
+                            }
+                    except Exception as err2:
+                        logger.error(f"Fallo en segundo intento de autocorrección JSON: {err2}")
             return None
         except Exception as e:
             logger.error(f"Error en generación Ollama estructurada: {e}")
@@ -273,7 +361,7 @@ class SLMBackend:
             logger.error(f"Error en generación Ollama: {e}")
         return None
 
-    def _generate_openai(self, prompt: str, system_prompt: str = None) -> Optional[str]:
+    def _generate_openai(self, prompt: str, system_prompt: str = None, structured: bool = False) -> Optional[str]:
         """Genera respuesta via API compatible OpenAI."""
         try:
             import requests
@@ -300,6 +388,8 @@ class SLMBackend:
                 "max_tokens": self.max_tokens,
                 "temperature": self.temperature,
             }
+            if structured:
+                payload["response_format"] = {"type": "json_object"}
 
             r = requests.post(chat_url, headers=headers, json=payload, timeout=45)
             if r.status_code == 200:
