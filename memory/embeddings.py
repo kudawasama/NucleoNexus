@@ -72,14 +72,33 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+import struct
+
 def embed_to_blob(embedding: List[float]) -> bytes:
-    """Convierte embedding a BLOB para SQLite."""
-    return json.dumps(embedding).encode()
+    """Convierte embedding a BLOB binario (float32) para SQLite."""
+    if not embedding:
+        return b''
+    return struct.pack('f' * len(embedding), *embedding)
 
 
 def blob_to_embed(blob: bytes) -> List[float]:
-    """Convierte BLOB de SQLite a embedding."""
-    return json.loads(blob.decode())
+    """Convierte BLOB de SQLite a embedding. Soporta migración desde JSON antiguo."""
+    if not blob:
+        return []
+    # Detectar formato JSON antiguo (comienza con '[')
+    if blob.startswith(b'['):
+        try:
+            return json.loads(blob.decode("utf-8"))
+        except Exception:
+            pass
+    try:
+        # nomic-embed-text tiene 768 flotantes, pero desempaquetamos dinámicamente según tamaño del blob
+        n = len(blob) // 4
+        if n > 0:
+            return list(struct.unpack('f' * n, blob))
+    except Exception as e:
+        logger.warning(f"Error desempaquetando blob a vector: {e}")
+    return []
 
 
 class EmbeddingIndex:

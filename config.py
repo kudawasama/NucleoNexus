@@ -56,6 +56,15 @@ MEMORY = {
     "decay_rate": 0.99,
 }
 
+# --- Umbrales y Algoritmos (Thresholds) --------------------------
+THRESHOLDS = {
+    "semantic_deduplication": 0.88,  # Similitud coseno mínima para considerar un hecho duplicado
+    "embedding_min_match": 0.50,     # Similitud coseno mínima para considerar un hecho relevante en vector query
+    "reinforce_increment": 0.1,      # Incremento de confianza ante repetición / duplicados
+    "reinforce_decrement": 0.1,      # Decremento de confianza ante penalizaciones
+    "consolidation_min_conf": 0.8,   # Confianza mínima para consolidar hecho de runtime a JSON
+}
+
 # --- Aprendizaje ----------------------------------------------
 LEARNING = {
     "pattern_extraction": True,

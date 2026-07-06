@@ -24,10 +24,64 @@ class SemanticMemory:
         self.conn.row_factory = sqlite3.Row
         self.lock = threading.Lock()
         
+        # Registrar la función personalizada de coseno en SQLite
+        self.conn.create_function("cosine_sim", 2, self._sqlite_cosine_similarity)
+        
+        # Crear tabla si no existe e inicializar migración
+        self._init_table()
+        self._migrate_embeddings_format()
+        
         # Iniciar worker asíncrono para embeddings
         self.worker_running = True
         self.worker_thread = threading.Thread(target=self._embedding_worker, daemon=True)
         self.worker_thread.start()
+
+    def _sqlite_cosine_similarity(self, a_blob: bytes, b_blob: bytes) -> float:
+        """Calcula la similitud coseno directamente para SQLite."""
+        if not a_blob or not b_blob:
+            return 0.0
+        try:
+            from memory.embeddings import blob_to_embed, cosine_similarity
+            a = blob_to_embed(a_blob)
+            b = blob_to_embed(b_blob)
+            return cosine_similarity(a, b)
+        except Exception:
+            return 0.0
+
+    def _migrate_embeddings_format(self):
+        """Migra automáticamente embeddings en formato JSON string a BLOB binario float32."""
+        with self.lock:
+            cur = self.conn.cursor()
+            # Verificar si la tabla existe antes de migrar
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='semantic'")
+            if not cur.fetchone():
+                return
+            
+            cur.execute("SELECT id, embedding FROM semantic WHERE embedding IS NOT NULL")
+            rows = cur.fetchall()
+            migrated_count = 0
+            
+            from memory.embeddings import blob_to_embed, embed_to_blob
+            for row in rows:
+                row_id = row['id']
+                blob_val = row['embedding']
+                # Si comienza con b'[' es formato JSON antiguo
+                if blob_val and blob_val.startswith(b'['):
+                    try:
+                        vector = blob_to_embed(blob_val)
+                        if vector:
+                            binary_blob = embed_to_blob(vector)
+                            cur.execute(
+                                "UPDATE semantic SET embedding = ? WHERE id = ?",
+                                (sqlite3.Binary(binary_blob), row_id)
+                            )
+                            migrated_count += 1
+                    except Exception as e:
+                        logger.warning(f"Error al migrar embedding ID {row_id} a binario: {e}")
+            
+            if migrated_count > 0:
+                self.conn.commit()
+                logger.info(f"Se migraron {migrated_count} embeddings a formato binario float32")
 
     def _init_table(self):
         cur = self.conn.cursor()
@@ -111,19 +165,29 @@ class SemanticMemory:
                         existing_rows = cur.fetchall()
                         
                         duplicate_found = False
+                        from memory.embeddings import blob_to_embed, embed_to_blob, cosine_similarity
+                        try:
+                            from config import THRESHOLDS
+                            dedup_threshold = THRESHOLDS.get("semantic_deduplication", 0.88)
+                            reinforce_inc = THRESHOLDS.get("reinforce_increment", 0.1)
+                        except Exception:
+                            dedup_threshold = 0.88
+                            reinforce_inc = 0.1
+
                         for ext_row in existing_rows:
                             try:
-                                ext_vec = _json.loads(ext_row['embedding'].decode("utf-8"))
-                                from memory.embeddings import cosine_similarity
+                                ext_vec = blob_to_embed(ext_row['embedding'])
+                                if not ext_vec:
+                                    continue
                                 sim = cosine_similarity(vec, ext_vec)
-                                if sim >= 0.88:  # Umbral de similitud semántica
+                                if sim >= dedup_threshold:  # Umbral de similitud semántica configurado
                                     ext_id = ext_row['id']
                                     ext_fact = ext_row['fact']
                                     ext_conf = ext_row['confidence']
                                     ext_access = ext_row['access_count'] or 0
                                     
                                     # Consolidar en el hecho existente
-                                    new_conf = min(1.0, ext_conf + 0.1)
+                                    new_conf = min(1.0, ext_conf + reinforce_inc)
                                     new_access = ext_access + 1
                                     
                                     cur.execute(
@@ -145,11 +209,11 @@ class SemanticMemory:
                                 continue
                         
                         if not duplicate_found:
-                            # Proceder con la actualización normal de vector
-                            blob = _json.dumps(vec).encode("utf-8")
+                            # Proceder con la actualización normal de vector binario
+                            binary_blob = embed_to_blob(vec)
                             cur.execute(
                                 "UPDATE semantic SET embedding = ? WHERE id = ?",
-                                (blob, fact_id)
+                                (sqlite3.Binary(binary_blob), fact_id)
                             )
                             worker_conn.commit()
                             logger.info(f"Worker guardó embedding para hecho #{fact_id}")
@@ -200,12 +264,17 @@ class SemanticMemory:
                 logger.info(f"Nuevo hecho aprendido [{category}]: {fact[:60]}...")
                 return True
             except sqlite3.IntegrityError:
-                # Reforzar confianza
+                # Reforzar confianza según la configuración
+                try:
+                    from config import THRESHOLDS
+                    reinforce_inc = THRESHOLDS.get("reinforce_increment", 0.1)
+                except Exception:
+                    reinforce_inc = 0.1
                 cur.execute(
-                    "UPDATE semantic SET confidence = MIN(1.0, confidence + 0.1), "
+                    f"UPDATE semantic SET confidence = MIN(1.0, confidence + ?), "
                     "updated_at = ?, access_count = access_count + 1 "
                     "WHERE fact = ?",
-                    (now, fact)
+                    (reinforce_inc, now, fact)
                 )
                 self.conn.commit()
                 return True
@@ -326,12 +395,60 @@ class SemanticMemory:
                     if syn != term:
                         expanded_terms.add(syn)
 
-        # Buscar facts que contengan al menos uno de los términos
-        results = []
+        # ─── BÚSQUEDA HÍBRIDA ───
+        # 1. Búsqueda vectorial primaria si Ollama/embeddings están disponibles
+        vector_results = {}
+        use_vectors = False
+        try:
+            from memory.embeddings import get_embedding, is_available, embed_to_blob
+            if is_available():
+                query_vec = get_embedding(query)
+                if query_vec:
+                    use_vectors = True
+                    query_blob = embed_to_blob(query_vec)
+                    with self.lock:
+                        cur = self.conn.cursor()
+                        # Buscar utilizando la función de similitud coseno registrada en SQLite
+                        cur.execute(
+                            "SELECT id, fact, category, confidence, source, created_at, updated_at, access_count, "
+                            "cosine_sim(embedding, ?) as similarity "
+                            "FROM semantic WHERE embedding IS NOT NULL "
+                            "ORDER BY similarity DESC LIMIT 100",
+                            (sqlite3.Binary(query_blob),)
+                        )
+                        rows = cur.fetchall()
+                    
+                    try:
+                        from config import THRESHOLDS
+                        min_match = THRESHOLDS.get("embedding_min_match", 0.50)
+                    except Exception:
+                        min_match = 0.50
 
+                    for row in rows:
+                        sim = row['similarity']
+                        # Considerar similitud coseno relevante según configuración
+                        if sim >= min_match:
+                            updated_at = row['updated_at'] or row['created_at'] or now
+                            delta_days = (now - updated_at) / 86400.0
+                            time_decay = max(0.2, decay_rate ** delta_days)
+                            access_count = row['access_count'] or 0
+                            access_factor = 1.0 + 0.1 * math.log(access_count + 1)
+                            score_vec = sim * time_decay * access_factor
+                            
+                            vector_results[row['fact']] = {
+                                "id": row['id'],
+                                "category": row['category'],
+                                "confidence": row['confidence'],
+                                "source": row['source'],
+                                "score_vec": score_vec
+                            }
+        except Exception as e:
+            logger.debug(f"Error en búsqueda por embeddings primaria: {e}")
+
+        # 2. Búsqueda TF-IDF (con stopwords y sinónimos)
+        tfidf_results = {}
         with self.lock:
             cur = self.conn.cursor()
-            # LIMIT 500 para evitar cargar toda la BD
             cur.execute(
                 "SELECT id, fact, category, confidence, source, created_at, updated_at, access_count "
                 "FROM semantic ORDER BY confidence DESC LIMIT 500"
@@ -353,122 +470,58 @@ class SemanticMemory:
                 if original_matches == 1 and syn_matches == 0 and len(terms) > 2:
                     relevance *= 0.3
                 
-                # Calcular decaimiento temporal y factor de accesos
                 updated_at = row['updated_at'] or row['created_at'] or now
                 delta_days = (now - updated_at) / 86400.0
                 time_decay = max(0.2, decay_rate ** delta_days)
-                
                 access_count = row['access_count'] or 0
                 access_factor = 1.0 + 0.1 * math.log(access_count + 1)
                 
-                score_final = relevance * time_decay * access_factor
-                
-                results.append({
-                    "doc_id": f"sem_{row['id']}",
-                    "id_int": row['id'],
-                    "text": row['fact'],
-                    "metadata": {
-                        "category": row['category'],
-                        "type": "semantic",
-                        "confidence": row['confidence'],
-                        "source": row['source'],
-                    },
-                    "score": round(score_final, 4),
-                })
+                score_tfidf = relevance * time_decay * access_factor
+                tfidf_results[row['fact']] = {
+                    "id": row['id'],
+                    "category": row['category'],
+                    "confidence": row['confidence'],
+                    "source": row['source'],
+                    "score_tfidf": score_tfidf
+                }
 
-        # Ordenar por relevancia modificada
-        results.sort(key=lambda x: x['score'], reverse=True)
+        # 3. Combinación Híbrida de Scores
+        results = []
+        all_facts = set(vector_results.keys()) | set(tfidf_results.keys())
 
-        # ── FASE 3: Busqueda por embeddings (complementa TF-IDF) ──
-        try:
-            from memory.embeddings import get_embedding, cosine_similarity, is_available
-
-            # Solo usar embeddings si TF-IDF fue debil
-            tfidf_weak = (
-                not results or
-                all(r.get("score", 0) < 0.3 for r in results)
-            )
+        for fact in all_facts:
+            v_data = vector_results.get(fact)
+            t_data = tfidf_results.get(fact)
             
-            if tfidf_weak and is_available():
-                query_vec = get_embedding(query)
-                if query_vec:
-                    with self.lock:
-                        cur = self.conn.cursor()
-                        cur.execute(
-                            "SELECT id, fact, category, confidence, source, created_at, updated_at, access_count, embedding "
-                            "FROM semantic WHERE embedding IS NOT NULL "
-                            "ORDER BY confidence DESC LIMIT 100"
-                        )
-                        emb_rows = cur.fetchall()
+            # Obtener datos comunes
+            item_data = v_data or t_data
+            
+            # Ponderación del Score Híbrido: 60% Vectorial, 40% TF-IDF
+            score_final = 0.0
+            if v_data and t_data:
+                # Si aparece en ambos, sumamos ponderados (con un boost por coincidencia híbrida)
+                score_final = (0.6 * v_data["score_vec"]) + (0.4 * t_data["score_tfidf"])
+            elif v_data:
+                score_final = 0.6 * v_data["score_vec"]
+            elif t_data:
+                # Si solo está en TF-IDF y usamos vectores, penalizamos ligeramente la ausencia semántica
+                weight = 0.4 if use_vectors else 1.0
+                score_final = weight * t_data["score_tfidf"]
+                
+            results.append({
+                "doc_id": f"sem_{item_data['id']}",
+                "id_int": item_data['id'],
+                "text": fact,
+                "metadata": {
+                    "category": item_data['category'],
+                    "type": "semantic",
+                    "confidence": item_data['confidence'],
+                    "source": item_data['source'],
+                },
+                "score": round(score_final, 4),
+            })
 
-                    import json as _json
-                    emb_results = []
-                    for row in emb_rows:
-                        try:
-                            vec = _json.loads(row['embedding'].decode("utf-8"))
-                            sim = cosine_similarity(query_vec, vec)
-                            if sim > 0.55:
-                                # Calcular decaimiento temporal y factor de accesos
-                                updated_at = row['updated_at'] or row['created_at'] or now
-                                delta_days = (now - updated_at) / 86400.0
-                                time_decay = max(0.2, decay_rate ** delta_days)
-                                
-                                access_count = row['access_count'] or 0
-                                access_factor = 1.0 + 0.1 * math.log(access_count + 1)
-                                
-                                adjusted_sim = sim * time_decay * access_factor
-                                
-                                emb_results.append({
-                                    "id": row['id'],
-                                    "text": row['fact'],
-                                    "sim": adjusted_sim,
-                                    "category": row['category'],
-                                    "confidence": row['confidence'],
-                                    "source": row['source'],
-                                })
-                        except Exception:
-                            continue
-
-                    emb_results.sort(key=lambda x: x['sim'], reverse=True)
-
-                    if not results and emb_results:
-                        for r in emb_results[:top_k]:
-                            results.append({
-                                "doc_id": f"sem_{r['id']}",
-                                "id_int": r['id'],
-                                "text": r['text'],
-                                "metadata": {
-                                    "category": r['category'],
-                                    "type": "semantic",
-                                    "confidence": r['confidence'],
-                                    "source": r['source'],
-                                },
-                                "score": round(r['sim'], 4),
-                            })
-                    elif emb_results:
-                        existing_texts = {r['text'] for r in results}
-                        for r in emb_results[:top_k]:
-                            if r['text'] not in existing_texts:
-                                results.append({
-                                    "doc_id": f"sem_{r['id']}",
-                                    "id_int": r['id'],
-                                    "text": r['text'],
-                                    "metadata": {
-                                        "category": r['category'],
-                                        "type": "semantic",
-                                        "confidence": r['confidence'],
-                                        "source": r['source'],
-                                        "embedding_adjusted": True,
-                                    },
-                                    "score": round(r['sim'] * 0.9, 4),
-                                })
-                                existing_texts.add(r['text'])
-
-                    results.sort(key=lambda x: x['score'], reverse=True)
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.debug(f"Error en busqueda por embeddings: {e}")
+        results.sort(key=lambda x: x['score'], reverse=True)
 
         # Incrementar accesos para los retornados finales
         if results:
@@ -498,12 +551,19 @@ class SemanticMemory:
             )
             return [dict(r) for r in cur.fetchall()]
 
-    def get_consolidable_facts(self, min_confidence: float = 0.8) -> list[dict]:
+    def get_consolidable_facts(self, min_confidence: float = None) -> list[dict]:
         """Devuelve hechos aprendidos en runtime listos para consolidar a JSON.
 
         Solo incluye hechos con confidence >= min_confidence cuyo source
         NO sea 'knowledge_base' (esos ya están en los JSON de origen).
         """
+        if min_confidence is None:
+            try:
+                from config import THRESHOLDS
+                min_confidence = THRESHOLDS.get("consolidation_min_conf", 0.8)
+            except Exception:
+                min_confidence = 0.8
+
         with self.lock:
             cur = self.conn.cursor()
             cur.execute(
