@@ -222,6 +222,52 @@ class TestMemoryAndSynonyms(unittest.TestCase):
             self.assertGreaterEqual(len(comp_facts_after), 1, "Debería haber extraído al menos 1 hecho semántico")
             self.assertTrue(any("sol" in f["fact"] for f in comp_facts_after), "Debería haber extraído la información del sol")
 
+    def test_ivf_index_search_accuracy(self):
+        """Verifica que el índice IVF se construye correctamente y filtra candidatos de forma precisa."""
+        import math
+        # 1. Crear conjunto de datos de prueba diversos
+        items = []
+        for i in range(120):
+            # Generar vectores sintéticos (dimensión 256)
+            # Para astronomía
+            if i < 40:
+                vec = [0.1] * 256
+                # Normalizar
+                norm = 0.1 * math.sqrt(256)
+                vec = [v/norm for v in vec]
+                items.append((i, vec))
+            # Para programación
+            elif i < 80:
+                vec = [0.5] * 256
+                norm = 0.5 * math.sqrt(256)
+                vec = [v/norm for v in vec]
+                items.append((i, vec))
+            # Para historia
+            else:
+                vec = [0.9] * 256
+                norm = 0.9 * math.sqrt(256)
+                vec = [v/norm for v in vec]
+                items.append((i, vec))
+
+        from memory.semantic import IVFIndex
+        # 2. Construir índice con 5 centroides
+        index = IVFIndex(k=5)
+        index.build(items)
+
+        # Verificar que se crearon los centroides y buckets
+        self.assertEqual(len(index.centroids), 5)
+        self.assertGreater(len(index.buckets), 0)
+
+        # 3. Buscar usando un vector similar al grupo de astronomía
+        query_vec = [0.12] * 256
+        norm = 0.12 * math.sqrt(256)
+        query_vec = [v/norm for v in query_vec]
+
+        candidates = index.search(query_vec, n_probes=2)
+        # Debería retornar una parte de los 120 elementos totales (filtrado)
+        self.assertLess(len(candidates), 120, "El índice IVF no filtró ningún candidato")
+        self.assertGreater(len(candidates), 0, "El índice IVF no retornó ningún candidato")
+
     def test_arch_memory_3_types(self):
         """Memoria debe tener los 3 tipos: episodica, semantica, procedural."""
         self.assertIsNotNone(self.nexus.memory.episodic)

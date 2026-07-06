@@ -649,10 +649,21 @@ class NexusCore:
             try:
                 mem_facts = self.memory.query_knowledge(user_input, top_k=3)
                 mem_records = self.memory.recall(user_input, top_k=2)
-                        # ─── SELF-CONSISTENCY (mejora #7 del roadmap) ───
+                
+                # F5.1: Habilitar ReAct en prompt de SLM para modelos grandes (>= 3B)
+                model_name = (self.slm.model_name or "").lower()
+                is_small = any(p in model_name for p in ["0.5b", "1b", "1.5b", "2b", "tiny", "nano"])
+                
+                prompt = self.context.build_react(
+                    user_input,
+                    memory_facts=mem_facts,
+                    memory_records=mem_records,
+                    small_model=is_small,
+                )
+                
+                # ─── SELF-CONSISTENCY (mejora #7 del roadmap) ───
                 # Para modelos pequeños, generar 3 respuestas y elegir el consenso semántico
-                is_tiny = any(p in (self.slm.model_name or "").lower()
-                              for p in ["0.5b", "tiny", "nano"])
+                is_tiny = any(p in model_name for p in ["0.5b", "tiny", "nano"])
                 n_attempts = 3 if is_tiny else 1
 
                 candidates = []

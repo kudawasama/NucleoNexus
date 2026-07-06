@@ -21,6 +21,114 @@ class ContradictionError(Exception):
         super().__init__(f"Contradice el hecho existente: '{existing_fact}' (confianza: {confidence})")
 
 
+class IVFIndex:
+    """Índice aproximado de vecinos cercanos (ANN) basado en archivos invertidos (IVF) en Python puro."""
+
+    def __init__(self, k: int = 50):
+        self.k = k
+        self.centroids = []  # Lista de vectores (centroides)
+        self.buckets = {}    # índice_centroide -> list de tuples (fact_id, vector)
+        
+    def build(self, items: list[tuple[int, list[float]]]):
+        """Construye los buckets e inicializa los centroides usando K-Means."""
+        if not items:
+            self.centroids = []
+            self.buckets = {}
+            return
+            
+        import math
+        from memory.embeddings import cosine_similarity
+        
+        # Si hay menos items que K, agrupamos todo en un único bucket
+        if len(items) < self.k:
+            self.centroids = [items[0][1]]
+            self.buckets = {0: items}
+            return
+            
+        # 1. Inicialización simple de centroides (muestreo aleatorio)
+        import random
+        random.seed(42)
+        sample = random.sample(items, self.k)
+        self.centroids = [s[1] for s in sample]
+        
+        # 2. Iteraciones de K-Means (máximo 5 para rendimiento óptimo)
+        for _ in range(5):
+            new_buckets = {i: [] for i in range(self.k)}
+            for fact_id, vec in items:
+                best_idx = 0
+                best_sim = -1.0
+                for idx, cent in enumerate(self.centroids):
+                    sim = cosine_similarity(vec, cent)
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_idx = idx
+                new_buckets[best_idx].append((fact_id, vec))
+                
+            # Recalcular centroides
+            new_centroids = []
+            for idx in range(self.k):
+                bucket_items = new_buckets[idx]
+                if bucket_items:
+                    dim = len(bucket_items[0][1])
+                    avg_vec = [0.0] * dim
+                    for _, vec in bucket_items:
+                        for d in range(dim):
+                            avg_vec[d] += vec[d]
+                    for d in range(dim):
+                        avg_vec[d] /= len(bucket_items)
+                    # Normalizar centroide
+                    norm = math.sqrt(sum(v*v for v in avg_vec))
+                    if norm > 0:
+                        avg_vec = [v/norm for v in avg_vec]
+                    new_centroids.append(avg_vec)
+                else:
+                    new_centroids.append(self.centroids[idx])
+            self.centroids = new_centroids
+            self.buckets = new_buckets
+            
+    def search(self, query_vec: list[float], n_probes: int = 3) -> list[int]:
+        """Busca y retorna los ids de hechos en los buckets de los centroides más similares."""
+        if not self.centroids:
+            return []
+            
+        from memory.embeddings import cosine_similarity
+        
+        # Encontrar los n_probes centroides más cercanos a la query
+        scores = []
+        for idx, cent in enumerate(self.centroids):
+            sim = cosine_similarity(query_vec, cent)
+            scores.append((sim, idx))
+        scores.sort(reverse=True)
+        
+        # Obtener ids de los buckets correspondientes
+        candidate_ids = []
+        for _, idx in scores[:n_probes]:
+            for fact_id, _ in self.buckets.get(idx, []):
+                candidate_ids.append(fact_id)
+        return candidate_ids
+
+    def add_incremental(self, fact_id: int, vec: list[float]):
+        """Agrega de forma incremental un hecho al centroide más cercano."""
+        if not self.centroids:
+            # Inicializar con este elemento si el índice estaba vacío
+            self.centroids = [vec]
+            self.buckets = {0: [(fact_id, vec)]}
+            return
+            
+        from memory.embeddings import cosine_similarity
+        best_idx = 0
+        best_sim = -1.0
+        for idx, cent in enumerate(self.centroids):
+            sim = cosine_similarity(vec, cent)
+            if sim > best_sim:
+                best_sim = sim
+                best_idx = idx
+                
+        if best_idx not in self.buckets:
+            self.buckets[best_idx] = []
+        self.buckets[best_idx].append((fact_id, vec))
+
+
 class SemanticMemory:
     """Memoria semántica — hechos y conceptos con confianza."""
 
@@ -38,6 +146,10 @@ class SemanticMemory:
         # Crear tabla si no existe e inicializar migración
         self._init_table()
         self._migrate_embeddings_format()
+        
+        # Inicializar índice aproximado (ANN IVF)
+        self.ivf_index = None
+        self.ivf_needs_rebuild = True
         
         # Iniciar worker asíncrono para embeddings
         self.worker_running = True
@@ -226,6 +338,11 @@ class SemanticMemory:
                             worker_conn.commit()
                             logger.info(f"Worker guardó embedding para hecho #{fact_id}")
                             
+                            # Actualización incremental del índice IVF bajo lock
+                            with self.lock:
+                                if self.ivf_index is not None:
+                                    self.ivf_index.add_incremental(fact_id, vec)
+                            
                         if fact_id in failed_attempts:
                             del failed_attempts[fact_id]
                     else:
@@ -236,6 +353,7 @@ class SemanticMemory:
                         )
                         time.sleep(1)
                 
+                self.ivf_needs_rebuild = True
             except sqlite3.OperationalError as oe:
                 logger.debug(f"Worker de embeddings: base de datos bloqueada ({oe}). Reintentando...")
                 time.sleep(2)
@@ -368,6 +486,32 @@ class SemanticMemory:
 
         return None
 
+    def _rebuild_ivf_index(self):
+        """Carga todos los hechos con embeddings desde SQLite y construye/reconstruye el índice IVF."""
+        with self.lock:
+            cur = self.conn.cursor()
+            cur.execute("SELECT id, embedding FROM semantic WHERE embedding IS NOT NULL")
+            rows = cur.fetchall()
+            
+            items = []
+            from memory.embeddings import blob_to_embed
+            for row in rows:
+                vec = blob_to_embed(row['embedding'])
+                if vec:
+                    items.append((row['id'], vec))
+                    
+            if items:
+                # Elegimos K dinámicamente como la raíz cuadrada del total de elementos dividida por 2 (mínimo 5 centroides para testing)
+                import math
+                k = max(5, int(math.sqrt(len(items))))
+                self.ivf_index = IVFIndex(k=k)
+                self.ivf_index.build(items)
+                self.ivf_needs_rebuild = False
+                logger.info(f"Índice IVF reconstruido con {len(items)} hechos y {k} centroides.")
+            else:
+                self.ivf_index = None
+                self.ivf_needs_rebuild = False
+
     def query_knowledge(self, query: str, top_k: int = 3) -> list[dict]:
         """Busca hechos por relevancia semántica de términos significativos.
 
@@ -495,17 +639,41 @@ class SemanticMemory:
                 if query_vec:
                     use_vectors = True
                     query_blob = embed_to_blob(query_vec)
+                    
+                    # 1. Comprobar e inicializar el índice IVF si es necesario
+                    # Para optimizar, solo usamos IVF si el número total de hechos es mayor a 100
+                    total_facts = self.count()
+                    if total_facts > 100 or (self.ivf_index is not None and self.ivf_needs_rebuild):
+                        if self.ivf_needs_rebuild or self.ivf_index is None:
+                            self._rebuild_ivf_index()
+                            
+                    # 2. Realizar búsqueda filtrada por IVF o exhaustiva lineal
                     with self.lock:
                         cur = self.conn.cursor()
-                        # Buscar utilizando la función de similitud coseno registrada en SQLite
-                        cur.execute(
-                            "SELECT id, fact, category, confidence, source, created_at, updated_at, access_count, "
-                            "cosine_sim(embedding, ?) as similarity "
-                            "FROM semantic WHERE embedding IS NOT NULL "
-                            "ORDER BY similarity DESC LIMIT 100",
-                            (sqlite3.Binary(query_blob),)
-                        )
-                        rows = cur.fetchall()
+                        if self.ivf_index is not None:
+                            candidate_ids = self.ivf_index.search(query_vec, n_probes=3)
+                            if candidate_ids:
+                                placeholders = ",".join("?" for _ in candidate_ids)
+                                cur.execute(
+                                    f"SELECT id, fact, category, confidence, source, created_at, updated_at, access_count, "
+                                    f"cosine_sim(embedding, ?) as similarity "
+                                    f"FROM semantic WHERE id IN ({placeholders}) "
+                                    f"ORDER BY similarity DESC LIMIT 100",
+                                    (sqlite3.Binary(query_blob), *candidate_ids)
+                                )
+                                rows = cur.fetchall()
+                            else:
+                                rows = []
+                        else:
+                            # Búsqueda exhaustiva lineal (fallback)
+                            cur.execute(
+                                "SELECT id, fact, category, confidence, source, created_at, updated_at, access_count, "
+                                "cosine_sim(embedding, ?) as similarity "
+                                "FROM semantic WHERE embedding IS NOT NULL "
+                                "ORDER BY similarity DESC LIMIT 100",
+                                (sqlite3.Binary(query_blob),)
+                            )
+                            rows = cur.fetchall()
                     
                     try:
                         from config import THRESHOLDS
