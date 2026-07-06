@@ -88,10 +88,48 @@ REJECT_WORDS = {"no", "incorrecto", "falso", "mal", "error", "mentira",
                 "equivocado", "eso no es", "no es asi", "te equivocas"}
 
 
+def clean_fact_text(fact: str) -> str:
+    """Limpia conectores iniciales/finales de precisión y filtra ruido de stop-words."""
+    # Limpiar signos de puntuación iniciales y finales
+    fact = fact.strip().strip(".,;:!¿?¡()")
+    
+    # Dividir en palabras
+    words = fact.split()
+    if not words:
+        return ""
+        
+    # Palabras vacías y conectores para limpiar en los extremos
+    strip_words = {
+        'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
+        'y', 'o', 'e', 'u', 'que', 'de', 'del', 'al', 'con', 'en', 'para', 'por', 'sin', 'a'
+    }
+    
+    # Limpiar el final de forma recursiva
+    while words and words[-1].lower() in strip_words:
+        words.pop()
+        
+    # Limpiar conectores al inicio de forma recursiva
+    start_strip_words = {'y', 'o', 'e', 'u', 'que', 'de', 'con', 'para', 'por'}
+    while words and words[0].lower() in start_strip_words:
+        words.pop(0)
+        
+    # Si queda sin palabras suficientes, descartar
+    if len(words) < 2:
+        return ""
+        
+    # Calcular ratio de stop-words para evitar hechos ruidosos
+    stop_words_count = sum(1 for w in words if w.lower() in strip_words)
+    if stop_words_count / len(words) >= 0.7:
+        # Si el 70% o más de la frase son stop-words, descartar
+        return ""
+        
+    return " ".join(words)
+
+
 def extract_facts(text: str) -> list:
     """Extrae todos los hechos de un texto usando todos los patrones.
     
-    Devuelve lista de strings con los hechos extraídos.
+    Devuelve lista de strings con los hechos extraídos limpios.
     """
     if not text or len(text) < 15:
         return []
@@ -106,13 +144,13 @@ def extract_facts(text: str) -> list:
                 fact = " ".join(match)
             else:
                 fact = match
-            # Limpiar
-            fact = fact.strip().strip(".,;:!¿?¡")
-            words = fact.split()
-            if len(words) >= 2 and len(fact) > 10:
+            
+            # Limpiar y filtrar de forma inteligente
+            cleaned_fact = clean_fact_text(fact)
+            if cleaned_fact and len(cleaned_fact) > 10:
                 # Evitar duplicados cercanos
-                if not any(fact in existing or existing in fact for existing in facts):
-                    facts.append(fact)
+                if not any(cleaned_fact in existing or existing in cleaned_fact for existing in facts):
+                    facts.append(cleaned_fact)
     
     return facts
 

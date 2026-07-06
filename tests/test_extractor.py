@@ -54,5 +54,19 @@ class TestFactExtractor(unittest.TestCase):
         for fact in facts:
             self.assertFalse(fact.rstrip().endswith(" y"), f"hecho termina con 'y': {fact}")
 
+    def test_extract_filters_multiple_trailing_connectors(self):
+        """Verifica que conectores múltiples al final son removidos recursivamente."""
+        from learning.extractor import clean_fact_text
+        cleaned = clean_fact_text("auto un vehiculo y de con para")
+        self.assertEqual(cleaned, "auto un vehiculo")
+
+    def test_extract_discards_stop_words_only(self):
+        """Verifica que frases ruidosas compuestas en su mayoría por stop words son descartadas."""
+        from learning.extractor import clean_fact_text
+        # Frase con 100% de stop words
+        self.assertEqual(clean_fact_text("el que de la con para"), "")
+        # Frase demasiado corta
+        self.assertEqual(clean_fact_text("sol"), "")
+
 if __name__ == "__main__":
     unittest.main()
