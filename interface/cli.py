@@ -20,7 +20,18 @@ try:
 except ImportError:
     HAS_INTERACTIVE_MENU = False
 
-# ─── Autocompletado con readline ───────────────────────────────
+# ─── Autocompletado con prompt_toolkit y readline fallbacks ──────
+try:
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.completion import WordCompleter
+    from prompt_toolkit.styles import Style
+    from prompt_toolkit.formatted_text import HTML
+    from prompt_toolkit.history import FileHistory
+    from prompt_toolkit.patch_stdout import patch_stdout
+    HAS_PROMPT_TOOLKIT = True
+except ImportError:
+    HAS_PROMPT_TOOLKIT = False
+
 try:
     import readline
     HAS_READLINE = True
@@ -82,6 +93,15 @@ class NexusCLI:
         self.running = True
         self._git_info = self._load_git_info()
         self._setup_history()
+        self._setup_autocomplete()
+        if HAS_PROMPT_TOOLKIT:
+            hist_file = Path(self.core.state.state_dir) / ".nexus_history"
+            self.completer = WordCompleter(self._all_commands, ignore_case=True)
+            self.session = PromptSession(
+                history=FileHistory(str(hist_file)),
+                completer=self.completer,
+                complete_while_typing=True
+            )
 
     def _setup_history(self):
         """Carga historial de comandos previos si existe."""
@@ -198,129 +218,55 @@ class NexusCLI:
             self._show_response(response, metadata)
 
     def _get_input(self, prompt: str) -> str:
-        """Lee la entrada del usuario. En Windows sin readline, usa msvcrt para Tab y flechas."""
+        """Lee la entrada del usuario usando prompt_toolkit si está disponible."""
+        if HAS_PROMPT_TOOLKIT:
+            # Barra inferior dinámica con metadatos del estado
+            def get_toolbar():
+                phase = self.core.state.get("nexus", "phase", default="Proto")
+                backend = self.core.state.get("capabilities", "backend", default="symbolic")
+                interactions = self.core.state.get("nexus", "total_interactions", default=0)
+                conf = self.core.state.get("nexus", "confidence_level", default=0.0)
+                # Formato elegante
+                return HTML(
+                    f" <b>Nexus CLI</b>"
+                    f" | Fase: <b>{phase}</b>"
+                    f" | Backend: <b>{backend}</b>"
+                    f" | Interacciones: <b>{interactions}</b>"
+                    f" | Confianza: <b>{conf:.0%}</b>"
+                )
+
+            # Estilo personalizado para el prompt y la barra inferior
+            style = Style.from_dict({
+                'prompt': 'ansicyan bold',
+                'at': 'ansigray',
+                'phi': 'ansiyellow',
+                'bottom-toolbar': 'bg:#222222 fg:#888888',
+            })
+            
+            # El prompt formateado
+            formatted_prompt = [
+                ('class:prompt', 'Nexus'),
+                ('class:at', '@'),
+                ('class:phi', 'φ'),
+                ('', ' '),
+            ]
+
+            # Usar patch_stdout para evitar colisiones si hay hilos imprimiendo en paralelo
+            with patch_stdout():
+                return self.session.prompt(
+                    formatted_prompt,
+                    style=style,
+                    bottom_toolbar=get_toolbar
+                )
+        
+        # Fallback a readline si está disponible
         if os.name != 'nt' or HAS_READLINE:
             return input(prompt)
-
-        import msvcrt
+            
+        # Fallback básico si nada está disponible (no debería ocurrir porque prompt_toolkit ya está instalado)
         sys.stdout.write(prompt)
         sys.stdout.flush()
-
-        buf = []
-        hist_idx = len(self.history)
-        
-        # Para el autocompletado ciclico con Tab
-        tab_prefix = None
-        tab_matches = []
-        tab_idx = 0
-        last_was_tab = False
-
-        def _render_suggestions():
-            current_text = "".join(buf)
-            if current_text.startswith('/'):
-                matches = [cmd for cmd in self._all_commands if cmd.startswith(current_text)]
-                if matches:
-                    # Mostrar sugerencias en la línea de abajo usando secuencias ANSI
-                    sug_line = f"  {Color.DIM}Sugerencias: {Color.GREEN}" + f"{Color.RESET}, {Color.GREEN}".join(matches[:8]) + f"{Color.RESET}"
-                    if len(matches) > 8:
-                        sug_line += f" {Color.DIM}(+{len(matches)-8} más){Color.RESET}"
-                    sys.stdout.write(f"\033[s\n\r\033[K{sug_line}\033[u")
-                else:
-                    sys.stdout.write("\033[s\n\r\033[K\033[u")
-            else:
-                sys.stdout.write("\033[s\n\r\033[K\033[u")
-            sys.stdout.flush()
-
-        while True:
-            try:
-                ch = msvcrt.getwch()
-            except (KeyboardInterrupt, SystemExit):
-                sys.stdout.write("\033[s\n\r\033[K\033[u")
-                sys.stdout.flush()
-                print()
-                raise KeyboardInterrupt
-            
-            # Detectar Enter
-            if ch == '\r' or ch == '\n':
-                # Limpiar sugerencias de forma definitiva
-                sys.stdout.write("\033[s\n\r\033[K\033[u")
-                sys.stdout.flush()
-                line = "".join(buf)
-                print()
-                return line
-            
-            # Detectar Backspace
-            elif ch == '\x08':
-                last_was_tab = False
-                if buf:
-                    buf.pop()
-                    sys.stdout.write('\b \b')
-                    sys.stdout.flush()
-                _render_suggestions()
-            
-            # Detectar Tab
-            elif ch == '\t':
-                current_text = "".join(buf)
-                if current_text.startswith('/') or (last_was_tab and tab_prefix):
-                    if not last_was_tab:
-                        tab_prefix = current_text
-                        tab_matches = [cmd for cmd in self._all_commands if cmd.startswith(tab_prefix)]
-                        tab_idx = 0
-                    else:
-                        if tab_matches:
-                            tab_idx = (tab_idx + 1) % len(tab_matches)
-                    
-                    if tab_matches:
-                        match = tab_matches[tab_idx]
-                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
-                        buf = list(match)
-                        sys.stdout.write(match)
-                        sys.stdout.flush()
-                        
-                    last_was_tab = True
-                    _render_suggestions()
-                    continue
-            
-            # Detectar teclas especiales (Flechas)
-            elif ch in ('\x00', '\xe0'):
-                last_was_tab = False
-                try:
-                    ch2 = msvcrt.getwch()
-                except Exception:
-                    continue
-                
-                # Flecha Arriba (H)
-                if ch2 == 'H' and self.history:
-                    if hist_idx > 0:
-                        hist_idx -= 1
-                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
-                        buf = list(self.history[hist_idx])
-                        sys.stdout.write("".join(buf))
-                        sys.stdout.flush()
-                        _render_suggestions()
-                # Flecha Abajo (P)
-                elif ch2 == 'P' and self.history:
-                    if hist_idx < len(self.history) - 1:
-                        hist_idx += 1
-                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
-                        buf = list(self.history[hist_idx])
-                        sys.stdout.write("".join(buf))
-                        sys.stdout.flush()
-                        _render_suggestions()
-                    elif hist_idx == len(self.history) - 1:
-                        hist_idx += 1
-                        sys.stdout.write('\b' * len(buf) + ' ' * len(buf) + '\b' * len(buf))
-                        buf = []
-                        sys.stdout.flush()
-                        _render_suggestions()
-            
-            # Caracter normal
-            else:
-                last_was_tab = False
-                buf.append(ch)
-                sys.stdout.write(ch)
-                sys.stdout.flush()
-                _render_suggestions()
+        return sys.stdin.readline().strip()
 
     def _setup_autocomplete(self):
         """Configura autocompletado con Tab para comandos /."""
@@ -335,18 +281,17 @@ class NexusCLI:
             "/renombrar", "/verbose"
         ]
         
-        if not HAS_READLINE:
-            return
-        try:
-            def completer(text, state):
-                options = [cmd for cmd in self._all_commands if cmd.startswith(text)]
-                if state < len(options):
-                    return options[state]
-                return None
-            readline.set_completer(completer)
-            readline.parse_and_bind("tab: complete")
-        except Exception:
-            pass
+        if HAS_READLINE:
+            try:
+                def completer(text, state):
+                    options = [cmd for cmd in self._all_commands if cmd.startswith(text)]
+                    if state < len(options):
+                        return options[state]
+                    return None
+                readline.set_completer(completer)
+                readline.parse_and_bind("tab: complete")
+            except Exception:
+                pass
 
     def _get_installed_ollama_models(self):
         """Consulta Ollama API y retorna lista de modelos instalados."""

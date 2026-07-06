@@ -25,6 +25,8 @@
 - ✅ Extractor automático de hechos (aprendizaje)
 - ✅ Backend Ollama (qwen2.5:0.5b)
 - ✅ Reforzamiento por feedback del usuario
+- ✅ Vectorización asíncrona y deduplicación semántica (Fase 1 y 2A)
+- ✅ Interfaz interactiva CLI moderna con autocompletado y barra de estado usando prompt_toolkit (Fase 3)
 - 📝 ReAct en prompt del SLM (pendiente)
 - 📝 Fine-tuning LoRA para tool calling (investigación)
 - 📝 Structured generation con Guidance/Outlines (pendiente)

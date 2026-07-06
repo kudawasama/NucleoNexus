@@ -45,7 +45,7 @@ memoria.get_conversation_history(limit=10)  # Historial formateado
 
 ## Memoria Semántica (`memory/semantic.py`)
 
-**Propósito**: Almacenar hechos, conceptos y relaciones que el sistema conoce.
+**Propósito**: Almacenar hechos, conceptos y relaciones que el sistema conoce, soportando búsqueda semántica por embeddings y consolidación dinámica de conocimientos.
 
 **Estructura**:
 | Campo | Descripción |
@@ -53,29 +53,33 @@ memoria.get_conversation_history(limit=10)  # Historial formateado
 | `id` | Auto-incremental |
 | `fact` | Texto del hecho (único) |
 | `category` | Categoría (ciencia, matematica, personal...) |
-| `confidence` | Confianza (0.0 - 1.0, sube con repetición) |
+| `confidence` | Confianza (0.0 - 1.0, sube con repetición o deduplicación) |
 | `source` | Origen (knowledge_base, auto_usuario, refuerzo...) |
 | `created_at` | Timestamp de creación |
 | `updated_at` | Timestamp de última actualización |
-| `access_count` | Veces que se ha usado |
+| `access_count` | Veces que se ha usado / retornado por consultas |
+| `embedding` | Vector float de 768 dimensiones (BLOB) almacenado como JSON UTF-8 |
 
-**Búsqueda inteligente** (`query_knowledge`):
-1. Tokeniza la query extrayendo términos significativos
-2. Filtra **stop words** (que, es, por, para, una, etc.)
-3. Normaliza acentos (á → a, é → e, etc.)
-4. Calcula relevancia: qué proporción de términos significativos aparecen en el hecho
-5. Penaliza matches únicos cuando hay múltiples términos en la query
-6. Ordena por relevancia + confianza
+**Optimización de Vectorización Asíncrona (Fase 1)**:
+Para evitar latencias y bloqueos en el chat interactivo, la inserción mediante `learn_fact` guarda los hechos de inmediato con `embedding = NULL`. Un hilo worker en segundo plano (demonio) lee constantemente de la base de datos, extrae registros sin embedding y genera el vector de forma asíncrona consultando localmente a Ollama.
 
-**Aprendizaje**:
-- `learn_fact()` inserta o refuerza (si ya existe, sube confidence +0.1)
-- La repetición refuerza automáticamente
+**Decaimiento Temporal y Frecuencia de Accesos**:
+La consulta de la memoria semántica (`query_knowledge`) integra una fórmula de relevancia híbrida combinando TF-IDF, similitud semántica de coseno, decaimiento temporal y frecuencia de uso para favorecer hechos frescos y útiles frente a los viejos u obsoletos:
+* **Time Decay**: $\max(0.2, \text{decay\_rate}^{\Delta t\_dias})$ (donde `decay_rate` por defecto es `0.99`).
+* **Access Factor**: $1.0 + 0.1 \times \log(\text{access\_count} + 1)$.
+
+**Deduplicación Semántica y Consolidación (Fase 2A)**:
+Al procesar un nuevo embedding, el worker asíncrono realiza una búsqueda interna comparando la similitud coseno contra los vectores ya existentes en la base de datos:
+* Si la similitud coseno es mayor o igual a **88%** ($sim \ge 0.88$), el hecho se considera un duplicado semántico redundante.
+* **Acción**: El worker incrementa la confianza del hecho original en `+0.1` (tope `1.0`), aumenta el contador de accesos en `+1` y elimina el nuevo registro duplicado para limpiar y consolidar la memoria de fondo.
 
 **Métodos clave**:
 ```python
-memoria.learn_fact(fact, category, confidence, source)  # Aprender
-memoria.query_knowledge(query, top_k=3)                 # Buscar
-memoria.get_facts_by_category(category)                  # Por categoría
+memoria.learn_fact(fact, category, confidence, source)  # Aprender de inmediato (asíncrono)
+memoria.query_knowledge(query, top_k=3)                 # Buscar con decaimiento y accesos (sincronizado)
+memoria.get_facts_by_category(category)                  # Listar hechos de una categoría (sincronizado)
+memoria.get_consolidable_facts(min_confidence)          # Obtener hechos listos para guardar en JSON (sincronizado)
+memoria.mark_as_consolidated(fact_id)                   # Cambiar source a 'knowledge_base' al persistir (sincronizado)
 ```
 
 ---
