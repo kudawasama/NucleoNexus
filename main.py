@@ -309,9 +309,16 @@ class NexusCore:
         from learning.extractor import learn_from_all, handle_feedback
         learned_input = learn_from_all(user_input, self.memory, source="usuario")
         
-        # Aprender también de la respuesta del SLM (confianza baja)
-        # Cada respuesta de Qwen es semilla para futuro conocimiento
-        learned_response = learn_from_all(response, self.memory, source="respuesta")
+        # Aprender también de la respuesta del SLM si el modelo es grande y fidedigno (>= 3B)
+        is_slm = metadata.get("backend") == "slm"
+        model_name = self.slm.model_name if (self.slm and self.slm.loaded) else ""
+        name_lower = (model_name or "").lower()
+        unreliable = any(p in name_lower for p in ["0.5b", "1b", "1.5b", "2b", "tiny", "nano"])
+        
+        if is_slm and not unreliable:
+            learned_response = learn_from_all(response, self.memory, source="respuesta")
+        else:
+            learned_response = 0
         
         # Detectar feedback (correcciones, refuerzos)
         feedback_handled = handle_feedback(user_input, self.memory)

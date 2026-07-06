@@ -30,7 +30,73 @@ class NexusMemory:
 
     def remember(self, role: str, content: str, context: dict = None,
                  importance: float = 1.0) -> int:
-        return self.episodic.remember(role, content, context, importance)
+        row_id = self.episodic.remember(role, content, context, importance)
+        
+        # 1. Comprobar si se alcanza el 80% de la capacidad de la memoria episódica
+        capacity = 10000  # Capacidad por defecto
+        try:
+            from config import MEMORY
+            capacity = MEMORY.get("episodic_limit", 10000)
+        except Exception:
+            pass
+            
+        if self.episodic.count() >= 0.8 * capacity:
+            self.compress_episodic_memory(capacity)
+            
+        return row_id
+
+    def compress_episodic_memory(self, capacity: int):
+        """Resume conversaciones antiguas en hechos semánticos y libera espacio en la memoria episódica."""
+        # Comprimir el 20% más viejo de los mensajes
+        to_remove_count = int(capacity * 0.2)
+        if to_remove_count <= 0:
+            return
+            
+        import logging
+        logger = logging.getLogger("nexus.memory.store")
+        logger.info(f"Comprimiendo memoria episódica: se purgarán y resumirán los {to_remove_count} recuerdos más antiguos.")
+        
+        # 1. Obtener los registros más antiguos
+        cur = self.episodic.conn.cursor()
+        cur.execute(
+            "SELECT id, role, content FROM episodic ORDER BY timestamp ASC LIMIT ?",
+            (to_remove_count,)
+        )
+        old_records = cur.fetchall()
+        if not old_records:
+            return
+            
+        # 2. Resumir / Extraer hechos de esos registros e insertarlos en la memoria semántica
+        from learning.extractor import extract_facts
+        extracted_facts = []
+        for row in old_records:
+            facts = extract_facts(row['content'])
+            for fact in facts:
+                try:
+                    # Guardamos el hecho en la memoria semántica con fuente 'compresion_episodica'
+                    # y una confianza moderada (0.4) ya que provienen de interacciones reales
+                    self.semantic.learn_fact(fact, category="aprendizaje", confidence=0.4, source="compresion_episodica")
+                    extracted_facts.append(fact)
+                except Exception:
+                    # Ignorar si es un hecho duplicado o contradictorio
+                    pass
+                    
+        # 3. Eliminar los registros de la base de datos de memoria episódica
+        record_ids = [row['id'] for row in old_records]
+        placeholders = ",".join("?" for _ in record_ids)
+        cur.execute(
+            f"DELETE FROM episodic WHERE id IN ({placeholders})",
+            record_ids
+        )
+        self.episodic.conn.commit()
+        
+        # 4. Reconstruir el índice TF-IDF para reflejar los cambios
+        from memory.episodic import TFIDFIndex
+        self.episodic._index = TFIDFIndex()  # Re-instanciar TFIDFIndex
+        self.episodic._index_loaded = False
+        self.episodic._load_index()
+        
+        logger.info(f"Compresión completada. Extrayendo {len(extracted_facts)} hechos e indexando de nuevo.")
 
     def recall(self, query: str, top_k: int = 5) -> list[dict]:
         return self.episodic.recall(query, top_k)

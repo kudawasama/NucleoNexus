@@ -350,5 +350,44 @@ class TestCognitionAndAgent(unittest.TestCase):
         synth_steps = [s for s in result.steps if s.tool == "synthesize"]
         self.assertGreaterEqual(len(synth_steps), 0, "synthesize es opcional, no debe fallar")
 
+    def test_selective_learning_from_slm(self):
+        """Verifica que no se aprende de las respuestas de modelos pequeños (< 3B)."""
+        original_model = self.nexus.slm.model_name
+        original_generate = self.nexus.slm.generate
+        
+        # Mock de una respuesta que contiene un hecho
+        self.nexus.slm.generate = lambda *a, **k: {"response": '{"accion": "responder", "respuesta": "el riñon es un organo vital"}', "model": self.nexus.slm.model_name}
+        
+        try:
+            # 1. Caso modelo pequeño (Qwen 0.5B): no debe aprender del response
+            self.nexus.slm.model_name = "qwen2.5:0.5b"
+            
+            # Limpiar hechos similares de prueba en la BD para evitar falsos positivos
+            cur = self.nexus.memory.semantic.conn.cursor()
+            cur.execute("DELETE FROM semantic WHERE fact LIKE '%riñon es%'")
+            self.nexus.memory.semantic.conn.commit()
+            
+            # Forzar consulta que vaya al SLM (con backend = "slm")
+            self.nexus.process("dime sobre el riñon")
+            
+            # Verificamos específicamente que no haya guardado el hecho de la respuesta "el riñon es un organo vital"
+            facts = self.nexus.memory.semantic.query_knowledge("riñon", top_k=5)
+            self.assertFalse(any("organo vital" in f["text"] for f in facts), "Aprendió de la respuesta de un modelo pequeño!")
+
+            # 2. Caso modelo grande (Hermes 3B): sí debe aprender del response
+            self.nexus.slm.model_name = "hermes3:3b"
+            
+            # Limpiar nuevamente
+            cur.execute("DELETE FROM semantic WHERE fact LIKE '%riñon es%'")
+            self.nexus.memory.semantic.conn.commit()
+            
+            self.nexus.process("dime sobre el riñon")
+            facts = self.nexus.memory.semantic.query_knowledge("riñon", top_k=5)
+            self.assertTrue(any("organo vital" in f["text"] for f in facts), "No aprendió de la respuesta de un modelo grande!")
+            
+        finally:
+            self.nexus.slm.model_name = original_model
+            self.nexus.slm.generate = original_generate
+
 if __name__ == "__main__":
     unittest.main()

@@ -173,6 +173,55 @@ class TestMemoryAndSynonyms(unittest.TestCase):
 
         self.assertTrue(success, "debió permitir guardar con force=True")
 
+    def test_episodic_memory_compression(self):
+        """Verifica que al alcanzar el 80% de la capacidad episódica, se comprimen los recuerdos más viejos."""
+        # 1. Limpiar recuerdos episódicos de prueba
+        cur_ep = self.nexus.memory.episodic.conn.cursor()
+        cur_ep.execute("DELETE FROM episodic")
+        self.nexus.memory.episodic.conn.commit()
+
+        # Limpiar hechos semánticos relacionados para evitar falsos positivos
+        cur_sem = self.nexus.memory.semantic.conn.cursor()
+        cur_sem.execute("DELETE FROM semantic WHERE source = 'compresion_episodica'")
+        self.nexus.memory.semantic.conn.commit()
+
+        # 2. Mockear el límite de la memoria episódica en config a un número pequeño (ej. 10)
+        from unittest.mock import patch
+        import config
+        
+        # Parchear el diccionario MEMORY en config
+        test_memory_config = config.MEMORY.copy()
+        test_memory_config["episodic_limit"] = 10
+        
+        with patch.dict(config.MEMORY, test_memory_config):
+            # 3. Agregar recuerdos episódicos (80% de 10 es 8. Así que al insertar el 8vo recuerdo, debería disparar compresión)
+            # El recuerdo más viejo contendrá un hecho para extraer
+            self.nexus.memory.remember("user", "el sol es caliente y amarillo", context={"t": "viejo"})
+            
+            # Insertar 6 recuerdos más (total = 7)
+            for i in range(6):
+                self.nexus.memory.remember("user", f"mensaje irrelevante de prueba numero {i}", context={"t": "medio"})
+                
+            # Verificar que hasta aquí hay 7 recuerdos y ningún hecho en memoria semántica de compresión
+            self.assertEqual(self.nexus.memory.episodic.count(), 7)
+            facts_before = self.nexus.memory.semantic.get_facts_by_category("aprendizaje")
+            comp_facts_before = [f for f in facts_before if f.get("source") == "compresion_episodica"]
+            self.assertEqual(len(comp_facts_before), 0)
+
+            # Insertar el 8vo recuerdo para disparar la compresión (8 >= 0.8 * 10)
+            # Esto purgará el 20% más viejo de 10 = 2 recuerdos.
+            self.nexus.memory.remember("user", "mensaje detonador final", context={"t": "detonador"})
+            
+            # 4. Verificar resultados:
+            # - Total de recuerdos debería ser 8 - 2 (purgados) = 6 registros
+            self.assertEqual(self.nexus.memory.episodic.count(), 6)
+            
+            # - El hecho del primer recuerdo ("el sol es caliente y amarillo") debió ser extraído y guardado en memoria semántica
+            facts_after = self.nexus.memory.semantic.get_facts_by_category("aprendizaje")
+            comp_facts_after = [f for f in facts_after if f.get("source") == "compresion_episodica"]
+            self.assertGreaterEqual(len(comp_facts_after), 1, "Debería haber extraído al menos 1 hecho semántico")
+            self.assertTrue(any("sol" in f["fact"] for f in comp_facts_after), "Debería haber extraído la información del sol")
+
     def test_arch_memory_3_types(self):
         """Memoria debe tener los 3 tipos: episodica, semantica, procedural."""
         self.assertIsNotNone(self.nexus.memory.episodic)
