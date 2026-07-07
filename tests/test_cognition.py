@@ -8,6 +8,7 @@ import unittest
 import sys
 import re
 import json
+import time
 from pathlib import Path
 
 # Configurar path del proyecto
@@ -75,12 +76,13 @@ class TestCognitionAndAgent(unittest.TestCase):
         self.nexus.memory.semantic.conn.commit()
 
         # Guardar hechos tipo lista con termino unico para evitar colision con knowledge base
-        self.nexus.memory.learn_fact("los seres mitologicos incluye: dragon", category="test_synth", confidence=0.5, source="test_synth")
-        self.nexus.memory.learn_fact("los seres mitologicos incluye: fenix", category="test_synth", confidence=0.5, source="test_synth")
-        self.nexus.memory.learn_fact("los seres mitologicos incluye: grifo", category="test_synth", confidence=0.5, source="test_synth")
+        unique_tag = f"synth_{int(time.time())}"
+        self.nexus.memory.learn_fact(f"los {unique_tag} incluye: alpha", category="test_synth", confidence=0.5, source="test_synth")
+        self.nexus.memory.learn_fact(f"los {unique_tag} incluye: beta", category="test_synth", confidence=0.5, source="test_synth")
+        self.nexus.memory.learn_fact(f"los {unique_tag} incluye: gamma", category="test_synth", confidence=0.5, source="test_synth")
 
         # Preguntar
-        r, m = self.nexus.process("cuales son los seres mitologicos")
+        r, m = self.nexus.process(f"cuales son los {unique_tag}")
         self.assertTrue("1." in r or "Encontre" in r, f"respuesta no es sintetizada: {r[:200]}")
 
     def test_self_consistency_metadata(self):
@@ -300,7 +302,7 @@ class TestCognitionAndAgent(unittest.TestCase):
         """Si SLM devuelve string vacio, fallback se activa."""
         from cognition.agent import NexusAgent
         agent = NexusAgent(self.nexus)
-        if not agent.nexus.slm.loaded:
+        if not self.nexus.slm.loaded:
             self.skipTest("SLM no disponible")
 
         prior = [
@@ -325,7 +327,7 @@ class TestCognitionAndAgent(unittest.TestCase):
         """Si SLM devuelve None, fallback se activa."""
         from cognition.agent import NexusAgent
         agent = NexusAgent(self.nexus)
-        if not agent.nexus.slm.loaded:
+        if not self.nexus.slm.loaded:
             self.skipTest("SLM no disponible")
 
         prior = [

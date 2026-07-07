@@ -438,15 +438,21 @@ class SemanticMemory:
         sig1 = w1 - stop_words
 
         existing = []
+        seen_texts = set()
 
         try:
             # Primero intentar con query_knowledge (búsqueda semántica/híbrida)
-            existing = self.query_knowledge(fact, top_k=5) or []
+            results = self.query_knowledge(fact, top_k=5) or []
+            for item in results:
+                text = item.get("text", "")
+                if text and text not in seen_texts:
+                    seen_texts.add(text)
+                    existing.append(item)
         except Exception:
             pass
 
-        # Fallback: si no hay resultados, buscar directamente por palabras significativas
-        if not existing and sig1:
+        # Busqueda directa por palabras significativas (complementa a query_knowledge)
+        if sig1:
             try:
                 with self.lock:
                     cur = self.conn.cursor()
@@ -457,11 +463,14 @@ class SemanticMemory:
                             (f"%{word}%",)
                         )
                         for row in cur.fetchall():
-                            existing.append({
-                                "id": row[0],
-                                "text": row[1],
-                                "metadata": {"confidence": row[2]},
-                            })
+                            text = row[1]
+                            if text and text not in seen_texts:
+                                seen_texts.add(text)
+                                existing.append({
+                                    "id": row[0],
+                                    "text": text,
+                                    "metadata": {"confidence": row[2]},
+                                })
             except Exception:
                 pass
 
