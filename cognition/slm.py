@@ -17,6 +17,7 @@ import json
 import subprocess
 import time
 import os
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger("nexus.cognition.slm")
@@ -80,6 +81,102 @@ def validate_and_repair_json(raw_json: str) -> dict:
     return data
 
 
+class SemanticCache:
+    """Caché semántica SQLite para respuestas del SLM basada en similitud de embeddings."""
+    
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+        self._init_db()
+        
+    def _init_db(self):
+        import sqlite3
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS semantic_cache ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "system_prompt TEXT,"
+            "prompt TEXT,"
+            "response TEXT,"
+            "embedding BLOB,"
+            "created_at REAL"
+            ")"
+        )
+        conn.commit()
+        conn.close()
+        
+    def lookup(self, prompt: str, system_prompt: str = None, threshold: float = 0.95) -> Optional[dict]:
+        """Busca en la caché una respuesta semánticamente similar (similitud >= threshold)."""
+        from memory.embeddings import get_embedding, cosine_similarity, blob_to_embed, is_available
+        if not is_available():
+            return None
+            
+        query_emb = get_embedding(prompt)
+        if not query_emb:
+            return None
+            
+        import sqlite3
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT system_prompt, prompt, response, embedding FROM semantic_cache")
+        
+        best_match = None
+        best_sim = -1.0
+        
+        for row in cur.fetchall():
+            sys_pr, pr, resp, emb_blob = row
+            if (system_prompt or "") != (sys_pr or ""):
+                continue
+                
+            emb = blob_to_embed(emb_blob)
+            if not emb:
+                continue
+                
+            sim = cosine_similarity(query_emb, emb)
+            if sim > best_sim:
+                best_sim = sim
+                best_match = resp
+                
+        conn.close()
+        
+        if best_sim >= threshold:
+            logger.info(f"Caché semántica: ACIERTO (similitud: {best_sim:.4f})")
+            import json as _json
+            try:
+                return _json.loads(best_match)
+            except Exception:
+                return best_match
+                
+        return None
+        
+    def store(self, prompt: str, response, system_prompt: str = None):
+        """Almacena una consulta y su respuesta en la caché semántica."""
+        from memory.embeddings import get_embedding, embed_to_blob, is_available
+        if not is_available():
+            return
+            
+        emb = get_embedding(prompt)
+        if not emb:
+            return
+            
+        import sqlite3
+        import json as _json
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        now = time.time()
+        
+        resp_str = _json.dumps(response, ensure_ascii=False) if isinstance(response, dict) else str(response)
+        
+        cur.execute(
+            "INSERT INTO semantic_cache (system_prompt, prompt, response, embedding, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (system_prompt, prompt, resp_str, embed_to_blob(emb), now)
+        )
+        conn.commit()
+        conn.close()
+        logger.debug("Consulta guardada en caché semántica.")
+
+
 class SLMBackend:
     """Backend para modelos de lenguaje locales (SLM).
     
@@ -118,6 +215,10 @@ class SLMBackend:
                                 break
                 except Exception as e:
                     logger.warning(f"No se pudo leer master env: {e}")
+
+        # Inicializar caché semántica
+        from config import DATA_DIR
+        self.cache = SemanticCache(str(Path(DATA_DIR) / "nexus_cache.db"))
         logger.info(f"SLMBackend creado (modo: {self.mode})")
 
     def load(self) -> bool:
@@ -222,24 +323,42 @@ class SLMBackend:
             logger.warning("SLM no cargado. Usa load() primero.")
             return None
 
-        if structured and self.mode == "ollama":
-            return self._generate_ollama_structured(prompt, system_prompt)
+        # 1. Consultar caché semántica
+        try:
+            cached = self.cache.lookup(prompt, system_prompt)
+            if cached is not None:
+                return cached
+        except Exception as e:
+            logger.warning(f"Error en lookup de caché semántica: {e}")
 
-        if self.mode == "ollama":
-            return self._generate_ollama(prompt, system_prompt)
+        # 2. Generación real
+        result = None
+        if structured and self.mode == "ollama":
+            result = self._generate_ollama_structured(prompt, system_prompt)
+        elif self.mode == "ollama":
+            result = self._generate_ollama(prompt, system_prompt)
         elif self.mode == "openai":
-            result = self._generate_openai(prompt, system_prompt, structured=structured)
-            if result and structured:
+            res_raw = self._generate_openai(prompt, system_prompt, structured=structured)
+            if res_raw and structured:
                 # Envolver en dict y reparar para mantener consistencia con structured mode
                 try:
-                    repaired = validate_and_repair_json(result)
-                    return {"response": json.dumps(repaired, ensure_ascii=False), "model": self.model_name}
+                    repaired = validate_and_repair_json(res_raw)
+                    result = {"response": json.dumps(repaired, ensure_ascii=False), "model": self.model_name}
                 except Exception:
-                    return {"response": result, "model": self.model_name}
-            return result
+                    result = {"response": res_raw, "model": self.model_name}
+            else:
+                result = res_raw
         elif self.mode == "llamacpp":
-            return self._generate_llamacpp(prompt, system_prompt)
-        return None
+            result = self._generate_llamacpp(prompt, system_prompt)
+
+        # 3. Guardar en caché si se generó con éxito
+        if result is not None:
+            try:
+                self.cache.store(prompt, result, system_prompt)
+            except Exception as e:
+                logger.warning(f"Error al guardar en caché semántica: {e}")
+
+        return result
 
     def _generate_ollama_structured(self, prompt: str, system_prompt: str = None) -> Optional[dict]:
         """Genera respuesta via Ollama con formato JSON forzado y metadata."""

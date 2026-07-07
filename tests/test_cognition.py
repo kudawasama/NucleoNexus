@@ -477,5 +477,59 @@ class TestCognitionAndAgent(unittest.TestCase):
         finally:
             requests.post = original_post
 
+    def test_semantic_cache_hit(self):
+        """Verifica que la caché semántica responda para consultas semánticamente similares."""
+        import os
+        from cognition.slm import SemanticCache
+        
+        # 1. Instanciar una caché temporal
+        test_db = "tests/test_cache.db"
+        if os.path.exists(test_db):
+            os.remove(test_db)
+            
+        cache = SemanticCache(test_db)
+        
+        # Mock de get_embedding y is_available para pruebas aisladas
+        original_get_embedding = None
+        original_is_available = None
+        import memory.embeddings as embed_module
+        
+        original_get_embedding = embed_module.get_embedding
+        original_is_available = embed_module.is_available
+        
+        # Vector simulado de 768 dimensiones
+        mock_vector = [0.1] * 768
+        mock_vector_similar = [0.105] * 768
+        
+        embed_module.is_available = lambda: True
+        
+        prompt_stored = "¿Cuál es la capital de Francia?"
+        prompt_query = "Dime la capital de Francia por favor"
+        
+        def mock_get_embedding(text):
+            if text == prompt_stored:
+                return mock_vector
+            elif text == prompt_query:
+                return mock_vector_similar
+            return [0.0] * 768
+            
+        embed_module.get_embedding = mock_get_embedding
+        
+        try:
+            # 2. Guardar respuesta en caché
+            response_data = {"response": "La capital de Francia es París.", "model": "test-model"}
+            cache.store(prompt_stored, response_data, system_prompt="sys1")
+            
+            # 3. Buscar usando consulta similar con un umbral bajo (0.90) para el mock
+            cached_res = cache.lookup(prompt_query, system_prompt="sys1", threshold=0.90)
+            self.assertIsNotNone(cached_res, "La caché semántica debió acertar con la consulta similar")
+            self.assertEqual(cached_res["response"], "La capital de Francia es París.")
+            
+        finally:
+            embed_module.get_embedding = original_get_embedding
+            embed_module.is_available = original_is_available
+            if os.path.exists(test_db):
+                os.remove(test_db)
+
 if __name__ == "__main__":
     unittest.main()

@@ -224,19 +224,20 @@ class SemanticMemory:
             self.conn.commit()
             logger.info("Tabla semantic migrada: columna embedding agregada")
         except sqlite3.OperationalError:
-            # La columna ya existe
             pass
-        self.conn.commit()
 
     def _embedding_worker(self):
-        """Worker en segundo plano para procesar embeddings pendientes."""
+        """Worker en segundo plano para procesar embeddings pendientes en paralelo."""
         import time
         import json as _json
         import sqlite3
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         
-        # Conexión propia del hilo secundario
         worker_conn = None
         failed_attempts = {}  # fact_id -> intentos fallidos
+        
+        # Pool de hilos para procesar peticiones en paralelo
+        executor = ThreadPoolExecutor(max_workers=4)
         
         while self.worker_running:
             try:
@@ -245,38 +246,49 @@ class SemanticMemory:
                 if not is_available():
                     time.sleep(10)
                     continue
-
+ 
                 if not worker_conn:
-                    worker_conn = sqlite3.connect(self.db_path, timeout=10.0)
+                    worker_conn = sqlite3.connect(self.db_path, timeout=15.0)
                     worker_conn.row_factory = sqlite3.Row
-
+ 
                 cur = worker_conn.cursor()
                 
-                # Excluir hechos que fallan continuamente para evitar bucles infinitos
+                # Excluir hechos que fallan continuamente
                 exclude_ids = [fid for fid, att in failed_attempts.items() if att >= 3]
+                limit_n = 8
                 if exclude_ids:
                     placeholders = ",".join("?" for _ in exclude_ids)
-                    query = f"SELECT id, fact FROM semantic WHERE embedding IS NULL AND id NOT IN ({placeholders}) LIMIT 5"
+                    query = f"SELECT id, fact FROM semantic WHERE embedding IS NULL AND id NOT IN ({placeholders}) LIMIT {limit_n}"
                     cur.execute(query, tuple(exclude_ids))
                 else:
-                    cur.execute("SELECT id, fact FROM semantic WHERE embedding IS NULL LIMIT 5")
+                    cur.execute(f"SELECT id, fact FROM semantic WHERE embedding IS NULL LIMIT {limit_n}")
                 
                 rows = cur.fetchall()
-
+ 
                 if not rows:
                     time.sleep(3)
                     continue
-
+ 
+                # Lanzar peticiones de embedding en paralelo
+                futures = {}
                 for row in rows:
-                    if not self.worker_running:
-                        break
                     fact_id = row['id']
                     fact_text = row['fact']
-                    
-                    logger.debug(f"Worker generando embedding para hecho #{fact_id}...")
-                    vec = get_embedding(fact_text)
+                    fut = executor.submit(get_embedding, fact_text)
+                    futures[fut] = (fact_id, fact_text)
+ 
+                for fut in as_completed(futures):
+                    if not self.worker_running:
+                        break
+                    fact_id, fact_text = futures[fut]
+                    try:
+                        vec = fut.result()
+                    except Exception as ex:
+                        vec = None
+                        logger.warning(f"Error generando embedding paralelo para #{fact_id}: {ex}")
+ 
                     if vec:
-                        # Buscar hechos similares existentes en la base de datos (con embedding calculado y diferente id)
+                        # Buscar hechos similares existentes en la base de datos
                         cur.execute(
                             "SELECT id, fact, confidence, access_count, embedding "
                             "FROM semantic WHERE embedding IS NOT NULL AND id != ?",
@@ -293,14 +305,14 @@ class SemanticMemory:
                         except Exception:
                             dedup_threshold = 0.88
                             reinforce_inc = 0.1
-
+ 
                         for ext_row in existing_rows:
                             try:
                                 ext_vec = blob_to_embed(ext_row['embedding'])
                                 if not ext_vec:
                                     continue
                                 sim = cosine_similarity(vec, ext_vec)
-                                if sim >= dedup_threshold:  # Umbral de similitud semántica configurado
+                                if sim >= dedup_threshold:
                                     ext_id = ext_row['id']
                                     ext_fact = ext_row['fact']
                                     ext_conf = ext_row['confidence']
@@ -336,7 +348,7 @@ class SemanticMemory:
                                 (sqlite3.Binary(binary_blob), fact_id)
                             )
                             worker_conn.commit()
-                            logger.info(f"Worker guardó embedding para hecho #{fact_id}")
+                            logger.info(f"Worker guardó embedding paralelo para hecho #{fact_id}")
                             
                             # Actualización incremental del índice IVF bajo lock
                             with self.lock:
@@ -351,7 +363,6 @@ class SemanticMemory:
                             f"Worker no pudo generar embedding para hecho #{fact_id}. "
                             f"Intento: {failed_attempts[fact_id]}/3"
                         )
-                        time.sleep(1)
                 
                 self.ivf_needs_rebuild = True
             except sqlite3.OperationalError as oe:
@@ -361,6 +372,7 @@ class SemanticMemory:
                 logger.error(f"Error en worker de embeddings: {e}")
                 time.sleep(5)
         
+        executor.shutdown(wait=False)
         if worker_conn:
             try:
                 worker_conn.close()

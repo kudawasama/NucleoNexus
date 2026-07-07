@@ -23,3 +23,6 @@ venv/
 Thumbs.db
 .DS_Store
 .hermes/
+
+# Auto-excluido por seguridad de Nexus
+data/nexus_cache.db
