@@ -74,13 +74,13 @@ class TestCognitionAndAgent(unittest.TestCase):
         cur.execute("DELETE FROM semantic WHERE source = 'test_synth'")
         self.nexus.memory.semantic.conn.commit()
 
-        # Guardar hechos tipo lista
-        self.nexus.memory.learn_fact("los animales incluye: perro", category="test_synth", confidence=0.5, source="test_synth")
-        self.nexus.memory.learn_fact("los animales incluye: gato", category="test_synth", confidence=0.5, source="test_synth")
-        self.nexus.memory.learn_fact("los animales incluye: pajaro", category="test_synth", confidence=0.5, source="test_synth")
+        # Guardar hechos tipo lista con termino unico para evitar colision con knowledge base
+        self.nexus.memory.learn_fact("los seres mitologicos incluye: dragon", category="test_synth", confidence=0.5, source="test_synth")
+        self.nexus.memory.learn_fact("los seres mitologicos incluye: fenix", category="test_synth", confidence=0.5, source="test_synth")
+        self.nexus.memory.learn_fact("los seres mitologicos incluye: grifo", category="test_synth", confidence=0.5, source="test_synth")
 
         # Preguntar
-        r, m = self.nexus.process("cuales son los animales")
+        r, m = self.nexus.process("cuales son los seres mitologicos")
         self.assertTrue("1." in r or "Encontre" in r, f"respuesta no es sintetizada: {r[:200]}")
 
     def test_self_consistency_metadata(self):
@@ -197,7 +197,7 @@ class TestCognitionAndAgent(unittest.TestCase):
         from cognition.agent import NexusAgent
         agent = NexusAgent(self.nexus)
         self.assertIsNotNone(agent.actions, "agente sin ActionRegistry")
-        step = agent._execute_tool("get_time", "")
+        step = agent._execute_tool("get_time")
         self.assertEqual(step.tool, "get_time", f"tool no ejecutada: {step}")
 
     def test_agent_summarizes_steps(self):
@@ -300,11 +300,13 @@ class TestCognitionAndAgent(unittest.TestCase):
         """Si SLM devuelve string vacio, fallback se activa."""
         from cognition.agent import NexusAgent
         agent = NexusAgent(self.nexus)
+        if not agent.nexus.slm.loaded:
+            self.skipTest("SLM no disponible")
 
         prior = [
             type('FakeStep', (), {
                 'tool': 'web_search',
-                'output': '{"resultados": ["• Dato importante para el test"]}',
+                'output': '{"resultados": ["• Dato importante para el test de sintesis de la respuesta automatica del sistema"]}',
                 'success': True,
                 'duration_ms': 100,
             })(),
@@ -323,11 +325,13 @@ class TestCognitionAndAgent(unittest.TestCase):
         """Si SLM devuelve None, fallback se activa."""
         from cognition.agent import NexusAgent
         agent = NexusAgent(self.nexus)
+        if not agent.nexus.slm.loaded:
+            self.skipTest("SLM no disponible")
 
         prior = [
             type('FakeStep', (), {
                 'tool': 'web_search',
-                'output': '{"resultados": ["• Dato importante"]}',
+                'output': '{"resultados": ["• Dato importante para el test de sintesis sin slm con datos de prueba validos"]}',
                 'success': True,
                 'duration_ms': 100,
             })(),
@@ -352,6 +356,8 @@ class TestCognitionAndAgent(unittest.TestCase):
 
     def test_selective_learning_from_slm(self):
         """Verifica que no se aprende de las respuestas de modelos pequeños (< 3B)."""
+        if not getattr(self.nexus.slm, 'loaded', False):
+            self.skipTest("SLM no disponible")
         original_model = self.nexus.slm.model_name
         original_generate = self.nexus.slm.generate
         
@@ -451,8 +457,11 @@ class TestCognitionAndAgent(unittest.TestCase):
 
     def test_structured_generation_self_correction_loop(self):
         """Verifica que el bucle de autocorrección se activa ante un JSON mal formado."""
+        try:
+            import requests
+        except ImportError:
+            self.skipTest("requests no instalado")
         original_post = None
-        import requests
         original_post = requests.post
         
         call_count = 0

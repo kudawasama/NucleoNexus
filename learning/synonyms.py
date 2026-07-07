@@ -31,8 +31,9 @@ SYNONYMS = {
     "niña": ["chica", "niña", "infanta", "nena"],
 
     # Profesiones
-    "médico": ["doctor", "médico", "facultativo"],
-    "doctor": ["médico", "doctor"],
+    "médico": ["doctor", "doctora", "médico", "médica", "facultativo", "facultativa"],
+    "doctor": ["médico", "doctor", "doctora"],
+    "doctora": ["médico", "doctor", "doctora"],
     "abogado": ["licenciado", "abogado", "letrado"],
 
     # Comida

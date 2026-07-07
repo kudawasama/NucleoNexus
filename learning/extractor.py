@@ -30,7 +30,8 @@ VERBOS_FUNCION = ["funciona", "funcionan", "opera", "operan", "trabaja", "trabaj
                   "ayuda", "ayudan", "permite", "permiten", "sirve", "sirven",
                   "contribuye", "contribuyen"]
 VERBOS_UBICACION = ["esta", "esta", "estan", "está", "están", "queda", "quedan",
-                     "se encuentra", "se encuentran", "se ubica", "se ubican"]
+                     "se encuentra", "se encuentran", "se ubica", "se ubican",
+                     "vive", "viven"]
 
 # Todos los verbos combinados para patrones
 SER_PATTERN = "|".join(VERBOS_SER)

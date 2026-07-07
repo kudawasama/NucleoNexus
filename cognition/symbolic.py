@@ -899,6 +899,9 @@ class SymbolicEngine:
                 "Cuentame más para poder darte una mejor respuesta."
             )
 
+        # --- Sin nada en memoria ---
+        return self._respond_empty()
+
     def _extract_list_items(self, facts: list, query: str) -> list[str]:
         """Extrae items de lista de una coleccion de hechos.
 

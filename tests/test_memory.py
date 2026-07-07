@@ -224,30 +224,23 @@ class TestMemoryAndSynonyms(unittest.TestCase):
 
     def test_ivf_index_search_accuracy(self):
         """Verifica que el índice IVF se construye correctamente y filtra candidatos de forma precisa."""
-        import math
+        import math, random
+        random.seed(42)
         # 1. Crear conjunto de datos de prueba diversos
         items = []
         for i in range(120):
-            # Generar vectores sintéticos (dimensión 256)
-            # Para astronomía
+            # Generar vectores sintéticos con ruido para crear clusters reales
             if i < 40:
-                vec = [0.1] * 256
-                # Normalizar
-                norm = 0.1 * math.sqrt(256)
-                vec = [v/norm for v in vec]
-                items.append((i, vec))
-            # Para programación
+                base = 0.1
             elif i < 80:
-                vec = [0.5] * 256
-                norm = 0.5 * math.sqrt(256)
-                vec = [v/norm for v in vec]
-                items.append((i, vec))
-            # Para historia
+                base = 0.5
             else:
-                vec = [0.9] * 256
-                norm = 0.9 * math.sqrt(256)
-                vec = [v/norm for v in vec]
-                items.append((i, vec))
+                base = 0.9
+            noise = [random.uniform(-0.05, 0.05) for _ in range(256)]
+            vec = [max(0.01, base + n) for n in noise]
+            norm = math.sqrt(sum(v*v for v in vec))
+            vec = [v/norm for v in vec]
+            items.append((i, vec))
 
         from memory.semantic import IVFIndex
         # 2. Construir índice con 5 centroides
@@ -259,8 +252,9 @@ class TestMemoryAndSynonyms(unittest.TestCase):
         self.assertGreater(len(index.buckets), 0)
 
         # 3. Buscar usando un vector similar al grupo de astronomía
-        query_vec = [0.12] * 256
-        norm = 0.12 * math.sqrt(256)
+        noise = [random.uniform(-0.05, 0.05) for _ in range(256)]
+        query_vec = [max(0.01, 0.12 + n) for n in noise]
+        norm = math.sqrt(sum(v*v for v in query_vec))
         query_vec = [v/norm for v in query_vec]
 
         candidates = index.search(query_vec, n_probes=2)

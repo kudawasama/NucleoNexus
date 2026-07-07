@@ -105,6 +105,8 @@ class TestRoutingAndIntents(unittest.TestCase):
 
     def test_hola_dime_impuestos_usa_slm(self):
         """'Hola, dime como puedo realizar ajuste de impuestos' -> SLM (no saludo)."""
+        if not getattr(self.nexus.slm, 'loaded', False):
+            self.skipTest("SLM no disponible")
         r, m = self.nexus.process("Hola, dime como puedo realizar un ajuste de impuestos en un monto bruto de 100000")
         self.assertEqual(m["backend"], "slm", f"debio ir al SLM, backend={m['backend']}")
         self.assertNotIn("Hola. Soy Nexus", r, f"respuesta generica, no personalizada: {r[:80]}")

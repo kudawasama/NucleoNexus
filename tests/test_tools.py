@@ -66,7 +66,7 @@ class TestSystemTools(unittest.TestCase):
         }
 
         try:
-            r, m = self.nexus.process("ejecuta mi herramienta de test")
+            r, m = self.nexus.process("activa mi herramienta de test")
             self.assertEqual(m.get("tool_called"), "mi_herramienta_custom")
             self.assertIn("secreto123", r)
         finally:

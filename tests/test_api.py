@@ -5,9 +5,20 @@ Verifica el funcionamiento de los endpoints de la API y sus restricciones de seg
 """
 
 import unittest
-from fastapi.testclient import TestClient
-from interface.api_server import app, get_nexus
+import sys
+
+try:
+    from fastapi.testclient import TestClient
+    from interface.api_server import app, get_nexus
+    HAS_FASTAPI = True
+except ImportError:
+    HAS_FASTAPI = False
+
 from main import NexusCore
+
+
+@unittest.skipIf(not HAS_FASTAPI, "fastapi no instalado")
+class TestAPIServer(unittest.TestCase):
 
 
 class TestAPIServer(unittest.TestCase):

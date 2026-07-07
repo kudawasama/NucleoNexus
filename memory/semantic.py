@@ -429,12 +429,6 @@ class SemanticMemory:
         Devuelve un diccionario con el hecho contradictorio y su confianza si se detecta alguno,
         o None si no hay contradicciones.
         """
-        try:
-            # Buscar hechos con similitud semántica en la BD usando la búsqueda híbrida actual
-            existing = self.query_knowledge(fact, top_k=5)
-        except Exception:
-            return None
-
         # Normalizar y tokenizar el nuevo hecho
         w1 = set(fact.lower().replace(".", "").replace(",", "").split())
         stop_words = {
@@ -442,6 +436,34 @@ class SemanticMemory:
             'es', 'son', 'esta', 'este', 'se', 'lo', 'le', 'sus'
         }
         sig1 = w1 - stop_words
+
+        existing = []
+
+        try:
+            # Primero intentar con query_knowledge (búsqueda semántica/híbrida)
+            existing = self.query_knowledge(fact, top_k=5) or []
+        except Exception:
+            pass
+
+        # Fallback: si no hay resultados, buscar directamente por palabras significativas
+        if not existing and sig1:
+            try:
+                with self.lock:
+                    cur = self.conn.cursor()
+                    for word in list(sig1)[:3]:
+                        cur.execute(
+                            "SELECT id, fact, confidence FROM semantic "
+                            "WHERE fact LIKE ? AND confidence > 0.8 LIMIT 3",
+                            (f"%{word}%",)
+                        )
+                        for row in cur.fetchall():
+                            existing.append({
+                                "id": row[0],
+                                "text": row[1],
+                                "metadata": {"confidence": row[2]},
+                            })
+            except Exception:
+                pass
 
         for item in existing:
             # Solo verificar contradicciones con hechos que tengan confianza alta (> 0.8)

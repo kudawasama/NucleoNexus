@@ -44,6 +44,13 @@ class Action:
             result = self.handler(**filtered_kwargs)
             elapsed = (time.time() - start) * 1000
             self.success_count += 1
+            if isinstance(result, dict) and "error" in result:
+                return {
+                    "success": False,
+                    "action": self.name,
+                    "error": result["error"],
+                    "elapsed_ms": round(elapsed, 2),
+                }
             return {
                 "success": True,
                 "action": self.name,
