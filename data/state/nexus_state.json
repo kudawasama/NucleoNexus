@@ -4,8 +4,8 @@
     "commit": "c77e7c0",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
-    "total_interactions": 1676,
-    "total_learned_facts": 720,
+    "total_interactions": 1677,
+    "total_learned_facts": 35,
     "total_skills": 15,
     "confidence_level": 1.0,
     "awake_time": 0
@@ -25,15 +25,15 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 11.02,
-    "responses_given": 1676,
-    "successful_responses": 1676,
+    "avg_response_time_ms": 11.01,
+    "responses_given": 1677,
+    "successful_responses": 1677,
     "failed_responses": 0,
-    "last_response_time": 1783459156.1273525
+    "last_response_time": 1783459156.1890519
   },
   "knowledge_stats": {
-    "episodic_memories": 138,
-    "semantic_facts": 720,
+    "episodic_memories": 140,
+    "semantic_facts": 35,
     "procedural_patterns": 0,
     "skills_learned": 15,
     "initial_facts": 711
