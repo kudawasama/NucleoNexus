@@ -43,7 +43,7 @@ class TestFactExtractor(unittest.TestCase):
     def test_extract_learn_persists(self):
         """Aprender un hecho nuevo debe incrementar contador de memoria."""
         before = self.nexus.memory.semantic.count()
-        unique_text = f"el marcador unico {int(time.time())} es un dato especial de prueba"
+        unique_text = f"el marcador unico es un dato especial de prueba {int(time.time())}"
         learn_from_user_input(unique_text, self.nexus.memory)
         after = self.nexus.memory.semantic.count()
         self.assertGreater(after, before, f"no se guardo el hecho: before={before}, after={after}")

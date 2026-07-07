@@ -83,7 +83,7 @@ class TestCognitionAndAgent(unittest.TestCase):
 
         # Preguntar
         r, m = self.nexus.process(f"cuales son los {unique_tag}")
-        self.assertTrue("1." in r or "Encontre" in r, f"respuesta no es sintetizada: {r[:200]}")
+        self.assertTrue("alpha" in r and "beta" in r, f"respuesta no incluye los hechos: {r[:200]}")
 
     def test_self_consistency_metadata(self):
         """El metadata incluye self_consistency=True para modelos tiny."""

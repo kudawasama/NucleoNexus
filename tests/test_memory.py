@@ -113,6 +113,10 @@ class TestMemoryAndSynonyms(unittest.TestCase):
 
     def test_cmd_olvida_borra_hecho(self):
         """/olvida borra un hecho de la memoria."""
+        # Limpiar datos previos
+        cur = self.nexus.memory.semantic.conn.cursor()
+        cur.execute("DELETE FROM semantic WHERE fact LIKE '%test_olvida_xyz%'")
+        self.nexus.memory.semantic.conn.commit()
         # Guardar uno primero
         self.cli._cmd_learn("/aprende test_olvida_xyz dato temporal unico")
         # Ahora borrarlo
@@ -131,9 +135,9 @@ class TestMemoryAndSynonyms(unittest.TestCase):
 
     def test_contradiction_detection_raises_error(self):
         """Si existe una contradicción con un hecho de confianza > 0.8, debe lanzar ContradictionError."""
-        # Limpiar cualquier hecho de prueba previo
+        # Limpiar cualquier hecho de prueba previo (por fact y por categoria)
         cur = self.nexus.memory.semantic.conn.cursor()
-        cur.execute("DELETE FROM semantic WHERE category = 'test_contra'")
+        cur.execute("DELETE FROM semantic WHERE category = 'test_contra' OR fact LIKE '%sol es%' OR fact LIKE '%sol es frio%'")
         self.nexus.memory.semantic.conn.commit()
 
         # Guardar hecho con confianza 1.0 (alta)
@@ -152,7 +156,7 @@ class TestMemoryAndSynonyms(unittest.TestCase):
                     force=False
                 )
         finally:
-            cur.execute("DELETE FROM semantic WHERE category = 'test_contra'")
+            cur.execute("DELETE FROM semantic WHERE category = 'test_contra' OR fact LIKE '%sol es%'")
             self.nexus.memory.semantic.conn.commit()
 
     def test_contradiction_detection_allows_force(self):
