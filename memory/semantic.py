@@ -751,7 +751,7 @@ class SemanticMemory:
             cur = self.conn.cursor()
             cur.execute(
                 "SELECT id, fact, category, confidence, source, created_at, updated_at, access_count "
-                "FROM semantic ORDER BY confidence DESC LIMIT 500"
+                "FROM semantic ORDER BY confidence DESC LIMIT 2000"
             )
             all_rows = cur.fetchall()
 
