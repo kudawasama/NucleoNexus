@@ -363,11 +363,11 @@ class NexusCore:
         self.state.record_interaction(success=True)
         self.state.evolve_phase()
 
-        # 5. Git automático: commit + push en background
+        # 5. Git automático: commit + push en background solo si se aprendieron nuevos hechos
         from utils.git_auto import auto_commit_push
         try:
-            if SYSTEM.get("git_auto_sync", False):
-                auto_commit_push(message=f"auto: interacción #{metadata.get('interactions', '?')}")
+            if SYSTEM.get("git_auto_sync", False) and metadata.get("facts_extracted"):
+                auto_commit_push(message=f"auto: nuevos hechos aprendidos en interacción #{metadata.get('interactions', '?')}")
         except Exception:
             pass  # Git no debe bloquear nunca
 
