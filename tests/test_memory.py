@@ -268,11 +268,48 @@ class TestMemoryAndSynonyms(unittest.TestCase):
         self.assertLess(len(candidates), 120, "El índice IVF no filtró ningún candidato")
         self.assertGreater(len(candidates), 0, "El índice IVF no retornó ningún candidato")
 
-    def test_arch_memory_3_types(self):
-        """Memoria debe tener los 3 tipos: episodica, semantica, procedural."""
         self.assertIsNotNone(self.nexus.memory.episodic)
         self.assertIsNotNone(self.nexus.memory.semantic)
         self.assertIsNotNone(self.nexus.memory.procedural)
+
+    def test_hybrid_rrf_search(self):
+        """Verifica que la búsqueda híbrida unifique resultados usando RRF."""
+        # 1. Limpiar base de datos semántica para pruebas controladas
+        with self.nexus.memory.semantic.lock:
+            cur = self.nexus.memory.semantic.conn.cursor()
+            cur.execute("DELETE FROM semantic")
+            self.nexus.memory.semantic.conn.commit()
+
+        # 2. Insertar hechos de prueba
+        self.nexus.memory.learn_fact("La luna orbita alrededor de la Tierra.", category="test_rrf", confidence=0.8, force=True)
+        self.nexus.memory.learn_fact("La luna es redonda y de queso.", category="test_rrf", confidence=0.8, force=True)
+        self.nexus.memory.learn_fact("El mar tiene peces y pulpos.", category="test_rrf", confidence=0.8, force=True)
+
+        original_get_embedding = None
+        original_is_available = None
+        import memory.embeddings as embed_module
+        original_get_embedding = embed_module.get_embedding
+        original_is_available = embed_module.is_available
+        
+        embed_module.is_available = lambda: True
+        mock_vec = [0.1] * 768
+        embed_module.get_embedding = lambda text: mock_vec
+
+        # Asignar un embedding al Hecho A en la base de datos
+        from memory.embeddings import embed_to_blob
+        with self.nexus.memory.semantic.lock:
+            cur = self.nexus.memory.semantic.conn.cursor()
+            cur.execute("UPDATE semantic SET embedding = ? WHERE fact LIKE 'La luna orbita%'", (embed_to_blob(mock_vec),))
+            self.nexus.memory.semantic.conn.commit()
+
+        try:
+            # 3. Realizar consulta híbrida
+            results = self.nexus.memory.query_knowledge("luna orbita la Tierra", top_k=2)
+            self.assertGreater(len(results), 0)
+            self.assertEqual(results[0]["text"], "La luna orbita alrededor de la Tierra.")
+        finally:
+            embed_module.get_embedding = original_get_embedding
+            embed_module.is_available = original_is_available
 
 if __name__ == "__main__":
     unittest.main()
