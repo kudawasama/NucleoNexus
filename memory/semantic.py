@@ -459,7 +459,8 @@ class SemanticMemory:
                     for word in list(sig1)[:3]:
                         cur.execute(
                             "SELECT id, fact, confidence FROM semantic "
-                            "WHERE fact LIKE ? AND confidence > 0.8 LIMIT 3",
+                            "WHERE fact LIKE ? AND confidence > 0.8 "
+                            "ORDER BY confidence DESC, id DESC LIMIT 10",
                             (f"%{word}%",)
                         )
                         for row in cur.fetchall():

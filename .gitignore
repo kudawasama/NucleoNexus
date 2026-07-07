@@ -26,3 +26,6 @@ Thumbs.db
 
 # Auto-excluido por seguridad de Nexus
 data/nexus_cache.db
+
+# Auto-excluido por seguridad de Nexus
+data/semantic.db
