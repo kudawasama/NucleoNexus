@@ -13,6 +13,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from main import NexusCore
 import config
+from utils.dotenv import get_env
 
 logger = logging.getLogger("nexus.api")
 
@@ -38,7 +39,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     """Valida la cabecera de autenticación Bearer Token."""
     token = credentials.credentials
     # Leer el token esperado de la variable de entorno o un valor por defecto seguro
-    expected_token = os.environ.get("NEXUS_API_TOKEN", "nexus_secret_key_2026")
+    expected_token = get_env("NEXUS_API_TOKEN", "nexus_secret_key_2026")
     if token != expected_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

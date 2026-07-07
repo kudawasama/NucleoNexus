@@ -216,6 +216,11 @@ class SLMBackend:
                 except Exception as e:
                     logger.warning(f"No se pudo leer master env: {e}")
 
+        # Fallback 3: leer del .env del proyecto
+        if not self._api_key:
+            from utils.dotenv import get_env
+            self._api_key = get_env("OPENCODE_GO_API_KEY")
+
         # Inicializar caché semántica
         from config import DATA_DIR
         self.cache = SemanticCache(str(Path(DATA_DIR) / "nexus_cache.db"))
