@@ -19,9 +19,6 @@ from main import NexusCore
 
 @unittest.skipIf(not HAS_FASTAPI, "fastapi no instalado")
 class TestAPIServer(unittest.TestCase):
-
-
-class TestAPIServer(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
