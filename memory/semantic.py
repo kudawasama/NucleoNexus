@@ -754,28 +754,27 @@ class SemanticMemory:
                     "score_tfidf": score_tfidf
                 }
 
-        # 3. Combinación Híbrida de Scores
+        # 3. Combinación Híbrida mediante Fusión de Rango Recíproco (RRF)
+        dense_ranking = [fact for fact, data in sorted(vector_results.items(), key=lambda x: x[1]["score_vec"], reverse=True)]
+        lexical_ranking = [fact for fact, data in sorted(tfidf_results.items(), key=lambda x: x[1]["score_tfidf"], reverse=True)]
+        
+        k_const = 60
+        rrf_scores = {}
+        for rank, fact in enumerate(dense_ranking, 1):
+            rrf_scores[fact] = 1.0 / (k_const + rank)
+            
+        for rank, fact in enumerate(lexical_ranking, 1):
+            rrf_scores[fact] = rrf_scores.get(fact, 0.0) + (1.0 / (k_const + rank))
+
         results = []
         all_facts = set(vector_results.keys()) | set(tfidf_results.keys())
 
         for fact in all_facts:
             v_data = vector_results.get(fact)
             t_data = tfidf_results.get(fact)
-            
-            # Obtener datos comunes
             item_data = v_data or t_data
             
-            # Ponderación del Score Híbrido: 60% Vectorial, 40% TF-IDF
-            score_final = 0.0
-            if v_data and t_data:
-                # Si aparece en ambos, sumamos ponderados (con un boost por coincidencia híbrida)
-                score_final = (0.6 * v_data["score_vec"]) + (0.4 * t_data["score_tfidf"])
-            elif v_data:
-                score_final = 0.6 * v_data["score_vec"]
-            elif t_data:
-                # Si solo está en TF-IDF y usamos vectores, penalizamos ligeramente la ausencia semántica
-                weight = 0.4 if use_vectors else 1.0
-                score_final = weight * t_data["score_tfidf"]
+            score_final = rrf_scores.get(fact, 0.0)
                 
             results.append({
                 "doc_id": f"sem_{item_data['id']}",
