@@ -100,7 +100,8 @@ class NexusCore:
         import threading
         from utils.git_auto import auto_pull
         try:
-            threading.Thread(target=auto_pull, daemon=True).start()
+            if SYSTEM.get("git_auto_sync", False):
+                threading.Thread(target=auto_pull, daemon=True).start()
         except Exception:
             pass
 
@@ -365,7 +366,8 @@ class NexusCore:
         # 5. Git automático: commit + push en background
         from utils.git_auto import auto_commit_push
         try:
-            auto_commit_push(message=f"auto: interacción #{metadata.get('interactions', '?')}")
+            if SYSTEM.get("git_auto_sync", False):
+                auto_commit_push(message=f"auto: interacción #{metadata.get('interactions', '?')}")
         except Exception:
             pass  # Git no debe bloquear nunca
 

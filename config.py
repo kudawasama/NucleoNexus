@@ -105,4 +105,5 @@ SYSTEM = {
     "author": "Jose Cespedes",
     "description": "Sistema de IA ultraligero con aprendizaje incremental",
     "repository": "https://github.com/kudawasama/NucleoNexus",
+    "git_auto_sync": False,
 }
