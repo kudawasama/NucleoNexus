@@ -37,13 +37,13 @@ class TestFactExtractor(unittest.TestCase):
         self.assertGreater(len(facts), 0, f"no extrajo 'significa': {facts}")
 
     def test_extract_x_vive_en_y(self):
-        facts = extract_facts_from_text("Messi vive en Miami")
-        self.assertTrue(any("messi" in f and "miami" in f for f in facts), f"no extrajo 'vive en': {facts}")
+        facts = extract_facts_from_text("un futbolista vive en Miami")
+        self.assertTrue(any("futbolista" in f and "miami" in f for f in facts), f"no extrajo 'vive en': {facts}")
 
     def test_extract_learn_persists(self):
         """Aprender un hecho nuevo debe incrementar contador de memoria."""
         before = self.nexus.memory.semantic.count()
-        unique_text = f"el termino marcador unico {int(time.time())} es especial para prueba"
+        unique_text = f"el marcador unico {int(time.time())} es un dato especial de prueba"
         learn_from_user_input(unique_text, self.nexus.memory)
         after = self.nexus.memory.semantic.count()
         self.assertGreater(after, before, f"no se guardo el hecho: before={before}, after={after}")

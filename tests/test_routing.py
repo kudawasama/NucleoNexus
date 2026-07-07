@@ -65,6 +65,8 @@ class TestRoutingAndIntents(unittest.TestCase):
 
     def test_intent_pokemon_que_es(self):
         """'pokemon champion que es' debe detectarse como definicion (regresion)."""
+        if not getattr(self.nexus.slm, 'loaded', False):
+            self.skipTest("SLM no disponible")
         r, m = self.nexus.process("pokemon champion que es")
         self.assertNotIn("Esto me recuerda", r, f"debio ir al SLM, no a memoria: {r[:80]}")
 

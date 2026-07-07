@@ -131,9 +131,9 @@ class TestMemoryAndSynonyms(unittest.TestCase):
 
     def test_contradiction_detection_raises_error(self):
         """Si existe una contradicción con un hecho de confianza > 0.8, debe lanzar ContradictionError."""
-        # Limpiar
+        # Limpiar cualquier hecho de prueba previo
         cur = self.nexus.memory.semantic.conn.cursor()
-        cur.execute("DELETE FROM semantic WHERE fact LIKE '%sol es%'")
+        cur.execute("DELETE FROM semantic WHERE category = 'test_contra'")
         self.nexus.memory.semantic.conn.commit()
 
         # Guardar hecho con confianza 1.0 (alta)
@@ -142,14 +142,18 @@ class TestMemoryAndSynonyms(unittest.TestCase):
             category="test_contra", confidence=1.0, source="test_contra"
         )
 
-        # Intentar aprender un hecho contradictorio (antónimo: frío) con force=False
-        from memory.semantic import ContradictionError
-        with self.assertRaises(ContradictionError):
-            self.nexus.memory.learn_fact(
-                "el sol es frio y oscuro",
-                category="test_contra", confidence=0.5, source="test_contra",
-                force=False
-            )
+        try:
+            # Intentar aprender un hecho contradictorio (antónimo: frío) con force=False
+            from memory.semantic import ContradictionError
+            with self.assertRaises(ContradictionError):
+                self.nexus.memory.learn_fact(
+                    "el sol es frio y oscuro",
+                    category="test_contra", confidence=0.5, source="test_contra",
+                    force=False
+                )
+        finally:
+            cur.execute("DELETE FROM semantic WHERE category = 'test_contra'")
+            self.nexus.memory.semantic.conn.commit()
 
     def test_contradiction_detection_allows_force(self):
         """Si force=True, debe permitir guardar el hecho contradictorio."""

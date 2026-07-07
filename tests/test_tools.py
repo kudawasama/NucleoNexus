@@ -57,8 +57,12 @@ class TestSystemTools(unittest.TestCase):
 
         original_generate = self.nexus.slm.generate
         original_model = self.nexus.slm.model_name
+        original_loaded = self.nexus.slm.loaded
+        original_backend = self.nexus.state.get("capabilities", "backend")
         
-        # Simular respuesta del SLM en modo estructurado llamando a la herramienta registrada
+        # Simular SLM cargado para que el flujo llegue al modo hibrido
+        self.nexus.slm.loaded = True
+        self.nexus.state.set("capabilities", "backend", value="hybrid")
         self.nexus.slm.model_name = "qwen2.5:0.5b"  # Forzar modo estructurado
         self.nexus.slm.generate = lambda *a, **k: {
             "response": '{"accion": "mi_herramienta_custom", "valor": "secreto123"}',
@@ -72,6 +76,8 @@ class TestSystemTools(unittest.TestCase):
         finally:
             self.nexus.slm.generate = original_generate
             self.nexus.slm.model_name = original_model
+            self.nexus.slm.loaded = original_loaded
+            self.nexus.state.set("capabilities", "backend", value=original_backend)
 
     def test_tool_security_allowlist(self):
         """Verifica que las herramientas bloqueen accesos y comandos fuera de PROJECT_ROOT."""

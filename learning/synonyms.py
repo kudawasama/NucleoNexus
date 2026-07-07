@@ -32,8 +32,9 @@ SYNONYMS = {
 
     # Profesiones
     "médico": ["doctor", "doctora", "médico", "médica", "facultativo", "facultativa"],
-    "doctor": ["médico", "doctor", "doctora"],
-    "doctora": ["médico", "doctor", "doctora"],
+    "medico": ["doctor", "doctora", "médico", "médica", "facultativo", "facultativa", "medico"],
+    "doctor": ["médico", "medico", "doctor", "doctora"],
+    "doctora": ["médico", "medico", "doctor", "doctora"],
     "abogado": ["licenciado", "abogado", "letrado"],
 
     # Comida
