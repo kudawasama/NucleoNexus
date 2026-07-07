@@ -115,5 +115,40 @@ class TestSystemTools(unittest.TestCase):
             if "error" in res_good:
                 self.assertNotIn("no permitido en modo API", res_good["error"])
 
+    def test_git_security_auto_exclusion(self):
+        """Verifica que el sistema de git automático bloquee y auto-excluya archivos sensibles."""
+        import os
+        from utils.git_auto import auto_commit_push
+        
+        # 1. Crear un archivo temporal sensible
+        secret_file = "test_credentials.env"
+        with open(secret_file, "w", encoding="utf-8") as f:
+            f.write("API_KEY=secreto123\n")
+            
+        # Leer el contenido original de .gitignore
+        gitignore_path = ".gitignore"
+        original_gitignore = ""
+        if os.path.exists(gitignore_path):
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                original_gitignore = f.read()
+
+        try:
+            # 2. Ejecutar auto_commit_push, debería bloquearse
+            success = auto_commit_push("test commit")
+            self.assertFalse(success, "auto_commit_push debió bloquearse ante el archivo sensible")
+            
+            # 3. Verificar que se haya añadido al .gitignore
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                current_gitignore = f.read()
+            self.assertIn(secret_file, current_gitignore, "El archivo sensible no fue añadido a .gitignore")
+            
+        finally:
+            # Limpiar el archivo sensible
+            if os.path.exists(secret_file):
+                os.remove(secret_file)
+            # Restaurar .gitignore
+            with open(gitignore_path, "w", encoding="utf-8") as f:
+                f.write(original_gitignore)
+
 if __name__ == "__main__":
     unittest.main()
