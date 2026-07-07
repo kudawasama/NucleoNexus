@@ -41,7 +41,7 @@ def load_knowledge_to_memory(memory, knowledge_dir: str) -> int:
                 # Los hechos se pueden embeber despues bajo demanda.
                 memory.learn_fact(
                     fact, category=category, confidence=0.5, source=source,
-                    with_embedding=False
+                    with_embedding=False, force=True
                 )
                 loaded += 1
             logger.info(f"Cargados {len(facts)} hechos desde {json_file.name}")

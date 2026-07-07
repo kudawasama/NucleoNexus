@@ -96,10 +96,11 @@ class NexusCore:
     def __init__(self):
         logger.info(f"{SYSTEM['name']} v{SYSTEM['version']} inicializando...")
 
-        # 0. Git pull inicial: sincronizar con remoto
+        # 0. Git pull inicial en segundo plano para evitar bloqueos de red
+        import threading
         from utils.git_auto import auto_pull
         try:
-            auto_pull()
+            threading.Thread(target=auto_pull, daemon=True).start()
         except Exception:
             pass
 
