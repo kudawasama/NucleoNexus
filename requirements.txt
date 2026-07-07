@@ -12,3 +12,8 @@
 # numpy             # Computacion numerica para vectores
 # sentence-transformers  # Embeddings semanticos (modelos mini)
 # llama-cpp-python  # Inference local con modelos GGUF
+
+# API Web
+fastapi
+uvicorn
+pydantic
