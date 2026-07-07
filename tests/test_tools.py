@@ -73,5 +73,47 @@ class TestSystemTools(unittest.TestCase):
             self.nexus.slm.generate = original_generate
             self.nexus.slm.model_name = original_model
 
+    def test_tool_security_allowlist(self):
+        """Verifica que las herramientas bloqueen accesos y comandos fuera de PROJECT_ROOT."""
+        # 1. Probar lectura/escritura/búsqueda fuera del proyecto
+        res_read = self.nexus.actions.execute("read_file", path="../../../../etc/passwd")
+        self.assertIn("error", res_read)
+        self.assertIn("fuera del proyecto", res_read["error"])
+        
+        res_write = self.nexus.actions.execute("write_file", path="../../../../hacked.txt", content="malicious")
+        self.assertIn("error", res_write)
+        self.assertIn("fuera del proyecto", res_write["error"])
+
+        res_search = self.nexus.actions.execute("search_files", pattern="confidencial", path="../../../../")
+        self.assertIn("error", res_search)
+        self.assertIn("fuera del proyecto", res_search["error"])
+
+        # 2. Probar comandos con retroceso de directorios bloqueados
+        res_cmd = self.nexus.actions.execute("run_command", command="cd ../../ && ls")
+        self.assertIn("error", res_cmd)
+        self.assertIn("bloqueado", res_cmd["error"])
+
+    def test_api_mode_command_blocking(self):
+        """Verifica que en modo API se bloqueen los comandos no autorizados."""
+        import config
+        from unittest.mock import patch
+
+        # Modificar configuración temporalmente
+        test_api_config = config.INTERFACE["api"].copy()
+        test_api_config["enabled"] = True
+        test_api_config["allowed_commands"] = ["git status", "dir"]
+
+        with patch.dict(config.INTERFACE["api"], test_api_config):
+            # 1. Comando no permitido en modo API
+            res_bad = self.nexus.actions.execute("run_command", command="python malicious.py")
+            self.assertIn("error", res_bad)
+            self.assertIn("no permitido en modo API", res_bad["error"])
+
+            # 2. Comando permitido en modo API
+            res_good = self.nexus.actions.execute("run_command", command="git status")
+            # Debería pasar la validación y ejecutarse (o dar error de ejecución, pero NO error de bloqueo API)
+            if "error" in res_good:
+                self.assertNotIn("no permitido en modo API", res_good["error"])
+
 if __name__ == "__main__":
     unittest.main()

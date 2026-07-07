@@ -22,6 +22,39 @@ logger = logging.getLogger("nexus.skills.tools")
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
 
+def is_safe_path(path_str: str) -> bool:
+    """Verifica si la ruta especificada está dentro de PROJECT_ROOT."""
+    try:
+        target = Path(path_str)
+        if not target.is_absolute():
+            target = PROJECT_ROOT / target
+        target = target.resolve()
+        return str(target).startswith(str(PROJECT_ROOT))
+    except Exception:
+        return False
+
+
+def is_safe_command(command: str) -> bool:
+    """Verifica si un comando es seguro (no intenta salir de PROJECT_ROOT)."""
+    # 1. Bloquear retroceso de directorios (..)
+    if ".." in command:
+        return False
+        
+    # 2. Buscar posibles rutas absolutas en el comando
+    # Ej: C:\Windows, /etc/passwd, C:/Users/somebody (que no sea PROJECT_ROOT)
+    import re as _re
+    abs_paths = _re.findall(r'(?:[a-zA-Z]:[\\/][^ \t\r\n\f\v"]+|/[a-zA-Z0-9_\-\.]+/[a-zA-Z0-9_\-\.\/]+)', command)
+    for path in abs_paths:
+        try:
+            resolved = Path(path).resolve()
+            if not str(resolved).startswith(str(PROJECT_ROOT)):
+                return False
+        except Exception:
+            return False
+            
+    return True
+
+
 # ======================================================================
 #  FUNCIONES AUXILIARES (module-level, usadas por las closures)
 # ======================================================================
@@ -425,7 +458,12 @@ def register() -> Skill:
         if not pattern:
             return {"error": "Especifica el texto a buscar"}
         try:
-            search_path = (PROJECT_ROOT / path).resolve()
+            search_path = Path(path)
+            if not search_path.is_absolute():
+                search_path = PROJECT_ROOT / search_path
+            search_path = search_path.resolve()
+            if not str(search_path).startswith(str(PROJECT_ROOT)):
+                return {"error": f"No puedo buscar archivos fuera del proyecto: {search_path}"}
             results, scanned = [], 0
             for fpath in sorted(search_path.rglob(file_pattern)):
                 if not fpath.is_file():
@@ -460,6 +498,22 @@ def register() -> Skill:
     def _run_command(command: str = "", timeout: int = 15):
         if not command:
             return {"error": "Especifica el comando a ejecutar"}
+        if not is_safe_command(command):
+            return {"error": f"Comando bloqueado por motivos de seguridad: {command}"}
+            
+        # Comprobar restricciones en modo API (F6.2)
+        try:
+            from config import INTERFACE
+            api_enabled = INTERFACE.get("api", {}).get("enabled", False)
+            allowed_cmds = INTERFACE.get("api", {}).get("allowed_commands", [])
+        except Exception:
+            api_enabled = False
+            allowed_cmds = []
+
+        if api_enabled:
+            cmd_clean = command.strip()
+            if not any(cmd_clean.startswith(allowed) for allowed in allowed_cmds):
+                return {"error": f"Comando no permitido en modo API: {command}"}
         try:
             # Usar encoding latin-1 para evitar UnicodeDecodeError con
             # salida de comandos Windows (ej: 'dir' en cp850/cp1252)

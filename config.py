@@ -84,6 +84,8 @@ INTERFACE = {
         "colors": True,
     },
     "api": {
+        "enabled": False,
+        "allowed_commands": ["git status", "dir"],
         "host": "127.0.0.1",
         "port": 8712,
         "workers": 1,
