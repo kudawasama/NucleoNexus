@@ -789,7 +789,40 @@ class SemanticMemory:
                 "score": round(score_final, 4),
             })
 
+        # Ordenar primero por RRF para obtener los candidatos principales
         results.sort(key=lambda x: x['score'], reverse=True)
+        candidates = results[:top_k * 3]
+        
+        # Re-ranking sintáctico fino
+        reranked_results = []
+        for cand in candidates:
+            score = cand["score"]
+            text_lower = _norm(cand["text"].lower())
+            
+            # 1. Overlap de términos significativos
+            terms_matched = sum(1.0 for term in terms if term in text_lower)
+            overlap_boost = (terms_matched / len(terms)) * 0.15 if terms else 0.0
+            
+            # 2. Boost de Categoría (si se menciona en la consulta)
+            cat_boost = 0.0
+            cat_name = cand["metadata"].get("category", "")
+            if cat_name and cat_name.lower() in query.lower():
+                cat_boost = 0.1
+                
+            # 3. Boost de Fuente (priorizar system y user)
+            src_boost = 0.0
+            src_name = cand["metadata"].get("source", "")
+            if src_name == "system":
+                src_boost = 0.1
+            elif src_name == "user":
+                src_boost = 0.05
+                
+            final_score = score + overlap_boost + cat_boost + src_boost
+            cand["score"] = round(final_score, 4)
+            reranked_results.append(cand)
+            
+        reranked_results.sort(key=lambda x: x['score'], reverse=True)
+        results = reranked_results
 
         # Incrementar accesos para los retornados finales
         if results:

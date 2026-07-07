@@ -311,5 +311,30 @@ class TestMemoryAndSynonyms(unittest.TestCase):
             embed_module.get_embedding = original_get_embedding
             embed_module.is_available = original_is_available
 
+    def test_syntactic_reranking(self):
+        """Verifica que el re-ranking sintáctico priorice hechos por categoría y fuente."""
+        with self.nexus.memory.semantic.lock:
+            cur = self.nexus.memory.semantic.conn.cursor()
+            cur.execute("DELETE FROM semantic")
+            self.nexus.memory.semantic.conn.commit()
+
+        # Insertar hechos con la misma confianza y coincidencia léxica básica, pero distinta categoría/fuente
+        self.nexus.memory.learn_fact("La fotosíntesis produce oxígeno.", category="general", source="api", force=True)
+        self.nexus.memory.learn_fact("Las plantas verdes realizan fotosíntesis.", category="biologia", source="system", force=True)
+
+        original_is_available = None
+        import memory.embeddings as embed_module
+        original_is_available = embed_module.is_available
+        embed_module.is_available = lambda: False
+
+        try:
+            # Consultar mencionando la palabra "biologia" en la consulta
+            results = self.nexus.memory.query_knowledge("fotosíntesis en biologia", top_k=2)
+            self.assertEqual(len(results), 2)
+            # El Hecho B debe quedar primero debido a los boosts de categoría y fuente
+            self.assertEqual(results[0]["text"], "Las plantas verdes realizan fotosíntesis.")
+        finally:
+            embed_module.is_available = original_is_available
+
 if __name__ == "__main__":
     unittest.main()
