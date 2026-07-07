@@ -5,7 +5,7 @@
     "phase": "Pro",
     "active_since": 1781626531.0590978,
     "total_interactions": 724,
-    "total_learned_facts": 831,
+    "total_learned_facts": 829,
     "total_skills": 15,
     "confidence_level": 0.824,
     "awake_time": 0
@@ -29,11 +29,11 @@
     "responses_given": 724,
     "successful_responses": 724,
     "failed_responses": 0,
-    "last_response_time": 1783434771.2060964
+    "last_response_time": 1783434804.5403838
   },
   "knowledge_stats": {
-    "episodic_memories": 1598,
-    "semantic_facts": 831,
+    "episodic_memories": 1600,
+    "semantic_facts": 829,
     "procedural_patterns": 0,
     "skills_learned": 15,
     "initial_facts": 710
