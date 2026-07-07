@@ -4,10 +4,10 @@
     "commit": "3bc0886",
     "phase": "Pro",
     "active_since": 1781626531.0590978,
-    "total_interactions": 857,
-    "total_learned_facts": 708,
+    "total_interactions": 858,
+    "total_learned_facts": 709,
     "total_skills": 15,
-    "confidence_level": 0.957,
+    "confidence_level": 0.958,
     "awake_time": 0
   },
   "personality": {
@@ -25,15 +25,15 @@
     "learning_enabled": true
   },
   "performance": {
-    "avg_response_time_ms": 21.83,
-    "responses_given": 857,
-    "successful_responses": 857,
+    "avg_response_time_ms": 21.8,
+    "responses_given": 858,
+    "successful_responses": 858,
     "failed_responses": 0,
-    "last_response_time": 1783457843.9418652
+    "last_response_time": 1783457858.009372
   },
   "knowledge_stats": {
-    "episodic_memories": 126,
-    "semantic_facts": 708,
+    "episodic_memories": 134,
+    "semantic_facts": 709,
     "procedural_patterns": 0,
     "skills_learned": 15,
     "initial_facts": 710
