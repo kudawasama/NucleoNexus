@@ -1593,7 +1593,7 @@ class NexusCLI:
         deleted = 0
         for fact in facts:
             fact_text = fact.get("text", "") or fact.get("fact", "")
-            fact_id = fact.get("id")
+            fact_id = fact.get("id_int") or fact.get("id")
             if not fact_id:
                 continue
             if text.lower() in fact_text.lower() or fact_text.lower() in text.lower():
