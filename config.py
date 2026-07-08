@@ -42,7 +42,7 @@ ENGINE = {
         "model_name": "hermes3:3b",  # 🏆 Mejor modelo local (131K ctx, agent-optimized)
         "api_base": "http://localhost:11434/v1",  # Ollama local
         "api_key": "not-needed", # Ollama no requiere API key
-        "max_tokens": 4096,
+        "max_tokens": 512,
         "temperature": 0.7,
     }
 }
