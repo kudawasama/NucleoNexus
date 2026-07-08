@@ -7,18 +7,18 @@
 ## A) Renombrador Inteligente de PDFs (`tools/pdf_renamer.py`)
 
 > *"Lee facturas PDF, extrae proveedor y fecha del contenido, y renombra los archivos con el formato:*
-> **{numero} - {PROVEEDOR_CORTO} - {MES AÑO}.pdf***
+> **N°{numero}_{PROVEEDOR_CORTO}_{MES}_{AÑO}.pdf***
 > *Incluye detección automática de conflictos: si dos proveedores comparten la misma marca (ej: ENEL Distribución / ENEL Generación), los diferencia incluyendo la palabra de giro."*
 
 ### Formato de renombrado
 
 ```
-{numero} - {PROVEEDOR_CORTO} - {MES AÑO}.pdf
+N°{numero}_{PROVEEDOR_CORTO}_{MES}_{AÑO}.pdf
 ```
 
 **Ejemplo:**
 ```
-12345 - ENELDISTRI - JUNIO 2026.pdf
+N°12345_ENELDISTRI_JUNIO_2026.pdf
 ```
 
 ### Uso
@@ -42,7 +42,7 @@ python tools/pdf_renamer.py "C:/ruta/carpeta" --dry-run
    b. Extraer: número de factura, RUT proveedor, razón social, fecha
    c. Derivar nombre corto del proveedor (ver regla abajo)
    d. Formatear fecha como "MES AÑO" (ej: "JUNIO 2026")
-   e. Construir nuevo nombre: `{numero} - {PROVEEDOR_CORTO} - {MES AÑO}.pdf`
+   e. Construir nuevo nombre: `N°{numero}_{PROVEEDOR_CORTO}_{MES}_{AÑO}.pdf`
 3. Detectar conflictos: si dos archivos quedarían con el mismo nombre, agrega sufijo numérico (`_1`, `_2`)
 4. Renombrar (con `--dry-run` solo muestra el cambio propuesto)
 
